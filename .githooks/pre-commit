@@ -14,6 +14,23 @@ staged="$(git diff --cached --name-only --diff-filter=ACM)"
 
 fail=0
 
+# 0. Block commits directly on `main`.
+# Pairs with CLAUDE.md § "Branch and PR standards": chat-driven edits go on
+# chat/<slug>, feat work on feat/<slug>, auto-fix on auto/<slug>. Prevents
+# drift accumulation that breaks intently-track worktrees branching off
+# origin/main.
+current_branch="$(git symbolic-ref --short HEAD 2>/dev/null || echo '')"
+if [ "$current_branch" = "main" ]; then
+  echo "pre-commit: refusing to commit directly on main." >&2
+  echo "  Create a branch first:" >&2
+  echo "    git switch -c chat/<slug>      (conversation-driven edits)" >&2
+  echo "    git switch -c feat/<slug>      (feature work)" >&2
+  echo "    git switch -c fix/<slug>       (targeted fixes)" >&2
+  echo "    git switch -c auto/<slug>      (auto-fix routines)" >&2
+  echo "  See CLAUDE.md § 'Branch and PR standards' for why." >&2
+  fail=1
+fi
+
 # 1. Block .env files outright (allow .env.example).
 env_hits="$(printf '%s\n' "$staged" | grep -E '(^|/)\.env($|\.)' | grep -v '\.env\.example$' || true)"
 if [ -n "$env_hits" ]; then
@@ -96,6 +113,17 @@ if printf '%s\n' "$staged" | grep -qE '^app/package(-lock)?\.json$'; then
   else
     echo "pre-commit: npm not found; skipping audit check." >&2
   fi
+fi
+
+# 6. Doc-map reminder (non-blocking).
+# When an upstream doc with known downstream consumers is touched, remind
+# the committer to check docs/architecture/doc-map.md. Non-blocking — just
+# a nudge. CI (.github/workflows/doc-map-check.yml) surfaces the same on PRs.
+doc_hits="$(printf '%s\n' "$staged" | grep -E '^(docs/product/requirements/life-ops-plugin-spec\.md|docs/design/app-experience\.md|docs/architecture/data-model\.md|docs/architecture/agent-memory\.md)$' || true)"
+if [ -n "$doc_hits" ]; then
+  echo "pre-commit: heads-up — these upstream docs have downstream consumers:" >&2
+  printf '  %s\n' $doc_hits >&2
+  echo "  Check docs/architecture/doc-map.md for downstream docs that may need alignment." >&2
 fi
 
 if [ "$fail" -ne 0 ]; then

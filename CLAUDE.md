@@ -51,6 +51,8 @@ Full process: `docs/process/acceptance-criteria.md`. Short form:
 
 See `CONTRIBUTING.md`. PR-Readiness loop verifies diff readiness on demand.
 
+**Chat-driven edits — branch first.** Any conversation ask that touches a tracked file requires creating a `chat/<slug>` branch BEFORE writing. Never accumulate uncommitted changes on `main` — they won't propagate to `intently-track` worktrees and drift compounds. Pre-commit hook enforces at git level; this rule exists so Claude routes correctly first time.
+
 ## Test scope ceiling (hackathon)
 
 - **Unit:** agent memory schema + deterministic business logic.
