@@ -5,7 +5,7 @@ name: auto-merge-safe
 #   Mechanical paths (routine-output / TRACKER.md / session-handoff.md)
 #     → auto-merge once security.yml passes. No human review.
 #   Docs/config paths (docs/**, CLAUDE.md, .gitignore, etc.)
-#     → flip ready-for-review, label, comment. Muxin reads these.
+#     → flip ready-for-review, label, comment. User reads these.
 #   Code paths (agents/**, app/**, supabase/**, tests/**, evals/**, scripts/**)
 #     → auto-merge once security.yml AND ci.yml both pass. Gated on tests green.
 #
@@ -13,7 +13,7 @@ name: auto-merge-safe
 # triggers the decision. Idempotent — if both have already passed when the
 # later one finishes, we merge; if one later fails, we no-op.
 #
-# Escape hatch: any PR with label `needs-muxin-review` is skipped entirely.
+# Escape hatch: any PR with label `needs-user-review` is skipped entirely.
 # Add that label from the babysit-prs loop when semantic judgment is required.
 
 on:
@@ -73,10 +73,10 @@ jobs:
         run: |
           set -euo pipefail
           HAS_LABEL=$(gh pr view "$PR" --repo "$REPO" --json labels \
-            --jq '[.labels[].name] | any(. == "needs-muxin-review")')
+            --jq '[.labels[].name] | any(. == "needs-user-review")')
           echo "needs_review=$HAS_LABEL" >> "$GITHUB_OUTPUT"
           if [ "$HAS_LABEL" = "true" ]; then
-            echo "PR $PR has needs-muxin-review label; skipping."
+            echo "PR $PR has needs-user-review label; skipping."
           fi
 
       - name: Check workflow statuses on head SHA
@@ -182,9 +182,9 @@ jobs:
         run: |
           set -euo pipefail
           gh pr ready "$PR" --repo "$REPO" || true
-          gh pr edit "$PR" --repo "$REPO" --add-label needs-muxin-review || true
+          gh pr edit "$PR" --repo "$REPO" --add-label needs-user-review || true
           gh pr comment "$PR" --repo "$REPO" --body \
-            "Auto-classified: docs/config only. security.yml passed. Marked ready for review (you read these)."
+            "Auto-classified: docs/config only. security.yml passed. Marked ready for review."
 
       - name: Comment on code PR when CI failed
         if: >

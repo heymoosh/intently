@@ -25,7 +25,8 @@
 
 set -euo pipefail
 
-REPO_ROOT="/Users/Muxin/Documents/GitHub/intently"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 WORKTREE_BASE="$HOME/worktrees/intently"
 
 # Color helpers — only if stdout is a tty.

@@ -3,7 +3,7 @@ name: Babysit PRs
 type: loop
 invocation: /loop 15m <paste prompt at bottom of this file>
 priority: P1
-owner: muxin
+owner: user
 model: Opus 4.7
 effort: high
 ---
@@ -12,22 +12,22 @@ effort: high
 
 ## Purpose
 
-Close the gap between what `auto-merge-safe.yml` can do deterministically and what requires model judgment. The workflow handles 90% of PR lifecycle (classify, merge-on-green). This loop handles the other 10%: merge conflicts, stalled PRs, rebase chains, and flagging PRs that genuinely need Muxin's eyes.
+Close the gap between what `auto-merge-safe.yml` can do deterministically and what requires model judgment. The workflow handles 90% of PR lifecycle (classify, merge-on-green). This loop handles the other 10%: merge conflicts, stalled PRs, rebase chains, and flagging PRs that genuinely need the user's eyes.
 
 ## What auto-merge-safe.yml already does (don't duplicate)
 
 - Classifies each `auto/*` and `feat/track-*` PR by changed files.
 - Mechanical path → merge on `security.yml` green.
-- Docs/config path → flip ready + add `needs-muxin-review` label.
+- Docs/config path → flip ready + add `needs-user-review` label.
 - Code path → merge on `security.yml` AND `ci.yml` both green.
-- Respects `needs-muxin-review` label as an escape hatch.
+- Respects `needs-user-review` label as an escape hatch.
 
 **If a PR is moving through that pipeline normally, do nothing.** The loop is for the stuck cases.
 
 ## What this loop handles
 
 1. **Merge conflicts on stacked track branches.** When branch A merges to main, branch B (stacked on A) now conflicts with origin/main. The loop rebases B onto origin/main; if the rebase is clean, force-push (with-lease) to the branch; if it conflicts, inspect.
-2. **Semantic vs mechanical conflict resolution.** Both files touched same lines → read both sides → if one version clearly subsumes the other (e.g. branch A added a test, branch B renamed a variable that happens to appear in the same hunk), resolve automatically. If intents diverge (both changed behavior in the same function differently), add `needs-muxin-review` label with a specific question in a PR comment.
+2. **Semantic vs mechanical conflict resolution.** Both files touched same lines → read both sides → if one version clearly subsumes the other (e.g. branch A added a test, branch B renamed a variable that happens to appear in the same hunk), resolve automatically. If intents diverge (both changed behavior in the same function differently), add `needs-user-review` label with a specific question in a PR comment.
 3. **Stalled PRs.** No commits on the branch for >2h AND `security.yml`/`ci.yml` haven't been run (or keep failing with the same error). Comment once with what's blocking.
 4. **Missing checks.** Branch pushed but a workflow never triggered. Re-trigger via `workflow_dispatch`.
 5. **Cleanup.** After a `feat/track-*` PR is merged and its branch deleted remotely, remove the local worktree at `~/worktrees/intently/<slug>` if it's clean (no uncommitted changes, no unpushed commits).
@@ -36,8 +36,8 @@ Close the gap between what `auto-merge-safe.yml` can do deterministically and wh
 
 - Merge anything that's in the workflow's "I'd auto-merge this" path — let the workflow do it. Race conditions create duplicate commits.
 - Push to `main` or any non-`auto/*` / non-`feat/track-*` branch.
-- Remove `needs-muxin-review` label once added. Only Muxin takes that off.
-- Rebase a PR whose author is Muxin (i.e. not `auto/*` or `feat/track-*`). His feat branches are his to manage.
+- Remove `needs-user-review` label once added. Only the user takes that off.
+- Rebase a PR whose author is the user (i.e. not `auto/*` or `feat/track-*`). Their feat branches are theirs to manage.
 - Write to `TRACKER.md`, `CLAUDE.md`, or `.claude/session-handoff.md` — those are owned by other routines.
 - Force-push without `--force-with-lease` — never overwrite unseen upstream commits.
 
@@ -60,7 +60,7 @@ Each iteration:
 ```
 1. LIST: gh pr list --state open --json number,headRefName,labels,mergeable,mergeStateStatus,author
      filter to branches matching auto/* or feat/track-*
-     skip PRs with needs-muxin-review label
+     skip PRs with needs-user-review label
 
 2. FOR EACH PR:
    a. If mergeable (clean, all checks passing): log "workflow will handle", skip
@@ -70,10 +70,10 @@ Each iteration:
         if clean: force-push-with-lease, comment "rebased onto $base"
         if conflict: analyze hunks
           MECHANICAL (rename/reorder/whitespace/additive-non-overlap): resolve, force-push, comment
-          SEMANTIC (intent divergence): add needs-muxin-review label + comment with specific question
+          SEMANTIC (intent divergence): add needs-user-review label + comment with specific question
    c. If CHECKS_FAILING with same error as last run:
         check last commit SHA equals last iteration's recorded SHA for this PR
-        if yes, and commit is >2h old: add needs-muxin-review label + comment
+        if yes, and commit is >2h old: add needs-user-review label + comment
    d. If CHECKS_MISSING (no run for either security.yml or ci.yml on head SHA):
         re-trigger via workflow_dispatch
 
@@ -106,7 +106,7 @@ Do NOT edit `TRACKER.md` directly — write a routine-output report and let rele
 **Manual (this session):**
 
 ```
-/loop 15m Read .claude/loops/babysit-prs.md and execute ONE iteration per the brief. Use Opus 4.7 at high effort. This loop may fire whether or not there is work; a no-op iteration should exit silently and write nothing. Honor all hard-stops in the brief, especially: do NOT merge anything auto-merge-safe.yml would merge (race conditions); do NOT push to main/feat/*/non-auto branches; do NOT remove needs-muxin-review labels; do NOT force-push without --force-with-lease; do NOT edit TRACKER.md, CLAUDE.md, or .claude/session-handoff.md.
+/loop 15m Read .claude/loops/babysit-prs.md and execute ONE iteration per the brief. Use Opus 4.7 at high effort. This loop may fire whether or not there is work; a no-op iteration should exit silently and write nothing. Honor all hard-stops in the brief, especially: do NOT merge anything auto-merge-safe.yml would merge (race conditions); do NOT push to main/feat/*/non-auto branches; do NOT remove needs-user-review labels; do NOT force-push without --force-with-lease; do NOT edit TRACKER.md, CLAUDE.md, or .claude/session-handoff.md.
 ```
 
 **Recurring (via launchd, after first manual run proves clean):**

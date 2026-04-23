@@ -1,6 +1,6 @@
 # Parallel Tracks Workflow
 
-**What it is:** a system for running several Claude Code sessions in parallel, each on its own bounded task, with git + PR + merge mechanics automated. Muxin opens new terminals, names tasks, and reviews only what's flagged — no manual worktree/branch/PR management.
+**What it is:** a system for running several Claude Code sessions in parallel, each on its own bounded task, with git + PR + merge mechanics automated. User opens new terminals, names tasks, and reviews only what's flagged — no manual worktree/branch/PR management.
 
 **When to use it:** multi-hour work where serialization (one session → merge → next session) is too slow. Not needed for single-task sessions.
 
@@ -30,9 +30,9 @@ Claude works, commits, pushes. A PR opens (either Claude opens it, or you push a
 - **`ci.yml`** runs → `npm run typecheck && npm run test:unit` in `app/`. Runs on PRs touching code.
 - **`auto-merge-safe.yml`** fires after either workflow completes:
   - **Mechanical files only** (`.claude/routine-output/`, `TRACKER.md`, `session-handoff.md`) → auto-merge on security green.
-  - **Docs/config only** (`docs/**`, `CLAUDE.md`, etc.) → flip ready-for-review, add `needs-muxin-review` label.
+  - **Docs/config only** (`docs/**`, `CLAUDE.md`, etc.) → flip ready-for-review, add `needs-user-review` label.
   - **Any code** (`agents/**`, `app/**`, `supabase/**`, `tests/**`, `evals/{datasets,rubrics,baselines,runner}/**`, `scripts/**`, `.githooks/**`, `.github/workflows/**`) → auto-merge only when BOTH security AND ci are green.
-- **Any PR labeled `needs-muxin-review`** → skipped entirely by the workflow. Only Muxin removes that label.
+- **Any PR labeled `needs-user-review`** → skipped entirely by the workflow. Only the user removes that label.
 
 ### What the babysit-prs loop does
 
@@ -40,7 +40,7 @@ Every 15 min (during 07:30–22:30 local), the loop:
 
 - Rebases stacked `feat/track-*` branches onto `origin/main` after an upstream merge.
 - Resolves mechanical merge conflicts (whitespace, rename, reorder, additive non-overlap) and force-pushes with lease.
-- Flags semantic conflicts (intent divergence) by adding `needs-muxin-review` with a specific question in a comment.
+- Flags semantic conflicts (intent divergence) by adding `needs-user-review` with a specific question in a comment.
 - Comments once on PRs whose CI keeps failing with the same error for >2h.
 - Removes worktrees at `~/worktrees/intently/<slug>` once the corresponding PR is merged and the worktree is clean.
 - Writes a report to `.claude/routine-output/babysit-prs-<date>-<time>.md` when it acts.
@@ -56,10 +56,10 @@ When a `feat/track-*` PR merges:
 
 ### Stop auto-merge for a specific PR
 
-Add the `needs-muxin-review` label:
+Add the `needs-user-review` label:
 
 ```bash
-gh pr edit <PR#> --add-label needs-muxin-review
+gh pr edit <PR#> --add-label needs-user-review
 ```
 
 The workflow and the babysit loop both respect it. Only you can remove it.
@@ -76,12 +76,11 @@ Running via launchd (post-promotion): `launchctl unload ~/Library/LaunchAgents/c
 ## Setup (one-time)
 
 ```bash
-# Make the track script executable.
-chmod +x /Users/Muxin/Documents/GitHub/intently/scripts/intently-track.sh
+# Make the track script executable (run from the repo root).
+chmod +x scripts/intently-track.sh
 
 # Optional: symlink into a PATH directory so you can type `intently-track` directly.
-ln -s /Users/Muxin/Documents/GitHub/intently/scripts/intently-track.sh \
-      /usr/local/bin/intently-track
+ln -s "$(pwd)/scripts/intently-track.sh" /usr/local/bin/intently-track
 ```
 
 (After merge. Until then, call via the full path.)
@@ -89,8 +88,8 @@ ln -s /Users/Muxin/Documents/GitHub/intently/scripts/intently-track.sh \
 ## What this doesn't solve
 
 - **Breaking schema changes across tracks.** If track A renames a Supabase column and track B queries it, they'll conflict regardless. The babysit loop will flag, not resolve.
-- **UI taste calls.** Design judgment (does this color work?) still needs Muxin's eyes. That's why `docs/**` changes require review.
-- **Architectural decisions.** New public APIs, breaking refactors, new dependencies — the babysit loop should be tuned to add `needs-muxin-review` on these heuristically.
+- **UI taste calls.** Design judgment (does this color work?) still needs the user's eyes. That's why `docs/**` changes require review.
+- **Architectural decisions.** New public APIs, breaking refactors, new dependencies — the babysit loop should be tuned to add `needs-user-review` on these heuristically.
 
 ## Limits
 
@@ -101,5 +100,5 @@ ln -s /Users/Muxin/Documents/GitHub/intently/scripts/intently-track.sh \
 ## Follow-ups after first use
 
 - If babysit consistently runs no-op (no conflicts, nothing stuck): drop to 30-min cadence, or promote to launchd and forget.
-- If babysit over-flags (adds `needs-muxin-review` on obvious merges): tighten the "semantic vs mechanical" heuristic in the brief.
+- If babysit over-flags (adds `needs-user-review` on obvious merges): tighten the "semantic vs mechanical" heuristic in the brief.
 - If `ci.yml` runs too slow: cache `node_modules` more aggressively (already caching npm); consider splitting typecheck + tests into parallel jobs.
