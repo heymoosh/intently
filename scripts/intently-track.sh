@@ -148,7 +148,29 @@ cmd_create() {
 
   cd "$wt"
   if [ -n "$initial_prompt" ]; then
-    claude "$initial_prompt"
+    # Append a standard handoff instruction so the track session ends with a
+    # PR ready for auto-merge-safe.yml to pick up. Without this, sessions push
+    # a branch but never open a PR, and the auto-merge pipeline has nothing to
+    # act on.
+    local handoff
+    handoff='
+
+When the task above is complete and you are ready to hand off:
+  1. Commit your work on this branch.
+  2. Push to origin.
+  3. Open a draft PR with:
+       gh pr create --draft --base main --title "<short title>" --body "<description>"
+     Auto-merge-safe.yml will flip it to ready and merge it once the security
+     and ci checks pass on the PR head commit.
+
+If you hit a blocker or cannot finish the full task, push what you have and
+still open the draft PR, with a body that describes what landed and what is
+left. That keeps the work reviewable and a future session can pick it up.
+
+Do not add the needs-user-review label unless you want to stop the automatic
+merge — e.g., you made a judgment call that should get human eyes before
+landing.'
+    claude "${initial_prompt}${handoff}"
   else
     claude
   fi
