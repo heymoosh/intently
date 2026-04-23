@@ -52,6 +52,12 @@ ${C_BOLD}intently-track${C_RESET} — spawn a parallel-work track
       Remove the worktree for <slug>. Refuses if the worktree has
       uncommitted changes or unpushed commits.
 
+  ${C_BOLD}intently-track --clean-merged${C_RESET}
+      Iterate every worktree under ~/worktrees/intently/ and remove any
+      whose work is in main (regular-, rebase-, or squash-merged). Same
+      per-worktree safety rules as --clean: refuses to remove anything
+      with uncommitted changes or with unmerged+unpushed commits.
+
   ${C_BOLD}intently-track --help${C_RESET}
       This message.
 
@@ -183,6 +189,59 @@ preflight_warn_main_state() {
   fi
 }
 
+cmd_clean_merged() {
+  # Iterate every worktree under $WORKTREE_BASE. For each, call cmd_clean
+  # (which has the existing safety checks — dirty tree refuses, merged-or-pushed
+  # allowed). Non-zero exits from individual cmd_clean calls don't stop the
+  # loop; each slug is independent.
+
+  if [ ! -d "$WORKTREE_BASE" ]; then
+    echo "${C_DIM}no worktrees at $WORKTREE_BASE${C_RESET}"
+    exit 0
+  fi
+
+  local any=0
+  local removed=0
+  local skipped=0
+
+  # Refresh origin so cmd_clean's squash-merge detection (git cherry main HEAD)
+  # compares against the latest main.
+  git -C "$REPO_ROOT" fetch origin main --quiet 2>/dev/null || true
+
+  for wt in "$WORKTREE_BASE"/*; do
+    [ -d "$wt" ] || continue
+    any=1
+    local slug
+    slug=$(basename "$wt")
+
+    # Skip anything whose name isn't a valid slug — safer than operating on
+    # unexpected directories that a user may have dropped in there manually.
+    if ! echo "$slug" | grep -qE '^[a-z][a-z0-9-]*$'; then
+      echo "${C_DIM}skip non-slug dir:${C_RESET} $wt"
+      skipped=$((skipped + 1))
+      continue
+    fi
+
+    echo ""
+    echo "${C_BOLD}--- $slug ---${C_RESET}"
+
+    # Subshell so an exit inside cmd_clean doesn't kill the whole loop.
+    if ( cmd_clean "$slug" ); then
+      removed=$((removed + 1))
+    else
+      skipped=$((skipped + 1))
+    fi
+  done
+
+  if [ "$any" -eq 0 ]; then
+    echo "${C_DIM}no worktrees in $WORKTREE_BASE${C_RESET}"
+    exit 0
+  fi
+
+  echo ""
+  echo "${C_OK}done:${C_RESET} removed $removed, skipped $skipped"
+}
+
 cmd_create() {
   local slug="$1"
   shift
@@ -259,6 +318,9 @@ case "${1:-}" in
   --clean)
     shift
     cmd_clean "$@"
+    ;;
+  --clean-merged)
+    cmd_clean_merged
     ;;
   -*)
     echo "${C_ERR}error:${C_RESET} unknown flag $1" >&2
