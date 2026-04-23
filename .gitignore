@@ -1,0 +1,64 @@
+# === Secrets ===
+# Hard rule (CLAUDE.md): Bitwarden Secrets Manager is the only allowed secrets store.
+# No .env files, keys, or credentials are ever committed.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+**/secrets.json
+**/credentials.json
+.bws-cache/
+
+# === OS / editor cruft ===
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+!.vscode/extensions.json
+
+# === Node / TypeScript ===
+node_modules/
+dist/
+build/
+.next/
+.expo/
+.expo-shared/
+*.tsbuildinfo
+coverage/
+.nyc_output/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# === Supabase (local dev) ===
+supabase/.branches/
+supabase/.temp/
+supabase/seed.sql.bak
+
+# === Claude Code local state ===
+.claude/scheduled_tasks.lock
+.claude/launchd/logs/
+.claude/launchd/bin/
+.claude/settings.local.json
+
+# === Misc ===
+*.log
+tmp/
+.tmp/

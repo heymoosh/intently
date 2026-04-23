@@ -1,0 +1,30 @@
+name: security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Nightly sweep at 04:00 UTC (00:00 EDT)
+    - cron: '0 4 * * *'
+
+jobs:
+  secrets-scan:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Fails the job on any committed secret. Bitwarden Secrets Manager
+        # is the only allowed secrets store for Intently — see
+        # docs/security/privacy-policy-for-builders.md.
+
+  # Dependency audit job is stack-dependent and wired alongside ci.yml on
+  # Thursday Apr 23 after the stack decision (npm audit, pip-audit, cargo
+  # audit, etc.).
