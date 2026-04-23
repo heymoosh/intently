@@ -15,6 +15,7 @@ on:
       - 'docs/design/app-experience.md'
       - 'docs/architecture/data-model.md'
       - 'docs/architecture/agent-memory.md'
+      - 'launch-plan.md'
 
 permissions:
   contents: read
@@ -69,6 +70,7 @@ jobs:
           - \`agents/*/SKILL.md\` — confirm skill flow still matches
           - \`evals/rubrics/\` — confirm scoring still aligns
           - UI components in \`app/\` — confirm token/layout consumers still match
+          - \`TRACKER.md\` — if \`launch-plan.md\` changed, confirm "Next (in order)" still ladders up to the updated milestones
 
           Adding \`needs-user-review\` label so auto-merge-safe holds until verified. Remove the label once downstream alignment is confirmed."
             gh pr comment "$PR" --repo "$REPO" --body "$BODY"

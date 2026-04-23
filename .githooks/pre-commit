@@ -119,7 +119,7 @@ fi
 # When an upstream doc with known downstream consumers is touched, remind
 # the committer to check docs/architecture/doc-map.md. Non-blocking — just
 # a nudge. CI (.github/workflows/doc-map-check.yml) surfaces the same on PRs.
-doc_hits="$(printf '%s\n' "$staged" | grep -E '^(docs/product/requirements/life-ops-plugin-spec\.md|docs/design/app-experience\.md|docs/architecture/data-model\.md|docs/architecture/agent-memory\.md)$' || true)"
+doc_hits="$(printf '%s\n' "$staged" | grep -E '^(docs/product/requirements/life-ops-plugin-spec\.md|docs/design/app-experience\.md|docs/architecture/data-model\.md|docs/architecture/agent-memory\.md|launch-plan\.md)$' || true)"
 if [ -n "$doc_hits" ]; then
   echo "pre-commit: heads-up — these upstream docs have downstream consumers:" >&2
   printf '  %s\n' $doc_hits >&2

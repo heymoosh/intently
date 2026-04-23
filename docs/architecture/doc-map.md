@@ -46,4 +46,15 @@ When a doc changes, review the downstream docs listed here before committing any
 
 ---
 
+## launch-plan.md
+
+**When it changes** → the hot queue (`TRACKER.md`) must be re-reviewed. Launch plan defines the milestones; TRACKER's "Next (in order)" is the week-to-week tactical list that rolls up to those milestones. If a milestone shifts, date changes, or the MVP demo bar moves, TRACKER may need re-prioritization.
+
+| Downstream | What to check |
+|---|---|
+| `TRACKER.md` | Confirm "Next (in order)" items still ladder up to the updated milestones. Re-sync the "Today's Go/No-Go" if demo bar changed. |
+| `docs/hackathon/Submission Tracker.md` | If the 3 mandatory deliverables list changed (should be rare — those are hackathon rules), confirm submission tracker reflects the updated list. |
+
+---
+
 _Last updated: 2026-04-23_
