@@ -24,18 +24,41 @@ Reference for the two user-facing automation entry points. Everything else is ei
 ---
 
 
+Scan tracker, review for any parallel-task items to run, approve with user and then generate session prompts.
+- When you invoke /next-tracks, Claude responds in the current session's effort setting. If you're in an Opus 4.7 high session, the classification will be thorough. If you're in a Sonnet 4.6 session, it'll be faster but shallower. For a dispatcher pass with real recommendations, Opus 4.7 high is probably the sweet spot — xhigh is overkill for classification.                                
+
+/next-tracks
+
+
+
+Pull remote changes to local.
+
+git pull --ff-only
+
+
+
+
+Push local changes to remote.
+
+
 
 Clean up stale work trees on command.
 
+./scripts/intently-track.sh --clean-merged
+
+
+
+
+Start a new parallel-work track. Opens a fresh Claude Code session inside a dedicated git worktree. Use 'cat' to run it from anywhere (starts from root).
 
 intently-track <slug> "prompt"
 
-Start a new parallel-work track. Opens a fresh Claude Code session inside a dedicated git worktree.
 
+
+Start the PR babysit loop in the current Claude session. Closes if session exits, runs every 15 mins.
 
 /babysit-prs
 
-Start the PR babysit loop in the current Claude session. Closes if session exits, runs every 15 mins.
 
 
 
