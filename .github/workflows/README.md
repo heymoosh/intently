@@ -4,7 +4,7 @@ CI for Intently. Three workflows targeted; `release-gate.yml` added in the final
 
 | Workflow | Status | Notes |
 |---|---|---|
-| `security.yml` | Wired (Apr 22) | Deterministic checks: gitleaks secrets scan, dep audit. Stack-agnostic. |
+| `security.yml` | Wired (Apr 22) | Deterministic checks: gitleaks secrets scan + `deps-audit` (npm audit). Stack-agnostic. |
 | `docs-check.yml` | Wired (Apr 22) | Deterministic doc-hygiene: enforces CLAUDE.md 100-line hard cap (soft target 75). Stack-agnostic. |
 | `ci.yml` | Pending | Lint, typecheck, unit/E2E tests, build. Wired Thursday Apr 23 after stack decision. |
 | `evals.yml` | Pending | Triggers AI Eval Batch Steward. Wired Friday Apr 24 once datasets exist. |
@@ -15,6 +15,11 @@ CI for Intently. Three workflows targeted; `release-gate.yml` added in the final
 `ci.yml` needs to know what to run — `npm test`, `pytest`, `cargo test`, etc. The stack is a Thursday Apr 23 decision, gated on the Michael Cohen managed-agents session. Wiring `ci.yml` before then means rewriting it; wait.
 
 `evals.yml` triggers a Managed Agent that reads `evals/datasets/`, `evals/rubrics/`, `evals/baselines/`. Until at least one skill has an authored dataset, the workflow has nothing useful to run. Wire it once `daily-brief/` dataset exists (Friday Apr 24 per implementation order).
+
+### Jobs inside `security.yml`
+
+- `secrets-scan` — runs gitleaks on every push/PR/nightly. Fails on any committed secret.
+- `deps-audit` — runs `npm audit --audit-level=high` in `app/` on every PR + nightly. Catches known-CVE dependencies deterministically. Threshold is `high` (not `moderate`) because 12 pre-existing moderate vulns inside Expo's internal tree cannot be resolved without a major breaking change; raise to `moderate` once those are cleared upstream.
 
 ## Why `security.yml` lands now
 
