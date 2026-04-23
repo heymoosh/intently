@@ -75,6 +75,21 @@ Update the Project Dashboard rows for the trackers you actually touched: status 
 
 Now write the narrative reflection per the "How to present this" section at the top. Steps 1–4 earn the right to write this honestly — but the user-facing output leads here.
 
+## 5a. Surface recurring patterns (multi-day)
+
+Before closing the narrative, scan the prior 7–14 days of `Daily Log.md` entries (and the journal file if available) for themes that appear across multiple days. Surface any pattern that has shown up **two or more times** — name it concretely and note how many times it appeared. If no repeating pattern is supportable from the data, do not invent one.
+
+This is the "noticing" beat that turns daily review into compound insight. Examples: "Third time this week you paused work to handle an unexpected request — worth naming." "Four of the last seven days had an energy dip after 3 pm." Deliver it as a brief observation inside the narrative, not as a separate section.
+
+## 5b. Shape tomorrow
+
+After the narrative, include **one grounded suggestion for shaping tomorrow**. Pull from:
+- Tomorrow's calendar (if `calendar_mcp: connected`, call `read_calendar(user_id, range=tomorrow)`)
+- The Ops Plan's Time-Sensitive section
+- The pacing signal from step 2 of daily-brief logic (today was intense → suggest a lighter tomorrow)
+
+Anchor the suggestion in observed state, not generic advice. Examples: "Tomorrow's calendar is clear until noon — protect that block for [P1 project]." "You've been sprinting three days; tomorrow is a good day to let the afternoon breathe." One sentence or two, no more.
+
 ## 6. Prompt for reflections
 
 After the narrative, ask:
