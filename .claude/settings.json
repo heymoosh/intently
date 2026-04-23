@@ -2,12 +2,25 @@
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "permissions": {
     "allow": [
+      "Write(/Users/Muxin/Documents/GitHub/intently/.claude/routine-output/*)",
+      "Edit(/Users/Muxin/Documents/GitHub/intently/.claude/routine-output/*)",
+      "Write(/Users/Muxin/Documents/GitHub/intently/.claude/routine-output/**)",
+      "Edit(/Users/Muxin/Documents/GitHub/intently/.claude/routine-output/**)",
+      "Write(.claude/routine-output/*)",
+      "Edit(.claude/routine-output/*)",
       "Write(.claude/routine-output/**)",
       "Edit(.claude/routine-output/**)",
+      "Write(/Users/Muxin/Documents/GitHub/intently/.claude/session-handoff.md)",
+      "Edit(/Users/Muxin/Documents/GitHub/intently/.claude/session-handoff.md)",
       "Write(.claude/session-handoff.md)",
       "Edit(.claude/session-handoff.md)",
+      "Write(/Users/Muxin/Documents/GitHub/intently/TRACKER.md)",
+      "Edit(/Users/Muxin/Documents/GitHub/intently/TRACKER.md)",
       "Write(TRACKER.md)",
       "Edit(TRACKER.md)"
+    ],
+    "additionalDirectories": [
+      "/Users/Muxin/Documents/GitHub/intently/.claude/routine-output"
     ]
   }
 }
