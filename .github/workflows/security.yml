@@ -8,6 +8,15 @@ on:
     # Nightly sweep at 04:00 UTC (00:00 EDT)
     - cron: '0 4 * * *'
 
+# gitleaks-action needs pull-requests:read to list PR commits for scanning.
+# Without this, the action 403s on `/repos/OWNER/REPO/pulls/NN/commits` and
+# fails the job even when there are no actual secrets. Default GITHUB_TOKEN
+# permissions no longer grant this implicitly — must be declared.
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+
 jobs:
   secrets-scan:
     name: gitleaks
