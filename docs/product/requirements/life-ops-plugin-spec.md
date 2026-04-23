@@ -726,13 +726,7 @@ This catches situations where a file got moved, renamed, or deleted but the skil
 
 ## What Does NOT Ship
 
-- Any user's actual project data, trackers, or strategies
-- Project-specific "continue" skills (job-hunt-continue, film-continue, etc.) — those are personal workflow, not system infrastructure. The generic `project-continue` covers the common case; specialized variants are user-written extensions.
-- Voice/brand guides — personal to the user
-- Domain-specific scheduled tasks (meal planning, job hunt ops, etc.) — the plugin is the rhythm layer, not the domain layer
-- Domain-specific review checks (financial zone, etc.) — the plugin handles universal patterns; domain logic lives in the user's project skills
-- Meta/maintenance skills like `system-health-check` — those are for the plugin's maintainer, not end users
-- `notes-action-sync` as a default install — shipped as an optional add-on skill (see Optional Add-On Skills section). Requires users to adopt a `meeting_series: true` frontmatter convention and have coaching/session-style notes to process. Not universal enough to install by default.
+See `docs/backlog/deferred-features.md`.
 
 ---
 
