@@ -77,7 +77,7 @@ If findings:
 - **Spec not touched, no agents/ activity.** Exit silently.
 - **A criterion is intentionally broader than the spec.** Rare. Should be flagged as MEDIUM; Muxin confirms or corrects. Not HIGH because not obviously gaming.
 - **A criterion with no matching spec section.** HIGH — criterion orphaned. Recommend deriving a spec section first.
-- **New skill added to `agents/` with no criterion file.** Pre-commit hook should have caught this. If it's there anyway, HIGH + recommend running `/derive-criteria <skill>`. EXCEPTION: if the skill is listed in `docs/product/deferred-skills.md`, the finding flips to "unexpected active scope for deferred skill" — recommend either un-deferring (spec edit) or removing the folder.
+- **New skill added to `agents/` with no criterion file.** Pre-commit hook should have caught this. If it's there anyway, HIGH + recommend running `/derive-criteria <skill>`. EXCEPTION: if the skill is listed in `docs/backlog/deferred-features.md` (§ Deferred Skills), the finding flips to "unexpected active scope for deferred skill" — recommend either un-deferring (spec edit) or removing the folder.
 
 ## Notes
 

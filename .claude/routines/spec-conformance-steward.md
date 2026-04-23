@@ -37,7 +37,7 @@ Tasks:
    docs/product/acceptance-criteria/. If none exists, that is itself a finding —
    record it as "criteria missing" and propose what they should be.
    EXCEPTION: before flagging "criteria missing," check
-   docs/product/deferred-skills.md. Any skill listed there is deliberately
+   docs/backlog/deferred-features.md (§ Deferred Skills). Any skill listed there is deliberately
    out of V1 scope; skip silently, do not record as a finding. (If a deferred
    skill unexpectedly appears under agents/<skill>/, that IS a finding —
    "unexpected active scope for deferred skill" — because it signals scope

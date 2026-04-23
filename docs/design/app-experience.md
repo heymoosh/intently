@@ -102,15 +102,9 @@ This is the compromise that lets non-technical users install and use Intently wi
 
 ---
 
-## Out of hackathon scope — captured for post-launch
+## Out of hackathon scope
 
-**Gamification layer.** Streaks, points, gardens, uncovering map areas toward a destination. Meant to reward progress without becoming a distraction. Sits on the Past screen. Not required for the demo; premature for a 4-day build.
-
-**Somatic embodiment exercises.** Guided breath, grounding prompts, 2-minute resets — ways to get unstuck and out of your head. Sits on the Present screen. Stretch goal: a single 60-second breath exercise surfaced on the Present screen if time allows. Anything more is post-launch.
-
-**Kanban and Gantt visualizations.** Project trackers get a detail view with visual timelines and swim-lane boards. Hackathon ships flat to-do checklists only.
-
-**Theme reskinning (default / clean workbench / fantasy adventure).** Covered in `docs/product/Intently Game Reskinning.md`. Out of scope for the hackathon build, but the component architecture should use **semantic tokens** (e.g., `PrimarySurface`, `FocusObject`, `QuestCard`) rather than appearance-based class names, so a future reskin is cheap rather than a full rewrite. This is the only post-launch item that has a hackathon-time cost if we skip it.
+See `docs/backlog/deferred-features.md`.
 
 ---
 
