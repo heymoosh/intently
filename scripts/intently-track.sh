@@ -128,6 +128,61 @@ cmd_clean() {
   echo "${C_OK}removed${C_RESET} $wt"
 }
 
+preflight_warn_main_state() {
+  # Before creating a worktree, surface conditions in the main repo that might
+  # surprise the user. Warn-only — does not block. User can Ctrl-C if needed.
+  #
+  #   1. Uncommitted changes in the main working tree (staged or unstaged):
+  #      those changes won't propagate to the new worktree (which branches
+  #      from origin/main). If the user expected the track to see that work,
+  #      this is a footgun.
+  #   2. Local branch commits not on origin/main: same problem — the new
+  #      track starts from origin/main, not the user's local tip.
+  #   3. origin/main ahead of local: informational only — the new track WILL
+  #      pick up the latest (post-fetch), but the user may want to pull main
+  #      after the track to stay in sync.
+
+  local warned=0
+
+  local dirty
+  dirty=$(git -C "$REPO_ROOT" status --porcelain --untracked-files=no 2>/dev/null || true)
+  if [ -n "$dirty" ]; then
+    echo "${C_WARN}warning:${C_RESET} main worktree has uncommitted changes. These will NOT appear in the track's worktree:" >&2
+    echo "$dirty" | head -8 | sed 's/^/  /' >&2
+    local dcount
+    dcount=$(echo "$dirty" | wc -l | tr -d ' ')
+    if [ "$dcount" -gt 8 ]; then
+      echo "  ... ($((dcount - 8)) more)" >&2
+    fi
+    warned=1
+  fi
+
+  # Refresh origin/main so the ahead/behind counts are accurate. Silent on
+  # network error — the worktree-create step that follows will retry.
+  git -C "$REPO_ROOT" fetch origin main --quiet 2>/dev/null || true
+
+  local behind_origin ahead_origin
+  behind_origin=$(git -C "$REPO_ROOT" rev-list --count HEAD..origin/main 2>/dev/null || echo 0)
+  ahead_origin=$(git -C "$REPO_ROOT" rev-list --count origin/main..HEAD 2>/dev/null || echo 0)
+
+  if [ "$ahead_origin" -gt 0 ]; then
+    local current_branch
+    current_branch=$(git -C "$REPO_ROOT" branch --show-current 2>/dev/null || echo '(detached)')
+    echo "${C_WARN}warning:${C_RESET} current branch ${current_branch} is ahead of origin/main by ${ahead_origin} commit(s). New tracks branch from origin/main; those commits will NOT be included." >&2
+    warned=1
+  fi
+
+  if [ "$behind_origin" -gt 0 ]; then
+    echo "${C_DIM}note:${C_RESET} origin/main is ahead of local by ${behind_origin} commit(s). The new track will use the latest origin/main."
+  fi
+
+  if [ "$warned" -eq 1 ]; then
+    echo ""
+    echo "${C_DIM}Continuing in 2s. Ctrl-C to abort.${C_RESET}"
+    sleep 2
+  fi
+}
+
 cmd_create() {
   local slug="$1"
   shift
@@ -142,8 +197,8 @@ cmd_create() {
     echo "${C_WARN}worktree already exists:${C_RESET} $wt"
     echo "${C_DIM}resuming in-place (no fetch, no rebase)${C_RESET}"
   else
-    echo "${C_DIM}fetching origin/main...${C_RESET}"
-    git -C "$REPO_ROOT" fetch origin main --quiet
+    preflight_warn_main_state
+    echo "${C_DIM}creating worktree from origin/main...${C_RESET}"
 
     # If branch already exists (e.g. previous worktree was cleaned but branch
     # wasn't), check it out; otherwise create fresh from origin/main.
