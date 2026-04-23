@@ -12,9 +12,9 @@
 
 ### CR-daily-review-01: Review captures today's actual events, not a generic template
 
-**Behavior:** The review reflects on what actually happened today (from calendar, email, voice memos, in-app captures), not a templated end-of-day prompt. If nothing notable happened, says so honestly.
+**Behavior:** The review reflects on what actually happened today. Reads: Today's Daily Log entry (AM section), Weekly Goals, all project trackers (status lines), config. Does not re-read calendar, email, voice memos, or in-app captures — those were consumed by daily-brief and their relevant content is already in the Daily Log. If nothing notable happened, says so honestly.
 
-**Verification:** E2E test against a fixture day; AI eval rubric scoring faithfulness.
+**Verification:** E2E test against a fixture day; AI eval rubric scoring faithfulness against the Daily Log entry. Verification does not check calendar, email, voice, or in-app capture access.
 
 **Demo blocker:** yes
 
@@ -38,11 +38,11 @@
 
 ---
 
-### CR-daily-review-03: Review notices recurring patterns
+### CR-daily-review-03: Review wraps the current day
 
-**Behavior:** When the same theme appears across multiple days (per Demo Script: "third time in two weeks you've noticed the boundary thing"), the review surfaces it. Doesn't invent patterns when none exist.
+**Behavior:** Wraps the current day only: captures what was accomplished, trims yesterday's entry to Done-only, syncs the Command Center (status indicators and next actions), and prompts for reflections. Does not synthesize multi-day patterns — that is the weekly review's responsibility.
 
-**Verification:** AI eval rubric scoring synthesis on multi-day fixtures.
+**Verification:** E2E test confirms the four-step flow (wrap today, trim yesterday, sync Command Center, reflections prompt). AI eval rubric confirms no multi-day pattern synthesis is produced.
 
 **Demo blocker:** yes
 
@@ -66,11 +66,11 @@
 
 ---
 
-### CR-daily-review-05: Review surfaces tomorrow shaping signal
+### CR-daily-review-05: Review ends with reflections prompt, not tomorrow shaping
 
-**Behavior:** Review ends with at least one suggestion for shaping tomorrow ("tomorrow is lighter; protect the morning for X"). Suggestion is grounded in observed state, not generic advice.
+**Behavior:** Ends with the reflections prompt: "Anything land for you today? A thought, a feeling, something you noticed? Even one sentence is fine. Or skip — no pressure." No tomorrow-shaping output. If the user engages in conversation during the review, the agent is present for it — but does not proactively propose tomorrow's sequence. That is daily-brief's job.
 
-**Verification:** AI eval rubric; manual review against held-out fixtures.
+**Verification:** E2E test confirms the review ends at the reflections prompt. AI eval rubric confirms no proactive tomorrow-sequencing suggestion is produced.
 
 **Demo blocker:** yes
 

@@ -40,9 +40,9 @@
 
 ### CR-daily-brief-03: Brief surfaces patterns across time, not just retrieval
 
-**Behavior:** The brief identifies at least one cross-session pattern when one is supportable from the data ("third call this week where the other side asked about timeline"). When no pattern is supportable, the brief does not invent one.
+**Behavior:** Surfaces patterns and themes already extracted by the weekly review into `Weekly Goals.md` — does not independently detect or synthesize cross-session patterns. When the "Review of Last Week" section of Weekly Goals.md contains pattern observations, the brief surfaces them as context for the day. If that section is absent, no pattern comment is made.
 
-**Verification:** AI eval rubric scoring synthesis vs retrieval; manual review against held-out cases.
+**Verification:** AI eval rubric confirms the brief surfaces content already present in Weekly Goals.md rather than synthesizing its own cross-session patterns; manual review against held-out cases verifies no independently invented patterns.
 
 **Demo blocker:** yes (this is the Opus 4.7 showcase moment)
 

@@ -18,6 +18,8 @@
 
 **Demo blocker:** no
 
+**V1 Cut:** SKILL.md explicitly cuts Phase 1 — "Phase 1 — Discover existing vault. New users don't have one. [V1 cut]" V1 assumes new users with no existing vault. When verifying, mark `fail (V1 cut — not a defect)`.
+
 **Status:** unknown
 
 **Last checked:** 2026-04-22
@@ -31,6 +33,8 @@
 **Verification:** TBD — E2E test for each branch; verifies the config file's paths reference discovered locations when present.
 
 **Demo blocker:** no
+
+**V1 Cut:** SKILL.md explicitly cuts Phase 1 — "Phase 1 — Discover existing vault. New users don't have one. [V1 cut]" V1 assumes new users with no existing vault. When verifying, mark `fail (V1 cut — not a defect)`.
 
 **Status:** unknown
 
@@ -74,6 +78,8 @@
 
 **Demo blocker:** no
 
+**V1 Cut:** SKILL.md simplifies to defaults-only — "Phase 5 — Full preferences. Use defaults. Ask only if the user volunteers a preference." The 7-item preferences conversation in the spec does not run in V1. When verifying, mark `fail (V1 cut — not a defect)`.
+
 **Status:** unknown
 
 **Last checked:** 2026-04-22
@@ -88,6 +94,8 @@
 
 **Demo blocker:** no
 
+**V1 Cut:** SKILL.md delegates file creation to the app platform — "Empty files are provisioned by the app on first run — this skill does not need to create them." Verification target is the app provisioning step, not the setup skill in isolation.
+
 **Status:** unknown
 
 **Last checked:** 2026-04-22
@@ -101,6 +109,8 @@
 **Verification:** TBD — E2E test for both branches; downstream morning-brief test verifies nudge presence/absence matches the config.
 
 **Demo blocker:** no
+
+**V1 Cut:** SKILL.md explicitly cuts Phase 4 — "Phase 4 — Health.md. Defer to post-V1. health_file_enabled: false." When verifying, mark `fail (V1 cut — not a defect)`.
 
 **Status:** unknown
 
