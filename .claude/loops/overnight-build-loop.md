@@ -67,11 +67,11 @@ All six must succeed or the iteration rolls back:
 
 On any step failing:
 - Attempt one fix.
-- If still failing, roll back the branch (`git reset --hard <base>` on the auto branch only) and write a failure note to `.claude/routine-output/build-loop-2026-04-23-<iter>.md` explaining root cause. Abandon the iteration, move to the next.
+- If still failing, roll back the branch (`git reset --hard <base>` on the auto branch only) and write a failure note to `routine-output/build-loop-2026-04-23-<iter>.md` explaining root cause. Abandon the iteration, move to the next.
 
 ## Reporting
 
-Each iteration writes `.claude/routine-output/build-loop-2026-04-23-<iter>.md`:
+Each iteration writes `routine-output/build-loop-2026-04-23-<iter>.md`:
 
 ```
 # Iteration <N> — <slug>
@@ -104,7 +104,7 @@ Exit immediately if any of:
 
 ## Post-loop
 
-On exit, write `.claude/routine-output/build-loop-2026-04-23-summary.md` with:
+On exit, write `routine-output/build-loop-2026-04-23-summary.md` with:
 - How many iterations shipped vs failed.
 - List of open draft PRs by URL.
 - What the next session should pick up first.

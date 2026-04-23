@@ -81,7 +81,7 @@ Each iteration:
      if worktree exists at ~/worktrees/intently/<slug> and is clean:
          git worktree remove ~/worktrees/intently/<slug>
 
-4. REPORT: write .claude/routine-output/babysit-prs-<YYYY-MM-DD>-<HHMM>.md with:
+4. REPORT: write routine-output/babysit-prs-<YYYY-MM-DD>-<HHMM>.md with:
      - PRs acted on (PR# + action taken)
      - PRs flagged for review (PR# + question)
      - Worktrees cleaned up
@@ -97,7 +97,7 @@ Each iteration:
 
 ## Reporting
 
-Each non-trivial iteration writes `.claude/routine-output/babysit-prs-<date>-<time>.md` in the schema above. On silent-success iterations, write nothing. The release-readiness-steward consumes these alongside other routine outputs.
+Each non-trivial iteration writes `routine-output/babysit-prs-<date>-<time>.md` in the schema above. On silent-success iterations, write nothing. The release-readiness-steward consumes these alongside other routine outputs.
 
 Do NOT edit `TRACKER.md` directly — write a routine-output report and let release-readiness synthesize it into the morning go/no-go.
 
