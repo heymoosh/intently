@@ -10,11 +10,11 @@
 
 ---
 
-### CR-daily-brief-01: Brief is ready before user opens the app
+### CR-daily-brief-01: Brief data is pre-gathered on schedule; display and conversation start on user tap
 
-**Behavior:** The morning brief has been produced by a scheduled managed agent before the user opens the app at their typical morning time. The user does not wait for generation on first open.
+**Behavior:** The morning brief agent runs on schedule before the user's morning time, pre-gathering and processing context (calendar, email, project state) so no in-flight generation is needed. The brief is not displayed and the conversation does not begin until the user taps the button in the app — the UI does not auto-render or auto-start the flow on open.
 
-**Verification:** TBD — likely a managed-agent invocation timestamp check + an E2E test that opens the app and confirms cached content renders without an in-flight call.
+**Verification:** TBD — managed-agent invocation timestamp confirms pre-run before morning time; E2E test confirms app open does not trigger a generation call; E2E test confirms tapping the button initiates the brief display and conversation.
 
 **Demo blocker:** yes
 
