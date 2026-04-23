@@ -16,6 +16,15 @@
 
 _(none)_
 
+## Follow-ups (pending flight test / manual steps)
+
+- **Promote overnight build loop to recurring** — first flight tonight (2026-04-22 → 23). Brief: `.claude/loops/overnight-build-loop.md`. If ≥3 clean PRs ship, add a `build-loop` case to `~/.intently/bin/intently-routine.sh` + a launchd plist firing at 23:30 daily. Each schedule re-picks model/effort against `/Users/Muxin/Documents/Personal Obsidian/Projects/Opus 4-7 Hackathon/Claude Code Practices/When to use opus 4.6, 4.7, and sonnet 4.6.md` per that night's scope.
+- **Release-readiness plist move 07:00 → 03:00** — ✅ DONE 2026-04-22 evening. Live plist Hour=3 confirmed via `plutil`. First scheduled fire: 2026-04-23 03:00 local (see verification item below).
+- **Verify release-readiness 03:00 first fire** — 2026-04-23 ~03:05+. Check `~/.intently/logs/release-readiness.log` for a START/END pair; confirm `.claude/routine-output/release-readiness-2026-04-23.md` exists and contains the per-demo-flow go/no-go synthesis. If the wrapper's post-run integrity check logs a WARN ("expected output missing"), the agent wrote somewhere wrong — prompt tuning needed.
+- **Verify auto-merge-safe.yml classifies correctly** — runs after any `auto/*` PR triggers `security.yml`. Fastest test path: `launchctl kickstart gui/$(id -u)/com.intently.privacy` to force a real draft PR from the privacy steward, then watch GitHub Actions tab. Mechanical paths should auto-merge; docs should flip ready + get `needs-muxin-review` label; code should stay draft. `--admin` flag bypasses branch protection (there is none yet).
+- **Delete stale remote branch** — `git push origin --delete feat/slim-claude-md` (old branch name before this session's rescope; current session committed on `feat/mvp10-scaffold-and-infra`). Safe — no unique commits on the old remote.
+- **Thursday 2026-04-23 post-stack-decision** — wire `ci.yml` (lint, typecheck, unit tests, build) per stack. Then update `auto-merge-safe.yml` to move code PRs from "stays draft" to "auto-merge on ci.yml + security.yml both green." That completes the "auto-fix anything that can be fixed without me" intent.
+
 ## Next (in order — start here)
 
 1. **Managed Agents TS SDK.** Install, wrap skill loading (concat `agents/_shared/life-ops-conventions.md` + `agents/<skill>/SKILL.md` → agent definition).
