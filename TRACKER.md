@@ -32,6 +32,10 @@
 
 1. **Spec decision: weekly-review scoring (qualitative vs numeric)** — CR-wr-01 and CR-wr-02 directly contradict spec. Spec says "Rate 1-10 on four axes"; criteria say "no numeric score." SKILL.md matches spec. Either keep numeric (rewrite criteria) or amend the spec to qualitative-only — either way, run `/derive-criteria weekly-review` after. Confirmed HIGH by both spec-conformance and criteria-sync stewards. `docs/product/acceptance-criteria/weekly-review.md`
 2. **Spec decision: daily-review scope** — Three criteria (CR-dr-03 pattern detection, CR-dr-05 tomorrow-shaping, CR-dr-01 re-reads calendar/email) attribute capabilities spec puts in weekly-review or daily-brief. Spec decision owed before Friday's eval-dataset authoring. `docs/product/acceptance-criteria/daily-review.md`
+3. **BLOCKER: npm audit threshold stuck at `high` — two upstream vuln chains** — `security.yml` ships with `--audit-level=high` instead of `moderate` because `npm audit` reports 12 moderate vulnerabilities we cannot fix. Two distinct root causes:
+   - **Root 1 — `react-native-markdown-display`** (direct dep, runtime). This package pins `markdown-it` < 12.3.2 ([GHSA-6vfc-qv3f-vr6c](https://github.com/advisories/GHSA-6vfc-qv3f-vr6c), ReDoS / Uncontrolled Resource Consumption). It is used in exactly one place: `App.tsx:81` renders `<Markdown>{md}</Markdown>` to display agent output. Practical risk is low (markdown comes from our own agents, not untrusted user input), but the advisory is real. **Decision owed:** swap to `@expensify/react-native-markdown-display` (maintained fork with `markdown-it` ≥ 12.3.2) to clear the vuln, or accept it for hackathon and revisit post-ship.
+   - **Root 2 — Expo SDK 54 internal toolchain** (build-time, not runtime). Chain: `expo` → `@expo/cli` → `@expo/config-plugins` → `xcode` → `uuid` < 14.0.0 ([GHSA-w5hq-g745-h8pq](https://github.com/advisories/GHSA-w5hq-g745-h8pq)). We did not choose these packages; they ship as Expo internals. `npm audit fix --force` would downgrade expo to v46 — not viable. Fully blocked on Expo upstream releasing a patched `@expo/config-plugins`. No action available on our side.
+   - **Consequence:** CI audit threshold stays at `high` until both are resolved. To raise back to `moderate`, fix Root 1 (swap library) and wait for Root 2 (Expo upstream). Root 1 is the only actionable item.
 
 ## Follow-ups (pending flight test / manual steps)
 
@@ -95,6 +99,11 @@ Point a new Claude session at this file:
 Update the **Status** block and prepend a dated **Log** entry below at the end of every non-trivial session.
 
 ## Log
+
+### 2026-04-23 (security session)
+- Added `deps-audit` job to `security.yml` (PR #29, merged): `npm audit --audit-level=high` on every PR + nightly, parallel with gitleaks.
+- Added npm audit pre-commit check (check 5 in `.githooks/pre-commit`) and `.github/dependabot.yml` (PR #31, open): audit runs only when `package.json`/`package-lock.json` are staged; dependabot sweeps weekly on Mondays.
+- Audit threshold is `high` not `moderate` — 12 pre-existing moderate vulns in two upstream chains. Root 1 (`react-native-markdown-display` → `markdown-it`) is actionable (swap to Expensify fork). Root 2 (Expo SDK toolchain → `xcode` → `uuid`) is fully upstream-blocked. Decision on Root 1 flagged in Critical items #3.
 
 ### 2026-04-22 (continued)
 - Wrote `supabase/migrations/0001_initial_schema.sql`: 6 tables (`profiles`, `life_ops_config`, `markdown_files`, `conversations`, `projects`, `events`), RLS owner-only on every user-scoped table, signup trigger auto-populates `profiles`. JSONB on `life_ops_config.config`, `conversations.turns`, `projects.metadata`, `events.metadata` so Thursday's managed-agents session learnings land as ALTERs not rewrites.
