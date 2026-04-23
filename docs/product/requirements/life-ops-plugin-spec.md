@@ -20,8 +20,7 @@
 - `setup` Phase 5 (preferences conversation) — defaults used; only asks if user volunteers a preference
 - `setup` Phase 6 file seeding — delegated to app platform (app provisions files on first run; skill does not create them)
 
-**Known structural divergence (resolve post-hackathon):**
-- `setup` SKILL.md creates `Monthly Goals.md` as a separate file. The spec puts Monthly Priorities inside `Ops Plan.md`. Multiple downstream skills reference `Monthly Goals.md`. Spec is authoritative; SKILL.md is the current V1 implementation. Not a demo blocker.
+**Monthly Goals.md is a separate file** — not embedded in `Ops Plan.md`. The spec has been updated to match this decision. All skill reads/writes use `Monthly Goals.md` directly.
 
 ---
 
@@ -139,21 +138,21 @@ flowchart TD
     Weekly["`**weekly-review** (Sun 9am)
     reads: 7 daily logs, current Weekly Goals,
     ALL trackers, ALL strategies, Ops Plan,
-    week's reflections, Goals, config
+    Monthly Goals, week's reflections, Goals, config
     → patterns from reflections → score week
     → archive past week → FULL tracker sync
-    → check vs Monthly Priorities → pre-mortems
+    → check vs Monthly Goals → pre-mortems
     → WRITES new Weekly Goals (full op context)`"]
 
     Weekly -->|compounds 4 weeks| Monthly
 
     Monthly["`**monthly-review** (1st, 10am)
     reads: 4 weekly reviews, Goals, all strategies,
-    all trackers, Ops Plan, 4 weeks reflections,
-    Master Backlog, 30-day calendar
+    all trackers, Ops Plan, Monthly Goals,
+    4 weeks reflections, Master Backlog, 30-day calendar
     → reflection patterns → goal health check
     → portfolio balance → pre-mortems
-    → UPDATES Goals, Ops Plan, Monthly Priorities,
+    → UPDATES Goals, Monthly Goals, Ops Plan,
     all trackers`"]
 
     Drift["`**vault-drift-check** (Fri 2am)
@@ -168,7 +167,7 @@ flowchart TD
 ```mermaid
 flowchart TD
     Goals["Goals.md<br/>(3-5 year vision, annual milestones)"]
-    MonthlyP["Monthly Priorities<br/>(in Ops Plan, 3-5 items)"]
+    MonthlyP["Monthly Goals.md<br/>(3-5 items, set by monthly-review)"]
     WeeklyG["Weekly Goals.md<br/>(FULL operating context)"]
     Daily["Daily Log.md<br/>(today's sequenced plan)"]
 
@@ -200,8 +199,9 @@ The plugin uses a **single-file-per-type** approach, not individual dated files.
 │                                      to remind you of something, tell it to add to Inbox.md."
 ├── Ops Plan.md                     ← Command Center dashboard
 │                                      - Project Dashboard (status, next action, priority tier)
-│                                      - Monthly Priorities (set by monthly review, checked by weekly)
 │                                      - Time-Sensitive items (checked daily by daily-triage)
+├── Monthly Goals.md                ← Current month's priorities (3-5 items, set by monthly review,
+│                                      checked by weekly review). Replaced each month.
 ├── Goals.md                        ← Life/long-term goals, 3-5 year vision, annual milestones
 ├── Weekly Goals.md                 ← SINGLE FILE. Full operating context for the current week.
 │                                      Contains: last week's review (patterns, scores, financial
@@ -247,7 +247,7 @@ This is the mechanism that connects long-term vision to today's to-do list. Each
 ```
 Goals.md (3-5 year vision, annual milestones)
     ↓ read by monthly review
-Monthly Priorities (written INTO Ops Plan by monthly review, 3-5 items)
+Monthly Goals.md (3-5 items, set by monthly review — its own file, not in Ops Plan)
     ↓ checked by weekly review
 Weekly Goals.md (FULL operating context for the week)
     Contains: last week's review (patterns, scores, financial zone,
@@ -261,7 +261,7 @@ The daily brief doesn't read Goals.md or Reflections.md directly — that alignm
 
 The weekly review explicitly checks: "Does the proposed week serve at least one of the monthly priorities? If not, name the gap." This is the cascade enforcement — lightweight, not heavy-handed. A quick sentence is enough.
 
-If Monthly Priorities are missing or stale (more than 5 weeks old), the weekly review flags it.
+If Monthly Goals.md is missing or stale (more than 5 weeks old), the weekly review flags it.
 
 ---
 
@@ -360,9 +360,14 @@ Outputs a dashboard with priority tiers:
 
 ## Project Dashboard — Priority 3 (Maintenance / As-Needed)
 ...
+```
 
-## Monthly Priorities — [Month Year]
-*Set by [date] setup. The weekly review reads this section before planning each week.*
+Monthly priorities are seeded into `Monthly Goals.md` (not Ops Plan):
+
+```markdown
+# Monthly Goals — [Month Year]
+*Set by [date] setup. The weekly review reads this file before planning each week.*
+
 1. [Priority from the goals conversation]
 2. ...
 3. ...
@@ -465,6 +470,7 @@ Preferences get written to `life-ops-config.md`.
 ### Phase 6: Seed Remaining Files
 
 Create the remaining files with minimal content:
+- Monthly Goals.md — seeded with priorities from the Phase 2 goals conversation (see template above)
 - Daily Log.md — empty, ready for first morning brief
 - [User's chosen name].md — empty, with year heading (this is the reflection file — Journal by default)
 - Master Backlog.md — empty, with brief explanation of purpose
@@ -577,7 +583,7 @@ Create the remaining files with minimal content:
 
 ### Weekly Review
 
-**Reads:** All daily log entries from the past week, Weekly Goals (current week), all project trackers (full docs), all project strategy docs, Ops Plan (dashboard + monthly priorities), Reflections.md (past week), Goals.md, config
+**Reads:** All daily log entries from the past week, Weekly Goals (current week), all project trackers (full docs), all project strategy docs, Ops Plan (dashboard), Monthly Goals.md, Reflections.md (past week), Goals.md, config
 
 **Writes:** Next week's Weekly Goals (including: review of last week with patterns/scores/financial zone/monthly priority check, this week's outcome-directions, pre-mortems, system notes — the full operating context the daily briefing needs), updates Ops Plan dashboard (full sync), updates all project trackers, archives past week from Daily Log to Past/Archive, Reflections.md (if user shares a personal reflection — but operational review content goes into Weekly Goals, not Reflections)
 
@@ -591,9 +597,9 @@ Create the remaining files with minimal content:
 
 3. **Archive and sync:** Trim yesterday's entries to Done-only. Archive the past week's Daily Log entries to Past/Archive. Update the Command Center dashboard to reflect current state across ALL projects. This is the full tracker sync — the equivalent of running update-tracker across everything. Check each project tracker against the Ops Plan dashboard and reconcile any drift.
 
-4. **Check against Monthly Priorities:** Read the Monthly Priorities section in the Ops Plan. Before proposing next week's plan, check: does the proposed week serve at least one of the monthly priorities? If not, name the gap explicitly. A quick sentence is enough: "This week's plan serves priorities #1 and #2. Priority #3 hasn't had a dedicated nudge — worth adding something?" The point is awareness, not guilt.
+4. **Check against Monthly Goals:** Read `Monthly Goals.md`. Before proposing next week's plan, check: does the proposed week serve at least one of the monthly priorities? If not, name the gap explicitly. A quick sentence is enough: "This week's plan serves priorities #1 and #2. Priority #3 hasn't had a dedicated nudge — worth adding something?" The point is awareness, not guilt.
 
-   If Monthly Priorities are missing or stale (more than 5 weeks old), flag it: "Monthly priorities are stale — next monthly review should refresh them."
+   If `Monthly Goals.md` is missing or stale (more than 5 weeks old), flag it: "Monthly goals are stale — next monthly review should refresh them."
 
 5. **Plan next week:** Based on the Command Center dashboard, monthly priorities, and what happened this week, propose a concrete focus for next week. What are the 1-2 things that matter most? Connect them to monthly priorities where possible. These become the outcome-directions in the new Weekly Goals.
 
@@ -617,13 +623,13 @@ Create the remaining files with minimal content:
 
 ### Monthly Review
 
-**Reads:** All weekly reviews from the past month, Goals.md, all project strategy docs, all project trackers, Ops Plan, Reflections.md (past 4 weeks), Master Backlog, calendar (next 30 days if connected), config
+**Reads:** All weekly reviews from the past month, Goals.md, all project strategy docs, all project trackers, Ops Plan, Monthly Goals.md, Reflections.md (past 4 weeks), Master Backlog, calendar (next 30 days if connected), config
 
-**Writes:** Updates Goals.md (if milestones shifted), updates Ops Plan (dashboard + Monthly Priorities + time-sensitive section), updates ALL project trackers that changed, Reflections.md (if user shares)
+**Writes:** Updates Goals.md (if milestones shifted), updates Ops Plan (dashboard + time-sensitive section), updates Monthly Goals.md (replaces with next month's priorities), updates ALL project trackers that changed, Reflections.md (if user shares)
 
 **Flow:**
 
-1. **Read the North Star and Current State:** Read Goals.md (long-term vision, annual milestones), Ops Plan (project dashboard, monthly priorities), Past/Archive (what actually got done last 4 weeks), Master Backlog (anything to promote or drop), all project trackers.
+1. **Read the North Star and Current State:** Read Goals.md (long-term vision, annual milestones), Ops Plan (project dashboard), Monthly Goals.md (current month's priorities), Past/Archive (what actually got done last 4 weeks), Master Backlog (anything to promote or drop), all project trackers.
 
 2. **Scan journal for Patterns:** Read the past 4 weeks of the journal file. Look for:
    - Recurring frustrations or friction points — things that keep coming up
@@ -663,7 +669,7 @@ Create the remaining files with minimal content:
 
    - **Goals.md** — update milestones if shifted, add/remove as agreed
    - **Ops Plan — Project Dashboard** — update status and next action for EVERY project that changed. The "Next Action" field is what the daily briefing reads — it must be current.
-   - **Ops Plan — Monthly Priorities** — replace with new month's priorities (3-5 items, specific enough to evaluate, balanced across goal areas, informed by calendar)
+   - **Monthly Goals.md** — replace entirely with next month's priorities (3-5 items, specific enough to evaluate, balanced across goal areas, informed by calendar)
    - **All Project Trackers** — update any tracker whose status or next action shifted
    - **Master Backlog** — update promoted/dropped items
 
@@ -674,7 +680,7 @@ Create the remaining files with minimal content:
 **Important notes:**
 - This review is a CONVERSATION, not a report. Present research, then listen. The user's judgment about their own life priorities is what matters — the system's job is to surface what the data shows and ask good questions.
 - Be honest but compassionate. If something is drifting, name it clearly without guilt-tripping.
-- If this is an automated run and the user isn't present: produce the full review as a report, do NOT update Goals.md (requires their agreement), DO set Monthly Priorities based on best judgment, hold questions for them to respond to later.
+- If this is an automated run and the user isn't present: produce the full review as a report, do NOT update Goals.md (requires their agreement), DO update Monthly Goals.md based on best judgment, hold questions for them to respond to later.
 
 ---
 
@@ -761,7 +767,7 @@ See `docs/backlog/deferred-features.md`.
 
 **Reflections are the self-awareness layer.** Every review prompts for them. Weekly and monthly reviews read them for patterns. They're captured in the user's own words. This is what elevates the system from task management to something that actually helps you understand yourself.
 
-**The cascade keeps everything connected.** Goals → Monthly Priorities → Weekly Goals → Daily Plan. Each layer checks the one above it. The weekly review is the enforcement mechanism — it explicitly names gaps between the weekly plan and monthly priorities.
+**The cascade keeps everything connected.** Goals → Monthly Goals.md → Weekly Goals → Daily Plan. Each layer checks the one above it. The weekly review is the enforcement mechanism — it explicitly names gaps between the weekly plan and the current month's goals.
 
 **Reviews prompt strategy evolution.** Weekly reviews lightly ask "does anything feel off?" Monthly reviews explicitly audit whether projects still serve their goals and whether strategies still make sense.
 
@@ -800,7 +806,7 @@ life-ops/
 
 **Configurable skills:** Users install the full plugin but can toggle user-facing skills on/off. The only hard dependency is that `setup` must run first (it creates the files everything else reads). Supporting infrastructure skills (`session-digest`, `vault-drift-check`) are not toggleable — they're invoked by other skills and the scheduler.
 
-If a user turns off `weekly-review`, the daily rhythm still works — they lose the compounding layer and will eventually get stale Monthly Priorities flagged. If `monthly-review` is off, the weekly review's cascade check still runs but will note that priorities haven't been refreshed. If `daily-triage` is off, the daily brief still runs but will see un-sorted Inbox items and unflagged deadlines — degraded but not broken. Graceful degradation, not breakage.
+If a user turns off `weekly-review`, the daily rhythm still works — they lose the compounding layer and will eventually get a stale `Monthly Goals.md` flagged. If `monthly-review` is off, the weekly review's cascade check still runs but will note that `Monthly Goals.md` hasn't been refreshed. If `daily-triage` is off, the daily brief still runs but will see un-sorted Inbox items and unflagged deadlines — degraded but not broken. Graceful degradation, not breakage.
 
 **Platform-specific behavior:**
 
