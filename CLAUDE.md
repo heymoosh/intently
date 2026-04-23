@@ -69,22 +69,25 @@ Cap exists so the Test Gap Steward doesn't grow coverage into time we don't have
 
 CLAUDE.md is updated when guidance drifts from reality. Any routine/loop that spots drift proposes the fix.
 
-## Routine and loop pack (MVP-7)
+## Routine and loop pack (MVP-10)
 
-Structural authority: `docs/Claude Code Repo-Ready Blueprint.md`. Everything outside the MVP-7 is in the manual's "Add if pain" appendix and stays off until a specific pain materializes.
+Structural authority: `docs/Claude Code Repo-Ready Blueprint.md`. All jobs auto-run via launchd (`~/Library/LaunchAgents/com.intently.*.plist`). Loops gated to 07:30–22:30 local; routines fire at fixed times. Sonnet 4.6 default; Opus 4.7 for Agent Memory. Auto-fix routines push only to `auto/*` branches and open draft PRs — never commit to `main`.
 
-- `.claude/routines/ai-eval-batch-steward.md` — nightly + on AI commit.
-- `.claude/routines/spec-conformance-steward.md` — nightly + pre-demo.
-- `.claude/routines/privacy-steward.md` — every push + pre-release.
-- `.claude/routines/agent-memory-steward.md` — every 2 days + pre-release.
-- `.claude/loops/build-watchdog.md` — `/loop 30m`.
-- `.claude/loops/critical-flow-check.md` — `/loop 30m`.
-- `.claude/loops/eval-spot-check.md` — `/loop 60m`, only when editing AI behavior.
+- `.claude/routines/ai-eval-batch-steward.md` — 02:07 daily.
+- `.claude/routines/spec-conformance-steward.md` — 02:13 daily (report-only; criteria Behavior is immutable).
+- `.claude/routines/privacy-steward.md` — 02:19 daily (auto-fixes LOW/MEDIUM).
+- `.claude/routines/agent-memory-steward.md` — 02:25 every 2 days (Opus 4.7).
+- `.claude/routines/release-readiness-steward.md` — 07:00 daily; morning go/no-go synthesis into `TRACKER.md`.
+- `.claude/routines/session-handoff-steward.md` — 22:45 daily; overwrites `.claude/session-handoff.md`.
+- `.claude/loops/build-watchdog.md` — every 30 min (shell-first; LLM only on fail).
+- `.claude/loops/critical-flow-check.md` — every 30 min; rotates demo flows.
+- `.claude/loops/eval-spot-check.md` — every 60 min; gated on `agents/*/SKILL.md` mtime.
+- `.claude/loops/criteria-sync-loop.md` — every 2 h; report-only fidelity audit.
 
-Plus the deterministic gitleaks push gate in `.github/workflows/security.yml`.
+Plus the deterministic gitleaks push gate in `.github/workflows/security.yml` and the criteria-creation gate in `.githooks/pre-commit`.
 
 **Cost discipline:** a loop producing nothing actionable 3 sessions running gets demoted or killed; a routine whose report goes unread for a week gets paused.
 
 ## Session handoff
 
-Convention: `docs/process/session-handoff.md`. The rolling file is `.claude/session-handoff.md` and is the first thing the next session reads.
+Convention: `docs/process/session-handoff.md`. The rolling file is `.claude/session-handoff.md` and is the first thing the next session reads. At session start, if `TRACKER.md` has a "Critical items awaiting review" section with items in it, walk through those with Muxin before substantive work.
