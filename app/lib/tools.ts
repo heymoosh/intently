@@ -1,3 +1,4 @@
+// smoke test: auto-merge verified 2026-04-23
 /**
  * Tool scaffolds with mock implementations.
  *
