@@ -1,0 +1,37 @@
+name: docs-check
+
+# Deterministic, stack-agnostic doc-hygiene checks. Runs on every push and PR
+# so CLAUDE.md bloat (and any future doc caps) is caught even if someone
+# bypasses the local pre-commit hook with --no-verify or a fresh clone without
+# `git config core.hooksPath .githooks`.
+#
+# CLAUDE.md cap rule lives in CLAUDE.md itself (top-of-file "House rule" note):
+#   Hard cap 100 lines. Soft target 75.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  claude-md-size:
+    name: CLAUDE.md size cap
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enforce CLAUDE.md <= 100 lines
+        run: |
+          set -euo pipefail
+          if [ ! -f CLAUDE.md ]; then
+            echo "::error::CLAUDE.md missing at repo root."
+            exit 1
+          fi
+          lines=$(wc -l < CLAUDE.md | tr -d ' ')
+          echo "CLAUDE.md: $lines lines"
+          if [ "$lines" -gt 100 ]; then
+            echo "::error file=CLAUDE.md::CLAUDE.md is $lines lines (hard cap 100). Refactor: move detail into docs/process/ or docs/architecture/ and link it from CLAUDE.md. Rule: pointers > content."
+            exit 1
+          fi
+          if [ "$lines" -gt 75 ]; then
+            echo "::warning file=CLAUDE.md::CLAUDE.md is $lines lines (soft target 75, hard cap 100). Non-blocking — consider trimming."
+          fi
