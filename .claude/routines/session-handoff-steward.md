@@ -22,8 +22,8 @@ Honest caveat: the LLM can only capture what's in git, routine outputs, and the 
 
 - `git log --since='24 hours ago' --stat` — today's commits with file touch stats
 - `git diff` summary for any uncommitted changes
-- `$REPO/.claude/routine-output/*-<today>.md` — today's routine reports
-- `$REPO/.claude/routine-output/*-<today>-<HHMM>.md` — today's loop reports
+- `$REPO/routine-output/*-<today>.md` — today's routine reports
+- `$REPO/routine-output/*-<today>-<HHMM>.md` — today's loop reports
 - `$REPO/.claude/session-handoff.md` — the existing handoff (especially "Status", "Next", "Open questions", "Locked decisions", "Timeline", "Recent routine runs")
 - `$REPO/TRACKER.md` — current phase / status / next actions
 - Open auto-fix PRs from overnight (`gh pr list --search 'auto/'`)

@@ -124,7 +124,7 @@ jobs:
           echo "Changed files:"
           echo "$FILES"
 
-          MECHANICAL_RE='^(\.claude/routine-output/|\.claude/session-handoff\.md$|TRACKER\.md$)'
+          MECHANICAL_RE='^(routine-output/|\.claude/session-handoff\.md$|TRACKER\.md$)'
           CODE_RE='^(agents/|app/|supabase/|tests/|evals/(datasets|rubrics|baselines|runner)/|scripts/|\.githooks/|\.github/workflows/)'
 
           ALL_MECHANICAL=true

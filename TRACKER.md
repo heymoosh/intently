@@ -8,19 +8,35 @@
 **Status:** 🟡 On track.
 **Last:** Expo app scaffolded in `app/` (TypeScript, Past/Present/Future `PagerView` shell, `react-native-markdown-display` rendering, stub voice button). Typecheck green.
 **Next:** Managed Agents TS SDK wiring (skill loader: concat `agents/_shared/life-ops-conventions.md` + `agents/<skill>/SKILL.md` → agent definition).
-**Last updated:** 2026-04-22
+**Last updated:** 2026-04-23
+
+### Today's Go/No-Go (2026-04-23)
+
+| Flow | Verdict | Top risk |
+|---|---|---|
+| Daily Brief | **BLOCK** | All 5 demo-critical criteria `unknown`; F-DB-03/04 need rework before evals can be authored |
+| Daily Review | **BLOCK** | 5 demo-critical criteria `unknown`; 3 criteria have spec scope drift |
+| Weekly Review | **BLOCK** | CR-wr-01 + CR-wr-02 directly contradict spec — must re-derive before any evals |
+
+**Top 3 blockers:**
+1. **CR-wr-01 + CR-wr-02 contradict spec** — decide qualitative vs numeric, then run `/derive-criteria weekly-review`
+2. **All 11 demo-critical criteria `unknown`** — gates on today's Michael Cohen managed-agents session → ci.yml → eval datasets
+3. **Stable-ID columns missing from Supabase** `projects`/`events`/`conversations`/`profiles` (HIGH, latent until Session 2)
+
+**PRs needing review:** #2–#7 (build-loop, stacked — merge in order, 84/84 tests pass)
+**Missing signals:** ai-eval-batch, spec-conformance, privacy routines produced no output for 04-23 (probable cause: working-tree conflict during build-loop iteration 5; see release-readiness report for diagnostic)
 
 ## Critical items awaiting review
 
 *Populated by `release-readiness-steward` at 03:00 daily when overnight routines surface items that need human decision (not auto-fixable). Empty = nothing blocking. Per CLAUDE.md, Claude walks through these with Muxin at session start before substantive work.*
 
-_(none)_
+1. **Spec decision: weekly-review scoring (qualitative vs numeric)** — CR-wr-01 and CR-wr-02 directly contradict spec. Spec says "Rate 1-10 on four axes"; criteria say "no numeric score." SKILL.md matches spec. Either keep numeric (rewrite criteria) or amend the spec to qualitative-only — either way, run `/derive-criteria weekly-review` after. Confirmed HIGH by both spec-conformance and criteria-sync stewards. `docs/product/acceptance-criteria/weekly-review.md`
+2. **Spec decision: daily-review scope** — Three criteria (CR-dr-03 pattern detection, CR-dr-05 tomorrow-shaping, CR-dr-01 re-reads calendar/email) attribute capabilities spec puts in weekly-review or daily-brief. Spec decision owed before Friday's eval-dataset authoring. `docs/product/acceptance-criteria/daily-review.md`
 
 ## Follow-ups (pending flight test / manual steps)
 
-- **Promote overnight build loop to recurring** — first flight tonight (2026-04-22 → 23). Brief: `.claude/loops/overnight-build-loop.md`. If ≥3 clean PRs ship, add a `build-loop` case to `~/.intently/bin/intently-routine.sh` + a launchd plist firing at 23:30 daily. Each schedule re-picks model/effort against `/Users/Muxin/Documents/Personal Obsidian/Projects/Opus 4-7 Hackathon/Claude Code Practices/When to use opus 4.6, 4.7, and sonnet 4.6.md` per that night's scope.
-- **Release-readiness plist move 07:00 → 03:00** — ✅ DONE 2026-04-22 evening. Live plist Hour=3 confirmed via `plutil`. First scheduled fire: 2026-04-23 03:00 local (see verification item below).
-- **Verify release-readiness 03:00 first fire** — 2026-04-23 ~03:05+. Check `~/.intently/logs/release-readiness.log` for a START/END pair; confirm `.claude/routine-output/release-readiness-2026-04-23.md` exists and contains the per-demo-flow go/no-go synthesis. If the wrapper's post-run integrity check logs a WARN ("expected output missing"), the agent wrote somewhere wrong — prompt tuning needed.
+- **Promote overnight build loop to recurring** — ✅ DONE 2026-04-22/23 first flight: 6 PRs shipped, 84 tests, 0 failures. Add `build-loop` case to `~/.intently/bin/intently-routine.sh` + launchd plist at 23:30 daily. Watch first weeknight run for working-tree conflicts with active human branches.
+- **Verify release-readiness 03:00 first fire** — ✅ DONE 2026-04-23. Report synthesized (see `release-readiness-2026-04-23.md`). Routine writer was blocked by working-tree conflict from build-loop iter 5 — fix: add git stash bracket or dedicated worktree to prevent overnight routine conflicts.
 - **Verify auto-merge-safe.yml classifies correctly** — runs after any `auto/*` PR triggers `security.yml`. Fastest test path: `launchctl kickstart gui/$(id -u)/com.intently.privacy` to force a real draft PR from the privacy steward, then watch GitHub Actions tab. Mechanical paths should auto-merge; docs should flip ready + get `needs-muxin-review` label; code should stay draft. `--admin` flag bypasses branch protection (there is none yet).
 - **Delete stale remote branch** — `git push origin --delete feat/slim-claude-md` (old branch name before this session's rescope; current session committed on `feat/mvp10-scaffold-and-infra`). Safe — no unique commits on the old remote.
 - **Thursday 2026-04-23 post-stack-decision** — wire `ci.yml` (lint, typecheck, unit tests, build) per stack. Then update `auto-merge-safe.yml` to move code PRs from "stays draft" to "auto-merge on ci.yml + security.yml both green." That completes the "auto-fix anything that can be fixed without me" intent.
@@ -55,11 +71,13 @@ _(none)_
 ## Timeline
 
 - Hackathon: 2026-04-21 → 2026-04-26 (submission deadline 2026-04-26)
-- Today: 2026-04-22
-- Days remaining: 4
+- Today: 2026-04-23
+- Days remaining: 3
 
 ## Done
 
+- 2026-04-22 — Release-readiness plist moved 07:00 → 03:00. Live plist Hour=3 confirmed via `plutil`.
+- 2026-04-22/23 — Overnight build-loop first flight: 6 PRs (#2–#7), 84 tests passing, 0 failures, gitleaks clean.
 - Docs: `vision.md`, `life-ops-plugin-spec.md`, `app-experience.md`, `data-model.md`, `document-taxonomy.md`.
 - ADRs: 0001 (runtime), 0002 (data store), 0003 (tech stack).
 - Backlog folder: deferred content moved out of active doc tree.

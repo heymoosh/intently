@@ -18,7 +18,7 @@ Daily morning run (not Saturday-only) is deliberate: a silent blocker on Wednesd
 
 ## Inputs
 
-- Today's routine outputs: `$REPO/.claude/routine-output/*-<YYYY-MM-DD>.md`
+- Today's routine outputs: `$REPO/routine-output/*-<YYYY-MM-DD>.md`
   - `ai-eval-batch-<date>.md`
   - `spec-conformance-<date>.md`
   - `privacy-<date>.md`
@@ -30,7 +30,7 @@ Daily morning run (not Saturday-only) is deliberate: a silent blocker on Wednesd
 
 ## Output
 
-- `$REPO/.claude/routine-output/release-readiness-<YYYY-MM-DD>.md` — full synthesis
+- `$REPO/routine-output/release-readiness-<YYYY-MM-DD>.md` — full synthesis
 - Prepended block in `$REPO/TRACKER.md` under the Status section: `### Today's Go/No-Go (<date>)` with demo flow scorecard + top 3 blockers + list of open auto-fix PRs needing review
 - No commits / PRs — synthesizer only
 
@@ -54,7 +54,7 @@ to tell Muxin at 8am: "Today you could demo these N flows; these M are
 blocked; here are the top 3 things to fix first."
 
 Tasks:
-1. Read today's routine outputs in .claude/routine-output/*-<today>.md.
+1. Read today's routine outputs in routine-output/*-<today>.md.
    If any routine's report for today is missing, note that explicitly — don't
    silently skip it.
 2. For each demo flow (daily brief / daily review / weekly review):
@@ -72,7 +72,7 @@ Tasks:
 5. If anything is ambiguous or missing, say so — do not optimistically mark
    things SHIP when the evidence is thin.
 
-Output to .claude/routine-output/release-readiness-<date>.md:
+Output to routine-output/release-readiness-<date>.md:
 - "## Today's Go/No-Go (<date>)"
 - Per-flow table (flow | verdict | top risk | evidence)
 - "## Top 3 blockers" with file/line refs where applicable

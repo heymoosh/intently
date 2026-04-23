@@ -28,11 +28,11 @@ Off-hours: silent. Nightly Spec Conformance Steward covers that window.
 - `$REPO/docs/product/acceptance-criteria/*.md` — every criterion file
 - `$REPO/docs/product/requirements/life-ops-plugin-spec.md` — the spec
 - `git log --since='<last run>'` — criteria + spec + agents/ commits since the prior run
-- Previous loop report if any: `$REPO/.claude/routine-output/criteria-sync-*.md`
+- Previous loop report if any: `$REPO/routine-output/criteria-sync-*.md`
 
 ## Output
 
-- If drift found: `$REPO/.claude/routine-output/criteria-sync-<YYYY-MM-DD>-<HHMM>.md`
+- If drift found: `$REPO/routine-output/criteria-sync-<YYYY-MM-DD>-<HHMM>.md`
 - If clean: a one-line note in the log, no output file. Silent loops are correct loops.
 
 ## Loop prompt
@@ -66,7 +66,7 @@ If no findings, write a one-line note to $LOG (the wrapper handles this)
 and exit 0 without writing an output file.
 
 If findings:
-- Write to .claude/routine-output/criteria-sync-<date>-<hhmm>.md.
+- Write to routine-output/criteria-sync-<date>-<hhmm>.md.
 - Do NOT edit any criterion file. Do NOT open a PR. Surface findings only.
 - For HIGH findings, also suggest the spec update needed + the re-derivation
   command (/derive-criteria <skill>).
