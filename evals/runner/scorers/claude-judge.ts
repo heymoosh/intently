@@ -81,13 +81,16 @@ function buildJudgePrompt(args: {
 }
 
 async function makeDefaultClient(): Promise<AnthropicClient> {
-  const { default: Anthropic } = await import('@anthropic-ai/sdk');
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     throw new EvalError(
       'ANTHROPIC_API_KEY not set; pass opts.client for testing or set the env var for real calls.'
     );
   }
+  // @ts-ignore — @anthropic-ai/sdk is in app/node_modules/; tsc resolving from evals/runner/scorers/
+  // walks up through evals/ and never reaches app/. tsx finds it at runtime via app/package.json.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { default: Anthropic } = await (import('@anthropic-ai/sdk') as Promise<any>);
   return new Anthropic({ apiKey }) as unknown as AnthropicClient;
 }
 
