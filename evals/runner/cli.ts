@@ -3,12 +3,14 @@ import { join } from 'node:path';
 import { loadDataset, loadRubric, loadBaseline, runEval } from './runner';
 import type { EvalReport, ExecuteFn, ScoreFn, AxisScores } from './types';
 import { EvalError } from './types';
+import { makeClaudeJudgeScorer } from './scorers/claude-judge';
 
 export type CliArgs = {
   skill: string;
   evalsRoot: string;
   out?: string;
   prettyPrint: boolean;
+  scorer?: 'stub' | 'claude';
 };
 
 export class CliUsageError extends Error {
@@ -19,7 +21,7 @@ export class CliUsageError extends Error {
 }
 
 const USAGE = [
-  'Usage: eval-runner --skill <name> [--evals-root <path>] [--out <path>] [--pretty]',
+  'Usage: eval-runner --skill <name> [--evals-root <path>] [--out <path>] [--pretty] [--scorer <stub|claude>]',
   '',
   'Options:',
   '  --skill <name>         Required. Which skill to run the eval batch against.',
@@ -27,6 +29,8 @@ const USAGE = [
   '  --out <path>           If set, write the JSON report to this path.',
   '                         Otherwise the report is printed to stdout.',
   '  --pretty               Format JSON output with 2-space indentation.',
+  '  --scorer <name>        Scorer to use: "stub" (default) or "claude" (LLM judge).',
+  '                         "claude" requires ANTHROPIC_API_KEY.',
   '  --help, -h             Show this message.',
 ].join('\n');
 
@@ -35,6 +39,7 @@ export function parseArgs(argv: string[]): CliArgs {
   let evalsRoot: string | undefined;
   let out: string | undefined;
   let prettyPrint = false;
+  let scorer: 'stub' | 'claude' | undefined;
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -57,6 +62,15 @@ export function parseArgs(argv: string[]): CliArgs {
       case '--pretty':
         prettyPrint = true;
         break;
+      case '--scorer': {
+        const raw = requireValue(argv, i, '--scorer');
+        i++;
+        if (raw !== 'stub' && raw !== 'claude') {
+          throw new CliUsageError(`--scorer must be "stub" or "claude", got "${raw}"\n\n${USAGE}`);
+        }
+        scorer = raw;
+        break;
+      }
       default:
         if (arg !== undefined && arg.startsWith('--skill=')) {
           skill = arg.slice('--skill='.length);
@@ -64,6 +78,12 @@ export function parseArgs(argv: string[]): CliArgs {
           evalsRoot = arg.slice('--evals-root='.length);
         } else if (arg !== undefined && arg.startsWith('--out=')) {
           out = arg.slice('--out='.length);
+        } else if (arg !== undefined && arg.startsWith('--scorer=')) {
+          const raw = arg.slice('--scorer='.length);
+          if (raw !== 'stub' && raw !== 'claude') {
+            throw new CliUsageError(`--scorer must be "stub" or "claude", got "${raw}"\n\n${USAGE}`);
+          }
+          scorer = raw;
         } else {
           throw new CliUsageError(`Unknown argument: ${arg}\n\n${USAGE}`);
         }
@@ -79,6 +99,7 @@ export function parseArgs(argv: string[]): CliArgs {
     evalsRoot: evalsRoot ?? join(process.cwd(), 'evals'),
     out,
     prettyPrint,
+    scorer,
   };
 }
 
@@ -157,12 +178,21 @@ export async function runCli(
   const rubric = await loadRubric(args.evalsRoot, args.skill);
   const baseline = await loadBaseline(args.evalsRoot, args.skill);
 
+  let scoreFn: ScoreFn;
+  if (opts.scoreFn) {
+    scoreFn = opts.scoreFn;
+  } else if (args.scorer === 'claude') {
+    scoreFn = makeClaudeJudgeScorer();
+  } else {
+    scoreFn = stubScorer;
+  }
+
   const report = await runEval({
     dataset,
     rubric,
     baseline,
     executeFn: opts.executeFn ?? stubExecutor,
-    scoreFn: opts.scoreFn ?? stubScorer,
+    scoreFn,
     now: opts.now,
   });
 

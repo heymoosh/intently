@@ -53,6 +53,20 @@ test('parseArgs --help surfaces as a usage error (caller decides exit code)', ()
   );
 });
 
+test('parseArgs accepts --scorer claude and --scorer=stub', () => {
+  const a = parseArgs(['--skill', 'daily-brief', '--scorer', 'claude']);
+  assert.equal(a.scorer, 'claude');
+  const b = parseArgs(['--skill', 'daily-brief', '--scorer=stub']);
+  assert.equal(b.scorer, 'stub');
+});
+
+test('parseArgs rejects unknown --scorer value', () => {
+  assert.throws(
+    () => parseArgs(['--skill', 'daily-brief', '--scorer', 'gpt']),
+    (err: unknown) => err instanceof CliUsageError && err.message.includes('"stub" or "claude"'),
+  );
+});
+
 // ---------- runCli ----------
 
 type EvalRoot = { root: string; cleanup: () => Promise<void> };
