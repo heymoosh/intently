@@ -1,12 +1,39 @@
-# Commands Muxin types manually
+Port tokens + set up fonts in one track. That unblocks every subsequent component-authoring track.                               
+                                                         
+./scripts/intently-track.sh design-tokens-port "$(cat docs/process/session-prompt-design-tokens-port.md)"
+
+
+A. Demo seed data (HIGH value — unblocks demo recording)                                                                         
+
+./scripts/intently-track.sh seed-data-v1 "$(cat docs/process/session-prompt-seed-data-v1.md)"
+
+
+B. Dependency audit in security.yml (LOW effort, MEDIUM value)                                                                   
+./scripts/intently-track.sh npm-audit-ci "$(cat docs/process/session-prompt-npm-audit-ci.md)"                                    
+
+
+
+
+# Commands to type manually
 
 Reference for the two user-facing automation entry points. Everything else is either a git operation you already know or a slash command documented elsewhere.
 
 ---
 
-## `intently-track <slug> ["prompt"]`
+intently-track <slug> "prompt"
 
 Start a new parallel-work track. Opens a fresh Claude Code session inside a dedicated git worktree.
+
+
+/babysit-prs
+
+Start the PR babysit loop in the current Claude session. Closes if session exits, runs every 15 mins.
+
+
+
+---
+
+## intently-track <slug> "prompt"
 
 ```bash
 # From the repo root:
