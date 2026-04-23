@@ -8,7 +8,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "test:unit": "tsx --test lib/**/*.test.ts"
+    "test:unit": "tsx --test lib/**/*.test.ts ../evals/runner/**/*.test.ts"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
