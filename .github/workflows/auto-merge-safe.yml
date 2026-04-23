@@ -1,18 +1,24 @@
 name: auto-merge-safe
 
-# Classifies auto/* PRs opened by scheduled routines and acts per policy:
-#   - Mechanical paths only (routine-output / TRACKER.md / session-handoff.md)
-#     → auto-merge once security.yml passes. No human review.
-#   - Any docs/config change (docs/**, CLAUDE.md, .gitignore, etc.)
-#     → flip ready-for-review, label, comment. Muxin reviews (reads these).
-#   - Any code change (agents/**, app/**, supabase/**, tests/**, evals/{datasets,rubrics,baselines}/**)
-#     → leave as draft, explanatory comment. Waits for ci.yml (Thursday Apr 23).
+# Classifies auto/* and feat/track-* PRs and auto-merges when safe.
 #
-# Triggered after security.yml completes so we know gitleaks passed before acting.
+#   Mechanical paths (routine-output / TRACKER.md / session-handoff.md)
+#     → auto-merge once security.yml passes. No human review.
+#   Docs/config paths (docs/**, CLAUDE.md, .gitignore, etc.)
+#     → flip ready-for-review, label, comment. Muxin reads these.
+#   Code paths (agents/**, app/**, supabase/**, tests/**, evals/**, scripts/**)
+#     → auto-merge once security.yml AND ci.yml both pass. Gated on tests green.
+#
+# Fires after either security.yml or ci.yml completes so the last gate to land
+# triggers the decision. Idempotent — if both have already passed when the
+# later one finishes, we merge; if one later fails, we no-op.
+#
+# Escape hatch: any PR with label `needs-muxin-review` is skipped entirely.
+# Add that label from the babysit-prs loop when semantic judgment is required.
 
 on:
   workflow_run:
-    workflows: [security]
+    workflows: [security, ci]
     types: [completed]
   workflow_dispatch:
     inputs:
@@ -27,12 +33,13 @@ permissions:
 jobs:
   classify-and-act:
     runs-on: ubuntu-latest
-    # Only act on successful security runs for auto/* branches (or manual dispatch).
+    # Only act on auto/* or feat/track-* branches (or manual dispatch).
     if: >
       github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.event == 'pull_request' &&
        github.event.workflow_run.conclusion == 'success' &&
-       startsWith(github.event.workflow_run.head_branch, 'auto/'))
+       (startsWith(github.event.workflow_run.head_branch, 'auto/') ||
+        startsWith(github.event.workflow_run.head_branch, 'feat/track-')))
     steps:
       - name: Resolve PR number
         id: pr
@@ -56,9 +63,52 @@ jobs:
           echo "number=$PR" >> "$GITHUB_OUTPUT"
           echo "skip=false" >> "$GITHUB_OUTPUT"
 
+      - name: Check human-review label
+        id: label
+        if: steps.pr.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR: ${{ steps.pr.outputs.number }}
+        run: |
+          set -euo pipefail
+          HAS_LABEL=$(gh pr view "$PR" --repo "$REPO" --json labels \
+            --jq '[.labels[].name] | any(. == "needs-muxin-review")')
+          echo "needs_review=$HAS_LABEL" >> "$GITHUB_OUTPUT"
+          if [ "$HAS_LABEL" = "true" ]; then
+            echo "PR $PR has needs-muxin-review label; skipping."
+          fi
+
+      - name: Check workflow statuses on head SHA
+        id: gates
+        if: steps.pr.outputs.skip != 'true' && steps.label.outputs.needs_review != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR: ${{ steps.pr.outputs.number }}
+        run: |
+          set -euo pipefail
+          HEAD_SHA=$(gh pr view "$PR" --repo "$REPO" --json headRefOid --jq '.headRefOid')
+          HEAD_REF=$(gh pr view "$PR" --repo "$REPO" --json headRefName --jq '.headRefName')
+
+          status_for() {
+            local wf="$1"
+            gh run list --repo "$REPO" \
+              --workflow="$wf" --branch="$HEAD_REF" \
+              --limit 5 --json conclusion,status,headSha \
+              --jq "[.[] | select(.headSha == \"$HEAD_SHA\")][0] | .conclusion // .status // \"missing\""
+          }
+
+          SEC=$(status_for security)
+          CI=$(status_for ci)
+          echo "security=$SEC" >> "$GITHUB_OUTPUT"
+          echo "ci=$CI" >> "$GITHUB_OUTPUT"
+          echo "security on $HEAD_SHA: $SEC"
+          echo "ci on $HEAD_SHA: $CI"
+
       - name: Classify changed files
         id: scope
-        if: steps.pr.outputs.skip != 'true'
+        if: steps.pr.outputs.skip != 'true' && steps.label.outputs.needs_review != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
@@ -70,7 +120,7 @@ jobs:
           echo "$FILES"
 
           MECHANICAL_RE='^(\.claude/routine-output/|\.claude/session-handoff\.md$|TRACKER\.md$)'
-          CODE_RE='^(agents/|app/|supabase/|tests/|evals/(datasets|rubrics|baselines)/|scripts/|\.githooks/)'
+          CODE_RE='^(agents/|app/|supabase/|tests/|evals/(datasets|rubrics|baselines|runner)/|scripts/|\.githooks/|\.github/workflows/)'
 
           ALL_MECHANICAL=true
           ANY_CODE=false
@@ -88,19 +138,43 @@ jobs:
           echo "any_code=$ANY_CODE" >> "$GITHUB_OUTPUT"
 
       - name: Auto-merge mechanical PR
-        if: steps.pr.outputs.skip != 'true' && steps.scope.outputs.all_mechanical == 'true'
+        if: >
+          steps.pr.outputs.skip != 'true' &&
+          steps.label.outputs.needs_review != 'true' &&
+          steps.scope.outputs.all_mechanical == 'true' &&
+          steps.gates.outputs.security == 'success'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           PR: ${{ steps.pr.outputs.number }}
         run: |
           set -euo pipefail
-          # Flip from draft if still drafted by the routine; idempotent.
+          gh pr ready "$PR" --repo "$REPO" || true
+          gh pr merge "$PR" --repo "$REPO" --squash --delete-branch --admin
+
+      - name: Auto-merge code PR on ci + security green
+        if: >
+          steps.pr.outputs.skip != 'true' &&
+          steps.label.outputs.needs_review != 'true' &&
+          steps.scope.outputs.any_code == 'true' &&
+          steps.gates.outputs.security == 'success' &&
+          steps.gates.outputs.ci == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR: ${{ steps.pr.outputs.number }}
+        run: |
+          set -euo pipefail
           gh pr ready "$PR" --repo "$REPO" || true
           gh pr merge "$PR" --repo "$REPO" --squash --delete-branch --admin
 
       - name: Flip docs/config PR to ready-for-review
-        if: steps.pr.outputs.skip != 'true' && steps.scope.outputs.all_mechanical != 'true' && steps.scope.outputs.any_code != 'true'
+        if: >
+          steps.pr.outputs.skip != 'true' &&
+          steps.label.outputs.needs_review != 'true' &&
+          steps.scope.outputs.all_mechanical != 'true' &&
+          steps.scope.outputs.any_code != 'true' &&
+          steps.gates.outputs.security == 'success'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
@@ -112,13 +186,23 @@ jobs:
           gh pr comment "$PR" --repo "$REPO" --body \
             "Auto-classified: docs/config only. security.yml passed. Marked ready for review (you read these)."
 
-      - name: Leave code PR as draft with note
-        if: steps.pr.outputs.skip != 'true' && steps.scope.outputs.any_code == 'true'
+      - name: Comment on code PR when CI failed
+        if: >
+          steps.pr.outputs.skip != 'true' &&
+          steps.label.outputs.needs_review != 'true' &&
+          steps.scope.outputs.any_code == 'true' &&
+          steps.gates.outputs.ci == 'failure'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           PR: ${{ steps.pr.outputs.number }}
         run: |
           set -euo pipefail
-          gh pr comment "$PR" --repo "$REPO" --body \
-            "Auto-classified: touches code. Staying as draft until ci.yml exists (Thursday Apr 23 stack decision). Do not merge without lint/typecheck/tests running."
+          MARKER="<!-- auto-merge-safe:ci-failed -->"
+          EXISTING=$(gh pr view "$PR" --repo "$REPO" --json comments \
+            --jq "[.comments[].body | select(contains(\"$MARKER\"))] | length")
+          if [ "$EXISTING" = "0" ]; then
+            gh pr comment "$PR" --repo "$REPO" --body \
+              "$MARKER
+          ci.yml failed on this PR's head commit. Won't auto-merge. Fix typecheck / tests and re-push."
+          fi
