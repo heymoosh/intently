@@ -78,6 +78,12 @@ export function parseArgs(argv: string[]): CliArgs {
           evalsRoot = arg.slice('--evals-root='.length);
         } else if (arg !== undefined && arg.startsWith('--out=')) {
           out = arg.slice('--out='.length);
+        } else if (arg !== undefined && arg.startsWith('--scorer=')) {
+          const raw = arg.slice('--scorer='.length);
+          if (raw !== 'stub' && raw !== 'claude') {
+            throw new CliUsageError(`--scorer must be "stub" or "claude", got "${raw}"\n\n${USAGE}`);
+          }
+          scorer = raw;
         } else {
           throw new CliUsageError(`Unknown argument: ${arg}\n\n${USAGE}`);
         }
