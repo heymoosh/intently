@@ -40,6 +40,9 @@ git pull --ff-only
 
 Push local changes to remote.
 
+- Depends on changes. If you don't, intently-track will warn you that 'main worktree has uncommitted changes' and that means, 'local has changes not on remote and the new worktree will not inherit the local changes'. Okay to run if they don't conflict.
+
+
 
 
 Clean up stale work trees on command.
