@@ -5,7 +5,7 @@ import { SourceSerif4_400Regular } from '@expo-google-fonts/source-serif-4';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import Markdown from 'react-native-markdown-display';
+import Markdown from '@ronradtke/react-native-markdown-display';
 import PagerView from 'react-native-pager-view';
 import { supabase } from './lib/supabase';
 import { theme } from './lib/tokens';
