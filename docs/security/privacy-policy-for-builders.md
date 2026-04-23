@@ -25,7 +25,7 @@
 
 ## Anthropic API specific
 
-- **Prompt content retention:** default 30 days. If the plan supports Zero Data Retention, configure it.
+- **Prompt content retention:** default 30 days. If the plan supports Zero Data Retention, configure it. **Current status (2026-04-23): ZDR eligibility not yet verified for the account in use. Verify before first real-user eval run (target: Fri Apr 25).**
 - **Trust assumption:** Anthropic is trusted to handle prompt content per their stated terms. We do not need to additionally redact or hash content destined for the model — that would defeat the purpose. We *do* need to minimize what we send (rule 4 above).
 
 ## What "consent" means in V1
