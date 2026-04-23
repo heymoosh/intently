@@ -79,7 +79,8 @@ Structural authority: `docs/Claude Code Repo-Ready Blueprint.md`. All jobs auto-
 - `.claude/routines/spec-conformance-steward.md` — 02:13 daily (report-only; criteria Behavior is immutable).
 - `.claude/routines/privacy-steward.md` — 02:19 daily (auto-fixes LOW/MEDIUM).
 - `.claude/routines/agent-memory-steward.md` — 02:25 every 2 days (Opus 4.7).
-- `.claude/routines/release-readiness-steward.md` — 07:00 daily; morning go/no-go synthesis into `TRACKER.md`.
+- `.claude/routines/release-readiness-steward.md` — 03:00 daily; morning go/no-go synthesis into `TRACKER.md`.
+- `.claude/routines/scope-overnight-steward.md` — 21:00 daily; proposes tonight's overnight build-loop scope (Opus 4.7).
 - `.claude/routines/session-handoff-steward.md` — 22:45 daily; overwrites `.claude/session-handoff.md`.
 - `.claude/loops/build-watchdog.md` — every 30 min (shell-first; LLM only on fail).
 - `.claude/loops/critical-flow-check.md` — every 30 min; rotates demo flows.
