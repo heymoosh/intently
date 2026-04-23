@@ -103,7 +103,7 @@
   - Effort: low (session-handoff), medium (most), high (agent-memory).
   - Loop window: 07:30–22:30 local. Wrapper gates; off-hours fires exit silently.                                                                                
   - Cost projection: ~$6–11/day, ~$24–44 over 4-day sprint.                                                                                                      
-  - Active skills: daily-brief, daily-review, weekly-review, setup, update-tracker. Deferred: see docs/product/deferred-skills.md.                               
+  - Active skills: daily-brief, daily-review, weekly-review, setup, update-tracker. Deferred: see docs/backlog/deferred-features.md.                               
   - Pre-commit hook active: gitleaks + .env block + criteria-creation gate + CLAUDE.md size cap. Install: git config core.hooksPath .githooks (already set).     
   - Auto-fix branch protocol: routines push only to auto/<routine>/<date> — never to main or feat/*.                                                             
                                                                                                                                                                  
