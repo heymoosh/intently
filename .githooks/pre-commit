@@ -83,6 +83,21 @@ if printf '%s\n' "$staged" | grep -qx 'CLAUDE.md'; then
   fi
 fi
 
+# 5. npm audit on dependency changes.
+# Mirrors CI threshold (--audit-level=high). Only runs when app/package.json or
+# app/package-lock.json is staged — skips entirely on unrelated commits.
+if printf '%s\n' "$staged" | grep -qE '^app/package(-lock)?\.json$'; then
+  if command -v npm >/dev/null 2>&1; then
+    if ! (cd app && npm audit --audit-level=high --no-fund 2>&1); then
+      echo "pre-commit: npm audit found high/critical vulnerabilities in app/." >&2
+      echo "  Run 'npm audit --audit-level=high' in app/ for details." >&2
+      fail=1
+    fi
+  else
+    echo "pre-commit: npm not found; skipping audit check." >&2
+  fi
+fi
+
 if [ "$fail" -ne 0 ]; then
   echo "" >&2
   echo "Commit blocked. See CLAUDE.md (§ 'Acceptance criteria authoring rule'" >&2

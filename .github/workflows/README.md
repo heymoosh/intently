@@ -21,6 +21,10 @@ CI for Intently. Three workflows targeted; `release-gate.yml` added in the final
 - `secrets-scan` — runs gitleaks on every push/PR/nightly. Fails on any committed secret.
 - `deps-audit` — runs `npm audit --audit-level=high` in `app/` on every PR + nightly. Catches known-CVE dependencies deterministically. Threshold is `high` (not `moderate`) because 12 pre-existing moderate vulns inside Expo's internal tree cannot be resolved without a major breaking change; raise to `moderate` once those are cleared upstream.
 
+## Dependabot
+
+`.github/dependabot.yml` runs weekly (Monday 09:00 ET) against `app/` npm dependencies. Opens up to 5 PRs at a time with the `dependencies` label. Auto-merge-safe.yml will merge these automatically once security + CI checks pass.
+
 ## Why `security.yml` lands now
 
 Secrets scanning (gitleaks/trufflehog) and dependency vulnerability scanning are stack-agnostic. They protect against the highest-priority risk in the threat model (secret leak via committed code) and there's no reason to wait.
