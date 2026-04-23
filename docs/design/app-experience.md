@@ -93,10 +93,10 @@ This is the compromise that lets non-technical users install and use Intently wi
 ## Hackathon scope (what ships Apr 21–26)
 
 - Three-screen swipe shell (even if each screen is sparse).
-- Center screen: chat with the agent — voice-or-text in, cards + text out.
+- Center screen: chat with the agent — voice-or-text in, cards + text out. Today's log (rendered from morning briefing), today's to-dos (extracted from morning briefing).
 - Left screen: Journal (rendered), past daily reviews list.
-- Right screen: Goals.md (rendered), active project trackers list, today's to-do checkboxes.
-- Markdown rendering + lightweight in-app edit for `Weekly Goals.md`, `Daily Log.md`, `<Reflection>.md`, per-project `Tracker.md`.
+- Right screen: Goals.md (rendered only — project trackers are post-launch).
+- Markdown rendering + lightweight in-app edit for `Weekly Goals.md`, `Daily Log.md`, `<Reflection>.md`.
 - Three demo flows working end-to-end: Daily Brief (morning), Daily Review (evening), Weekly Review.
 - Undo (or confirm-before-apply) on every agent-originated write.
 
