@@ -58,6 +58,12 @@ supabase/seed.sql.bak
 .claude/launchd/bin/
 .claude/settings.local.json
 
+# === User-local scratch ===
+# Files under docs/process/usr-*.md are per-user notes (command cheatsheets,
+# personal workflow docs, scratch). Not meant to be shared or committed.
+# Any author can drop a usr-<slug>.md file here and it stays local.
+docs/process/usr-*.md
+
 # === Misc ===
 *.log
 tmp/
