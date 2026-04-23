@@ -1,15 +1,18 @@
-Port tokens + set up fonts in one track. That unblocks every subsequent component-authoring track.                               
-                                                         
-./scripts/intently-track.sh design-tokens-port "$(cat docs/process/session-prompt-design-tokens-port.md)"
-
-
-A. Demo seed data (HIGH value — unblocks demo recording)                                                                         
-
+  # Track B — demo seed data (new seed/ at repo root, docs classification → your review)
 ./scripts/intently-track.sh seed-data-v1 "$(cat docs/process/session-prompt-seed-data-v1.md)"
 
+  # Track C — npm audit in CI (.github/workflows/security.yml, merges on green CI)
+./scripts/intently-track.sh npm-audit-ci "$(cat docs/process/session-prompt-npm-audit-ci.md)"
 
-B. Dependency audit in security.yml (LOW effort, MEDIUM value)                                                                   
-./scripts/intently-track.sh npm-audit-ci "$(cat docs/process/session-prompt-npm-audit-ci.md)"                                    
+  # Track D — app README (app/README.md new file, code path → merges on green CI)
+./scripts/intently-track.sh app-readme "$(cat docs/process/session-prompt-app-readme.md)"
+
+  # Track E — Claude-as-judge eval scorer (evals/runner/scorers/, merges on green CI)
+./scripts/intently-track.sh claude-judge-scorer "$(cat docs/process/session-prompt-claude-judge-scorer.md)"
+
+
+
+
 
 
 
@@ -19,6 +22,11 @@ B. Dependency audit in security.yml (LOW effort, MEDIUM value)
 Reference for the two user-facing automation entry points. Everything else is either a git operation you already know or a slash command documented elsewhere.
 
 ---
+
+
+
+Clean up stale work trees on command.
+
 
 intently-track <slug> "prompt"
 
