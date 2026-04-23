@@ -10,11 +10,11 @@
 
 ---
 
-### CR-daily-brief-01: Brief is ready before user opens the app
+### CR-daily-brief-01: Brief data is pre-gathered on schedule; display and conversation start on user tap
 
-**Behavior:** The morning brief has been produced by a scheduled managed agent before the user opens the app at their typical morning time. The user does not wait for generation on first open.
+**Behavior:** The morning brief agent runs on schedule before the user's morning time, pre-gathering and processing context (calendar, email, project state) so no in-flight generation is needed. The brief is not displayed and the conversation does not begin until the user taps the button in the app — the UI does not auto-render or auto-start the flow on open.
 
-**Verification:** TBD — likely a managed-agent invocation timestamp check + an E2E test that opens the app and confirms cached content renders without an in-flight call.
+**Verification:** TBD — managed-agent invocation timestamp confirms pre-run before morning time; E2E test confirms app open does not trigger a generation call; E2E test confirms tapping the button initiates the brief display and conversation.
 
 **Demo blocker:** yes
 
@@ -40,9 +40,9 @@
 
 ### CR-daily-brief-03: Brief surfaces patterns across time, not just retrieval
 
-**Behavior:** The brief identifies at least one cross-session pattern when one is supportable from the data ("third call this week where the other side asked about timeline"). When no pattern is supportable, the brief does not invent one.
+**Behavior:** Surfaces patterns and themes already extracted by the weekly review into `Weekly Goals.md` — does not independently detect or synthesize cross-session patterns. When the "Review of Last Week" section of Weekly Goals.md contains pattern observations, the brief surfaces them as context for the day. If that section is absent, no pattern comment is made.
 
-**Verification:** AI eval rubric scoring synthesis vs retrieval; manual review against held-out cases.
+**Verification:** AI eval rubric confirms the brief surfaces content already present in Weekly Goals.md rather than synthesizing its own cross-session patterns; manual review against held-out cases verifies no independently invented patterns.
 
 **Demo blocker:** yes (this is the Opus 4.7 showcase moment)
 

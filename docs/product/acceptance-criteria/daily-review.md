@@ -12,9 +12,9 @@
 
 ### CR-daily-review-01: Review captures today's actual events, not a generic template
 
-**Behavior:** The review reflects on what actually happened today (from calendar, email, voice memos, in-app captures), not a templated end-of-day prompt. If nothing notable happened, says so honestly.
+**Behavior:** The review reflects on what actually happened today. Reads: Today's Daily Log entry (AM section), all project trackers (status lines), config. Does not re-read Weekly Goals — daily-brief already absorbed Weekly Goals into the AM section of the Daily Log, providing sufficient context. Does not re-read calendar, email, voice memos, or in-app captures — those were consumed by daily-brief and their relevant content is already in the Daily Log. If nothing notable happened, says so honestly.
 
-**Verification:** E2E test against a fixture day; AI eval rubric scoring faithfulness.
+**Verification:** E2E test against a fixture day; AI eval rubric scoring faithfulness against the Daily Log entry. Verification does not check calendar, email, voice, or in-app capture access.
 
 **Demo blocker:** yes
 
@@ -38,11 +38,11 @@
 
 ---
 
-### CR-daily-review-03: Review notices recurring patterns
+### CR-daily-review-03: Review wraps the current day
 
-**Behavior:** When the same theme appears across multiple days (per Demo Script: "third time in two weeks you've noticed the boundary thing"), the review surfaces it. Doesn't invent patterns when none exist.
+**Behavior:** Wraps the current day only: captures what was accomplished, trims yesterday's entry to Done-only, syncs the Command Center (status indicators and next actions), and prompts for reflections. Does not synthesize multi-day patterns — that is the weekly review's responsibility.
 
-**Verification:** AI eval rubric scoring synthesis on multi-day fixtures.
+**Verification:** E2E test confirms the four-step flow (wrap today, trim yesterday, sync Command Center, reflections prompt). AI eval rubric confirms no multi-day pattern synthesis is produced.
 
 **Demo blocker:** yes
 
@@ -66,13 +66,27 @@
 
 ---
 
-### CR-daily-review-05: Review surfaces tomorrow shaping signal
+### CR-daily-review-05: Review closes with next-day preview and reflections prompt
 
-**Behavior:** Review ends with at least one suggestion for shaping tomorrow ("tomorrow is lighter; protect the morning for X"). Suggestion is grounded in observed state, not generic advice.
+**Behavior:** Closes with two elements: (1) a factual next-day preview — a brief heads-up of what's on tomorrow's calendar (if connected) and anything time-sensitive due; and (2) the reflections prompt: "Anything land for you today? A thought, a feeling, something you noticed? Even one sentence is fine. Or skip — no pressure." The preview is informational only — it does not propose how to sequence or approach tomorrow. Proposing tomorrow's sequence is daily-brief's job.
 
-**Verification:** AI eval rubric; manual review against held-out fixtures.
+**Verification:** E2E test confirms the review includes both a next-day preview and the reflections prompt. AI eval rubric confirms the preview contains no proactive sequencing suggestions — only factual calendar/deadline content.
 
 **Demo blocker:** yes
+
+**Status:** unknown
+
+**Last checked:** 2026-04-22
+
+---
+
+### CR-daily-review-06: Daily Log is the day's operational record; Journal gets separate reflection entries
+
+**Behavior:** The completed Daily Log entry for a day — AM plan written by daily-brief + PM wrap written by daily-review — forms the day's operational record ("what we aimed to do, what we did"). This combined entry is the structural account of the day. Reflections shared during the review prompt are captured in Journal.md as separate entries — not embedded in or appended to the Daily Log. Deeper topics, observations, and non-operational reflections belong in Journal.md, not in the Daily Log.
+
+**Verification:** Post-review file inspection confirms Daily Log entry contains only operational content (plan + done); Journal.md contains reflection text as a separate entry, not a copy of or addition to the log entry.
+
+**Demo blocker:** no
 
 **Status:** unknown
 
