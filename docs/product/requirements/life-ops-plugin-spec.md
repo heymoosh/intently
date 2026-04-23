@@ -6,6 +6,25 @@
 
 ---
 
+## V1 Intently Scope
+
+**Platform:** Intently mobile app (React Native + Supabase + Anthropic Managed Agents). State files live in Intently's per-user cloud store, not an Obsidian vault.
+
+**Skills shipping in V1:** `daily-brief`, `daily-review`, `weekly-review`, `setup`, `update-tracker`.
+
+**Skills deferred:** `daily-triage`, `monthly-review`, `project-continue`, `session-digest`, `vault-drift-check`, `notes-action-sync`. See `docs/backlog/deferred-features.md`.
+
+**V1 cuts within shipped skills (made explicitly in SKILL.md):**
+- `setup` Phase 1 (existing vault discovery) — V1 assumes new users; cut entirely
+- `setup` Phase 4 (Health.md / wellness setup) — `health_file_enabled: false`
+- `setup` Phase 5 (preferences conversation) — defaults used; only asks if user volunteers a preference
+- `setup` Phase 6 file seeding — delegated to app platform (app provisions files on first run; skill does not create them)
+
+**Known structural divergence (resolve post-hackathon):**
+- `setup` SKILL.md creates `Monthly Goals.md` as a separate file. The spec puts Monthly Priorities inside `Ops Plan.md`. Multiple downstream skills reference `Monthly Goals.md`. Spec is authoritative; SKILL.md is the current V1 implementation. Not a demo blocker.
+
+---
+
 ## What Ships in the Plugin
 
 ### Skills (8)
@@ -785,15 +804,15 @@ If a user turns off `weekly-review`, the daily rhythm still works — they lose 
 
 **Platform-specific behavior:**
 
-| Capability | Cowork | Claude Code |
-|---|---|---|
-| User-facing skills (8) | Full | Full |
-| Supporting infrastructure (session-digest, vault-drift-check) | Full | Full |
-| Scheduled tasks | Yes (6 tasks) | No — manual invocation only |
-| Calendar/email MCP | Yes if connected | No |
-| Conversational UX | Native | Works but terminal-based |
-| Vault drift check | Standalone scheduled task | Folded into weekly review |
-| Daily triage | Scheduled pre-briefing | Runs as a user-invoked step at start of the morning |
+| Capability | Cowork | Claude Code | Intently mobile |
+|---|---|---|---|
+| User-facing skills (8) | Full | Full | 5 of 8 (see V1 Intently Scope above) |
+| Supporting infrastructure (session-digest, vault-drift-check) | Full | Full | Partial — session-digest deferred |
+| Scheduled tasks | Yes (6 tasks) | No — manual invocation only | Yes (Managed Agents + pg_cron) |
+| Calendar/email MCP | Yes if connected | No | Yes if connected |
+| Conversational UX | Native | Works but terminal-based | Native mobile chat interface |
+| Vault drift check | Standalone scheduled task | Folded into weekly review | Deferred |
+| Daily triage | Scheduled pre-briefing | Runs as a user-invoked step at start of the morning | Deferred |
 
 **MCP fallback rule:** Every skill that reads calendar or email must handle the case where those integrations aren't available. When absent: skip the step, note "no calendar connected" or "no email connected" in the output, and continue. Never error on missing integrations.
 

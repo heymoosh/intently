@@ -1,4 +1,4 @@
-# Product Brief
+# Vision
 
 **Type:** Reference doc — what we're building for the Opus 4.7 hackathon and why.
 **Created:** 2026-04-21
