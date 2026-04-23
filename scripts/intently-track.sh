@@ -101,11 +101,27 @@ cmd_clean() {
     exit 1
   fi
 
-  local ahead
-  ahead=$(git -C "$wt" rev-list --count '@{u}..HEAD' 2>/dev/null || echo 0)
-  if [ "$ahead" -gt 0 ]; then
-    echo "${C_ERR}error:${C_RESET} worktree $wt has $ahead unpushed commits. Push first, then re-run --clean." >&2
-    exit 1
+  # Check whether the branch's work is in main by any route — regular merge,
+  # rebase, or squash merge. `git cherry main HEAD` marks each commit with
+  # `+` (not in main) or `-` (patch-equivalent commit exists in main). A
+  # squash-merged branch has all `-` lines. A non-merged branch has at least
+  # one `+` line.
+  local unmerged
+  unmerged=$(git -C "$wt" cherry main HEAD 2>/dev/null | grep -c '^+' || true)
+  if [ "$unmerged" -gt 0 ]; then
+    # Work not yet in main. Only allow removal if everything is pushed —
+    # otherwise we'd lose commits.
+    local upstream_tip local_tip
+    upstream_tip=$(git -C "$wt" rev-parse --verify '@{u}' 2>/dev/null || echo '')
+    local_tip=$(git -C "$wt" rev-parse HEAD)
+    if [ -z "$upstream_tip" ] || [ "$upstream_tip" != "$local_tip" ]; then
+      echo "${C_ERR}error:${C_RESET} worktree $wt has $unmerged commit(s) not in main and not pushed to origin." >&2
+      echo "Push first, then re-run --clean. Or discard the branch with: git -C $REPO_ROOT worktree remove --force $wt" >&2
+      exit 1
+    fi
+    # Pushed but not merged — a valid in-flight state (PR still open).
+    # Warn but proceed.
+    echo "${C_WARN}warning:${C_RESET} branch is pushed but not yet merged. Removing worktree anyway."
   fi
 
   git -C "$REPO_ROOT" worktree remove "$wt"
