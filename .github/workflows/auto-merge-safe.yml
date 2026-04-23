@@ -29,6 +29,11 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  # actions:read lets `gh run list` query workflow statuses to check whether
+  # security.yml and ci.yml have both passed on the PR head SHA. Without
+  # this, the "Check workflow statuses on head SHA" step 403s and the whole
+  # job fails, blocking all auto-merges.
+  actions: read
 
 jobs:
   classify-and-act:
