@@ -1,3 +1,7 @@
+import { Fraunces_500Medium, Fraunces_600SemiBold, useFonts } from '@expo-google-fonts/fraunces';
+import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold } from '@expo-google-fonts/inter';
+import { JetBrainsMono_400Regular } from '@expo-google-fonts/jetbrains-mono';
+import { SourceSerif4_400Regular } from '@expo-google-fonts/source-serif-4';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -89,6 +93,15 @@ function Screen({ md, banner }: { md: string; banner?: React.ReactNode }) {
 }
 
 export default function App() {
+  const [fontsLoaded] = useFonts({
+    Fraunces_500Medium,
+    Fraunces_600SemiBold,
+    SourceSerif4_400Regular,
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    JetBrainsMono_400Regular,
+  });
   const pager = useRef<PagerView>(null);
   const [status, setStatus] = useState<ConnStatus>({ kind: 'idle' });
 
@@ -108,6 +121,8 @@ export default function App() {
     };
   }, []);
 
+  if (!fontsLoaded) return null;
+
   return (
     <View style={styles.container}>
       <PagerView ref={pager} style={styles.pager} initialPage={1}>
@@ -120,31 +135,38 @@ export default function App() {
   );
 }
 
+const t = theme.light;
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.PrimarySurface, paddingTop: 60 },
+  container: { flex: 1, backgroundColor: t.colors.PrimarySurface, paddingTop: 60 },
   pager: { flex: 1 },
-  screen: { flex: 1, backgroundColor: theme.colors.PrimarySurface },
-  scroll: { padding: theme.spacing.lg, paddingBottom: 140 },
+  screen: { flex: 1, backgroundColor: t.colors.PrimarySurface },
+  scroll: { padding: t.spacing['5'], paddingBottom: 140 },
   banner: {
-    padding: theme.spacing.md,
-    borderRadius: theme.radius.sm,
-    marginBottom: theme.spacing.base,
+    padding: t.spacing['3'],
+    borderRadius: t.radius.Chip,
+    marginBottom: t.spacing['4'],
   },
-  bannerIdle: { backgroundColor: theme.colors.SecondarySurface },
-  bannerOk: { backgroundColor: theme.colors.ConfirmationBanner },
-  bannerError: { backgroundColor: theme.colors.WarningBanner },
-  bannerText: { ...theme.typography.mono, color: theme.colors.PrimaryText },
+  bannerIdle:  { backgroundColor: t.colors.SecondarySurface },
+  bannerOk:    { backgroundColor: t.colors.ConfirmationCardSurface },
+  bannerError: { backgroundColor: 'rgba(163, 115, 31, 0.10)' },
+  bannerText: {
+    fontFamily: t.typography.fonts.Mono,
+    fontSize: 13,
+    lineHeight: 18,
+    color: t.colors.PrimaryText,
+  },
   voiceButton: {
     position: 'absolute',
     bottom: 40,
-    right: theme.spacing.lg,
+    right: t.spacing['5'],
     width: 72,
     height: 72,
-    borderRadius: theme.radius.pill,
-    backgroundColor: theme.colors.FocusObject,
+    borderRadius: t.radius.Pill,
+    backgroundColor: t.colors.FocusObject,
     alignItems: 'center',
     justifyContent: 'center',
-    ...theme.elevation.floating,
+    ...t.elevation.Hero,
   },
-  voiceIcon: { fontSize: 32, color: theme.colors.FocusObjectText },
+  voiceIcon: { fontSize: 32, color: t.colors.FocusObjectText },
 });
