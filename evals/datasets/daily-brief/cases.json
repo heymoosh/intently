@@ -1,0 +1,298 @@
+{
+  "skill": "daily-brief",
+  "cases": [
+    {
+      "id": "scenario-01-mid-sprint-fatigue",
+      "notes": "Thursday mid-sprint with two consecutive late nights; calendar connected, email not_connected; full cascade present. Exercises prior_context, pacing_calibration, cascade_adherence, integration_grace, conversation_first, and narrative_tone. Reference scenario and expected output live in scenario-01.md and expected-output.md.",
+      "input": {
+        "persona": "Sam",
+        "today": "Thursday 2026-04-23 07:30",
+        "config": {
+          "daily_brief_time": "07:30",
+          "first_run_complete": true,
+          "integrations": { "calendar_enabled": true, "email_enabled": false },
+          "projects": ["Intently", "Design System Port", "Health Routine"],
+          "health_file_enabled": false
+        },
+        "monthly_goals": [
+          "Ship Intently V1 by the hackathon close (Saturday).",
+          "Keep the strength routine - 3x/wk - through the sprint. Don't bargain it away.",
+          "Two real weekend days with family. Not 'working in the background.'"
+        ],
+        "weekly_goals": {
+          "review_of_last_week": [
+            "Pattern: lost mornings twice to email/Slack before the P1 block started. Put that back in a box.",
+            "Pattern: two good evenings when I quit by 21:00. The late nights didn't actually produce more shippable code."
+          ],
+          "this_week": {
+            "P1": "Intently demo path: Managed Agents wiring + three demo flows runnable end-to-end by Friday EOD.",
+            "P2": "Design System Port: tokens compile into the Expo app; not the full visual port yet.",
+            "P3": "Admin / house: inbox zero by Thursday. Walk daily."
+          }
+        },
+        "daily_log_current_week": {
+          "Wednesday 2026-04-22": {
+            "AM plan": "P1 - eval runner scaffold + skill loader. P2 - token compile script.",
+            "PM done": "Shipped skill loader (PR #2, merged). Started on tool scaffolds - got read_calendar mocked, read_emails deferred. Tokens compile script is half done; the font-family translation is annoying.",
+            "Evening reflection": "2nd late night this week. Body is already griping. If Thursday goes late I'll pay for it Saturday. Cut it tomorrow."
+          },
+          "Tuesday 2026-04-21": {
+            "Done": "First ADR shipped. Repo scaffold up. Felt slow, turned out the slow day set up every fast day after it."
+          },
+          "Monday 2026-04-20": {
+            "Done": "Strategy doc for Intently. Worked backwards from demo day."
+          }
+        },
+        "journal_most_recent": {
+          "timestamp": "2026-04-22 evening",
+          "body": "Two in a row. The evening one again got away from me - I thought 'one more thing' and it was three things and then it was 23:40. The demo has teeth now though. The agent actually produced a recognizable morning briefing on the first real run. Tomorrow is the wiring day. Managed Agents -> tools -> three flows. If I get that end-to-end even roughly, Friday is polish and Saturday is rehearsal."
+        },
+        "projects": {
+          "Intently": {
+            "status": "In Progress",
+            "priority": "P1",
+            "recent_log": [
+              "Apr 22 - Skill loader shipped. Tool scaffolds half-done. Tokens compile script in progress.",
+              "Apr 21 - ADR 0001 (Managed Agents as runtime). Repo scaffold.",
+              "Apr 20 - Strategy locked. Demo path named."
+            ],
+            "next": "Managed Agents invocation surface. Tool wiring. First live daily-brief run."
+          },
+          "Design System Port": {
+            "status": "In Progress",
+            "priority": "P2",
+            "next": "Tokens compile script finishes, then ports into Expo app screens."
+          },
+          "Health Routine": {
+            "status": "Healthy",
+            "priority": "P3",
+            "recent_log": [
+              "Apr 21 - strength session, felt strong.",
+              "Apr 19 - walk 5k."
+            ],
+            "next": "Second strength session this week. Open slot: Thursday PM or Friday morning."
+          }
+        },
+        "calendar_today": [
+          "09:00-10:00   Demo-path pairing (with Kaya)",
+          "15:30-16:00   1:1 with Anya (hackathon check-in)"
+        ],
+        "email_today": "not_connected"
+      },
+      "expected": {
+        "must_surface": [
+          "Pacing note leaning recovery: two consecutive late nights and the Weekly Goals pattern 'two good evenings when I quit by 21:00' should combine into a hard-stop nudge around 21:00. Must NOT suggest a sprint tone.",
+          "Calendar highlights conversationally (pairing with Kaya at 9, Anya at 3:30), not a full dump.",
+          "Email not connected - one sentence, no error, no setup prompting.",
+          "Where you left off: skill loader shipped, tool scaffolds half-done (read_calendar mocked, read_emails deferred), tokens compile script mid-stream with the font-family translation pain point.",
+          "P1 block (Managed Agents wiring + tool scaffolds finish) explicitly tied back to Monthly Goal 'Ship Intently V1.'",
+          "Deadline creep named without catastrophizing (two days to demo).",
+          "Proposed day sequence framed conversationally, not as a decree.",
+          "Ends with a question about today's energy and any overrides.",
+          "Does NOT write to Daily Log."
+        ],
+        "anti_patterns": [
+          "Sprint-tone day",
+          "P1 with no line to a Monthly Goal",
+          "Daily Log write before the sequencing conversation",
+          "Treating 'email not connected' as an error",
+          "Referencing Health.md when health_file_enabled is false",
+          "Bulleted dashboard dump with section headers"
+        ]
+      }
+    },
+    {
+      "id": "first-run-empty-memory",
+      "notes": "New user's very first daily-brief. first_run_complete is false; no Daily Log entries, no Weekly Goals pattern section yet, one Monthly Goal, no journal. Exercises first_run_graceful end-to-end and checks pattern_surfacing silence when no Weekly Goals review exists.",
+      "input": {
+        "persona": "Sam",
+        "today": "Monday 2026-04-20 07:30",
+        "config": {
+          "daily_brief_time": "07:30",
+          "first_run_complete": false,
+          "integrations": { "calendar_enabled": true, "email_enabled": false },
+          "projects": ["Intently"],
+          "health_file_enabled": false
+        },
+        "monthly_goals": [
+          "Ship Intently V1 by the hackathon close (Saturday)."
+        ],
+        "weekly_goals": {
+          "review_of_last_week": null,
+          "this_week": {
+            "P1": "Intently: strategy doc + repo scaffold."
+          }
+        },
+        "daily_log_current_week": {},
+        "journal_most_recent": null,
+        "projects": {
+          "Intently": {
+            "status": "Planning",
+            "priority": "P1",
+            "recent_log": [],
+            "next": "Write strategy doc. Stand up repo."
+          }
+        },
+        "calendar_today": [
+          "10:00-10:30   Kickoff call with Anya"
+        ],
+        "email_today": "not_connected"
+      },
+      "expected": {
+        "must_surface": [
+          "Acknowledges the thin first-run state exactly once, without apologizing repeatedly, e.g. 'this is your first week - the brief will be sparse until we have a few days of data.'",
+          "Proceeds to propose a plausible P1 block tied to the single Monthly Goal, using only the context that exists.",
+          "Mentions calendar kickoff briefly; notes email is not connected in one sentence.",
+          "Makes NO cross-session pattern claim - Weekly Goals has no review section and there is no Daily Log history yet.",
+          "Does not invent a 'where you left off' from empty history; may briefly say there is no log yet.",
+          "Ends with a question."
+        ],
+        "anti_patterns": [
+          "Apology loop or 'come back tomorrow' refusal",
+          "Fabricating prior context, recent shipped work, or patterns",
+          "Erroring out on the empty Daily Log",
+          "Claiming 'I've noticed you tend to...' when there is no history to detect from"
+        ]
+      }
+    },
+    {
+      "id": "weekly-pattern-present-surface-verbatim",
+      "notes": "Monday morning right after a weekly review. Weekly Goals has a fresh 'Review of last week' with two pattern observations in the user's own voice. Exercises pattern_surfacing pass direction: the brief must surface at least one pattern verbatim-ish, not reframed.",
+      "input": {
+        "persona": "Sam",
+        "today": "Monday 2026-04-27 07:30",
+        "config": {
+          "daily_brief_time": "07:30",
+          "first_run_complete": true,
+          "integrations": { "calendar_enabled": true, "email_enabled": false },
+          "projects": ["Intently", "Design System Port"],
+          "health_file_enabled": false
+        },
+        "monthly_goals": [
+          "Ship Intently V1 refinements - bug triage + one polish cut.",
+          "Keep the strength routine - 3x/wk."
+        ],
+        "weekly_goals": {
+          "review_of_last_week": [
+            "Pattern: the days I started with the P1 block before opening Slack were the days that actually moved the demo.",
+            "Pattern: late nights still cost me the next morning, every time. Not negotiable anymore."
+          ],
+          "this_week": {
+            "P1": "Intently post-hackathon: bug triage + one UX polish pass from demo feedback.",
+            "P2": "Design System Port: finish the font-family translation.",
+            "P3": "Walk daily. Strength session twice."
+          }
+        },
+        "daily_log_current_week": {},
+        "journal_most_recent": {
+          "timestamp": "2026-04-26 evening",
+          "body": "Demo shipped. Submitted at 19:45. Tomorrow is the reset day - pick the highest-value polish and hold the line on quitting at 21:00."
+        },
+        "projects": {
+          "Intently": {
+            "status": "In Progress",
+            "priority": "P1",
+            "recent_log": [
+              "Apr 26 - V1 submitted.",
+              "Apr 25 - three demo flows green."
+            ],
+            "next": "Bug triage from demo feedback."
+          },
+          "Design System Port": {
+            "status": "In Progress",
+            "priority": "P2",
+            "next": "Font-family translation wraps."
+          }
+        },
+        "calendar_today": [
+          "11:00-12:00   Retro with Anya"
+        ],
+        "email_today": "not_connected"
+      },
+      "expected": {
+        "must_surface": [
+          "Surfaces at least one of the Weekly Goals patterns in the user's own words (e.g. 'days you started with P1 before Slack were the days that moved the demo' or 'late nights still cost you the next morning'). Phrasing stays close to the user's language; light paraphrasing is fine, but it is clearly reflecting back, not a new agent synthesis.",
+          "P1 proposal (bug triage) ties explicitly to the Monthly Goal 'Ship Intently V1 refinements.'",
+          "Orients on the demo-shipped state from yesterday's journal.",
+          "Calendar retro call noted conversationally; email not-connected noted once.",
+          "Ends with a question."
+        ],
+        "anti_patterns": [
+          "Reframing the pattern into agent-voice and losing the user's wording ('Based on last week's analysis, your productivity correlates with...').",
+          "Inventing an additional pattern that was not in the Weekly Goals review.",
+          "Ignoring the pattern section entirely."
+        ]
+      }
+    },
+    {
+      "id": "weekly-pattern-absent-stay-silent",
+      "notes": "Tuesday mid-week; Weekly Goals exists but has no 'Review of last week' section (it was skipped). Exercises pattern_surfacing anti-invention direction: the brief must NOT synthesize patterns of its own. Also checks cascade_adherence and prior_context on a non-fatigue day.",
+      "input": {
+        "persona": "Sam",
+        "today": "Tuesday 2026-04-28 07:30",
+        "config": {
+          "daily_brief_time": "07:30",
+          "first_run_complete": true,
+          "integrations": { "calendar_enabled": true, "email_enabled": true },
+          "projects": ["Intently"],
+          "health_file_enabled": false
+        },
+        "monthly_goals": [
+          "Ship Intently V1.1 (post-hackathon polish).",
+          "Two rest days per week minimum."
+        ],
+        "weekly_goals": {
+          "review_of_last_week": null,
+          "this_week": {
+            "P1": "Intently V1.1: ship the polish PR from Monday's triage list.",
+            "P2": "Inbox zero by Wednesday."
+          }
+        },
+        "daily_log_current_week": {
+          "Monday 2026-04-27": {
+            "AM plan": "P1 - bug triage. P2 - inbox.",
+            "PM done": "Triaged 9 issues; shipped one fix (PR #72). Inbox down from 47 to 12.",
+            "Evening reflection": "Solid day. Quit at 20:45. Felt good."
+          }
+        },
+        "journal_most_recent": {
+          "timestamp": "2026-04-27 evening",
+          "body": "Clean day. Triage was satisfying. Tomorrow's polish PR is the next visible thing - want it merged by EOD."
+        },
+        "projects": {
+          "Intently": {
+            "status": "In Progress",
+            "priority": "P1",
+            "recent_log": [
+              "Apr 27 - triage done, PR #72 merged.",
+              "Apr 26 - V1 submitted."
+            ],
+            "next": "Ship polish PR from the triage list."
+          }
+        },
+        "calendar_today": [
+          "14:00-15:00   Design sync with Kaya"
+        ],
+        "email_today": [
+          "From Anya - 'quick question about the retro' (low urgency)"
+        ]
+      },
+      "expected": {
+        "must_surface": [
+          "References yesterday's shipped work concretely: triage done, PR #72 merged, inbox 47 -> 12.",
+          "Makes NO cross-session pattern claim - the Weekly Goals review is empty. No 'I've noticed you tend to...' synthesis.",
+          "P1 (ship polish PR) ties to Monthly Goal 'Ship Intently V1.1.'",
+          "Notes the design sync and the one low-urgency email briefly.",
+          "Proposes a balanced day (not sprint, not recovery) - yesterday was clean and the user quit at 20:45.",
+          "Ends with a question."
+        ],
+        "anti_patterns": [
+          "Invented patterns like 'I've noticed you tend to ship more when you triage first' when Weekly Goals had no pattern section.",
+          "P1 with no stated tie to a Monthly Goal.",
+          "Forced recovery nudge with no fatigue signal present.",
+          "Treating the email as urgent."
+        ]
+      }
+    }
+  ]
+}
