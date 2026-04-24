@@ -10,6 +10,7 @@ export type MaSkill =
   | 'daily-brief'
   | 'daily-review'
   | 'weekly-review'
+  | 'monthly-review'
   | 'update-tracker'
   | 'setup';
 
