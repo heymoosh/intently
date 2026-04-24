@@ -110,6 +110,7 @@ Read in order:
 2. This file (`TRACKER.md`) — current hot state, Next queue, Critical items awaiting review.
 3. `CLAUDE.md` — repo-wide rules (branch-first, secrets policy, etc.).
 4. If "Critical items awaiting review" has entries, walk through them with the user before substantive work.
+5. If any Follow-up or Critical item links to a GitHub issue, open the issue — that's where the procedural detail lives.
 
 Update the **Status** block and prepend a dated **Log** entry below at the end of every non-trivial session.
 
