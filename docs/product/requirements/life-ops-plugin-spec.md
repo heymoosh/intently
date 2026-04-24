@@ -546,7 +546,7 @@ Create the remaining files with minimal content:
 
 ### Daily Review (Evening)
 
-**Reads:** Today's Daily Log entry (AM section), Weekly Goals, all project trackers (status lines), config
+**Reads:** Today's Daily Log entry (AM section), all project trackers (status lines), prior 7–14 days of Daily Log entries (for pattern detection), tomorrow's calendar (if connected), Ops Plan Time-Sensitive section, config
 
 **Writes:** Today's Daily Log entry (PM section), updates project trackers if progress reported, Reflections.md (if user shares one)
 
@@ -569,7 +569,11 @@ Create the remaining files with minimal content:
    - "Last updated" date
    - Do NOT change priority tiers, time budgets, or project structure — only refresh status/next-action within the existing layout
 
-4. **Prompt for reflections (and optional GTJ capture):** "Anything land for you today? A thought, a feeling, something you noticed? Even one sentence is fine. Or skip — no pressure."
+4. **Surface recurring patterns:** Scan the prior 7–14 days of Daily Log entries (and the journal if available) for themes that appear across multiple days. Surface any pattern seen **two or more times** — name it concretely with a count. If no supportable pattern, do not invent one. Delivered as a brief observation inside the narrative, not a separate section.
+
+5. **Shape tomorrow:** Include one grounded, factual next-day preview. Pull from tomorrow's calendar (if connected), the Ops Plan Time-Sensitive section, and today's pacing signal (intense day → suggest a lighter tomorrow). Anchor the suggestion in observed state, not generic advice. One or two sentences, no more. This is a preview, not a plan-ahead or commitment.
+
+6. **Prompt for reflections (and optional GTJ capture):** "Anything land for you today? A thought, a feeling, something you noticed? Even one sentence is fine. Or skip — no pressure."
 
    If shared: append to the journal file at the top of the current year's section, using their own words.
 
