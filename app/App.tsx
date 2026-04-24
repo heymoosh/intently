@@ -57,30 +57,36 @@ type LiveBriefState =
   | { kind: 'ok'; output: AgentOutput }
   | { kind: 'error'; message: string };
 
+// Dev-only Supabase status pill. Hidden in normal state so the demo surface
+// isn't cluttered; we only surface an error (user-meaningful).
 function ConnectionBanner({ status }: { status: ConnStatus }) {
-  let text = '';
-  let style = styles.bannerIdle;
-  switch (status.kind) {
-    case 'idle':
-      text = '⏺ Supabase: idle';
-      break;
-    case 'checking':
-      text = '… Supabase: checking';
-      break;
-    case 'ok':
-      text = `✓ Supabase connected · markdown_files visible to you: ${status.rows}`;
-      style = styles.bannerOk;
-      break;
-    case 'error':
-      text = `✗ Supabase: ${status.message}`;
-      style = styles.bannerError;
-      break;
-  }
+  if (status.kind !== 'error') return null;
   return (
-    <View style={[styles.banner, style]}>
-      <Text style={styles.bannerText}>{text}</Text>
+    <View style={[styles.banner, styles.bannerError]}>
+      <Text style={styles.bannerText}>Supabase: {status.message}</Text>
     </View>
   );
+}
+
+function ScreenHeader({
+  tense,
+  title,
+}: {
+  tense: string;
+  title: string;
+}) {
+  return (
+    <View style={styles.screenHeader}>
+      <Text style={styles.screenHeaderTense}>{tense}</Text>
+      <Text style={styles.screenHeaderTitle}>{title}</Text>
+    </View>
+  );
+}
+
+function formatDateHeader(now: Date = new Date()): string {
+  const day = now.toLocaleDateString('en-US', { weekday: 'long' });
+  const month = now.toLocaleDateString('en-US', { month: 'long' });
+  return `${day}, ${month} ${now.getDate()}`;
 }
 
 function LiveBriefTrigger({
@@ -92,17 +98,17 @@ function LiveBriefTrigger({
 }) {
   if (state.kind === 'loading') {
     return (
-      <View style={[styles.liveTrigger, styles.liveTriggerLoading]}>
-        <ActivityIndicator size="small" color={t.colors.FocusObjectText} />
-        <Text style={styles.liveTriggerLabel}>Running the agent…</Text>
+      <View style={[styles.liveTriggerPill, styles.liveTriggerLoading]}>
+        <ActivityIndicator size="small" color={t.colors.SupportingText} />
+        <Text style={styles.liveTriggerPillLabel}>Running agent…</Text>
       </View>
     );
   }
-  const label = state.kind === 'ok' ? 'Regenerate live brief' : 'Generate live brief';
+  const label = state.kind === 'ok' ? '↻ Regenerate' : '✨ Generate live brief';
   return (
     <View>
-      <Pressable style={styles.liveTrigger} onPress={onPress}>
-        <Text style={styles.liveTriggerLabel}>{label}</Text>
+      <Pressable style={styles.liveTriggerPill} onPress={onPress}>
+        <Text style={styles.liveTriggerPillLabel}>{label}</Text>
       </Pressable>
       {state.kind === 'error' ? (
         <Text style={styles.liveTriggerError}>{state.message}</Text>
@@ -171,6 +177,7 @@ export default function App() {
   });
   const pager = useRef<ScrollView>(null);
   const initialized = useRef(false);
+  const wrapGuard = useRef(false);
   const [screenWidth, setScreenWidth] = useState(() => Dimensions.get('window').width);
   const [status, setStatus] = useState<ConnStatus>({ kind: 'idle' });
   const [journalOpen, setJournalOpen] = useState(false);
@@ -213,16 +220,30 @@ export default function App() {
   };
 
   // Circular wrap: when user lands on a clone slot, silently jump to the real
-  // equivalent. animated:false = no visible scroll, feels like infinite rotation.
-  const onMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    if (pageWidth <= 0) return;
-    const x = e.nativeEvent.contentOffset.x;
+  // equivalent. Wired on both onMomentumScrollEnd (native + most web) AND
+  // onScrollEndDrag (belt & suspenders for react-native-web, which sometimes
+  // skips momentum-end after a programmatic scrollTo). wrapGuard prevents
+  // both handlers from double-firing.
+  const maybeWrap = (x: number) => {
+    if (pageWidth <= 0 || wrapGuard.current) return;
     const slot = Math.round(x / pageWidth);
     if (slot === SLOT_FUTURE_CLONE) {
+      wrapGuard.current = true;
       pager.current?.scrollTo({ x: SLOT_FUTURE * pageWidth, animated: false });
+      setTimeout(() => (wrapGuard.current = false), 50);
     } else if (slot === SLOT_PAST_CLONE) {
+      wrapGuard.current = true;
       pager.current?.scrollTo({ x: SLOT_PAST * pageWidth, animated: false });
+      setTimeout(() => (wrapGuard.current = false), 50);
     }
+  };
+  const onMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    maybeWrap(e.nativeEvent.contentOffset.x);
+  };
+  const onScrollEndDrag = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    // Fires when finger lifts. On web after a programmatic scrollTo the
+    // momentum-end often doesn't fire; drag-end is our fallback.
+    maybeWrap(e.nativeEvent.contentOffset.x);
   };
 
   const handleGenerateLiveBrief = async () => {
@@ -258,10 +279,16 @@ export default function App() {
 
   const displayOutput = liveBrief.kind === 'ok' ? liveBrief.output : dailyBriefSeed;
 
+  const todayLabel = formatDateHeader();
   const pastScreen = (
     <Screen
       md={pastMd}
-      header={<NewJournalEntryButton onPress={() => setJournalOpen(true)} />}
+      header={
+        <>
+          <ScreenHeader tense="Past" title="Earlier" />
+          <NewJournalEntryButton onPress={() => setJournalOpen(true)} />
+        </>
+      }
     />
   );
   const presentScreen = (
@@ -269,13 +296,24 @@ export default function App() {
       banner={<ConnectionBanner status={status} />}
       content={
         <View>
+          <ScreenHeader tense="Today" title={todayLabel} />
           <LiveBriefTrigger state={liveBrief} onPress={handleGenerateLiveBrief} />
           <AgentOutputCard output={displayOutput} />
         </View>
       }
     />
   );
-  const futureScreen = <Screen md={futureMd} />;
+  const futureScreen = (
+    <Screen
+      md={futureMd}
+      header={<ScreenHeader tense="Future" title="What's ahead" />}
+    />
+  );
+
+  // Each slot needs explicit height on web: horizontal ScrollView children
+  // collapse to content height otherwise, breaking the inner vertical scroll.
+  // `flex: 1` + `height: '100%'` gives us the scroll-view height either way.
+  const slotStyle = { width: pageWidth, height: '100%' as const };
 
   return (
     <View style={styles.container}>
@@ -287,12 +325,13 @@ export default function App() {
         style={styles.pager}
         onContentSizeChange={onPagerContentSized}
         onMomentumScrollEnd={onMomentumScrollEnd}
+        onScrollEndDrag={onScrollEndDrag}
       >
-        <View key="future-clone" style={{ width: pageWidth }}>{futureScreen}</View>
-        <View key="past" style={{ width: pageWidth }}>{pastScreen}</View>
-        <View key="present" style={{ width: pageWidth }}>{presentScreen}</View>
-        <View key="future" style={{ width: pageWidth }}>{futureScreen}</View>
-        <View key="past-clone" style={{ width: pageWidth }}>{pastScreen}</View>
+        <View key="future-clone" style={slotStyle}>{futureScreen}</View>
+        <View key="past" style={slotStyle}>{pastScreen}</View>
+        <View key="present" style={slotStyle}>{presentScreen}</View>
+        <View key="future" style={slotStyle}>{futureScreen}</View>
+        <View key="past-clone" style={slotStyle}>{pastScreen}</View>
       </ScrollView>
       <JournalEditor
         visible={journalOpen}
@@ -354,32 +393,50 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: t.colors.PrimaryText,
   },
-  liveTrigger: {
-    alignSelf: 'stretch',
+  liveTriggerPill: {
+    alignSelf: 'flex-end',
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     gap: t.spacing['2'],
-    paddingHorizontal: t.spacing['4'],
-    paddingVertical: t.spacing['3'],
-    borderRadius: t.radius.Chip,
-    backgroundColor: t.colors.FocusObject,
-    marginBottom: t.spacing['4'],
-    minHeight: t.a11y.MinTapTarget,
+    paddingHorizontal: t.spacing['3'],
+    paddingVertical: t.spacing['2'],
+    borderRadius: t.radius.Pill,
+    backgroundColor: t.colors.SecondarySurface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: t.colors.EdgeLine,
+    marginBottom: t.spacing['3'],
   },
   liveTriggerLoading: {
-    backgroundColor: t.colors.FocusObject,
-    opacity: 0.75,
+    opacity: 0.8,
   },
-  liveTriggerLabel: {
-    fontFamily: t.typography.fonts.UISemi,
-    fontSize: 14,
-    color: t.colors.FocusObjectText,
+  liveTriggerPillLabel: {
+    fontFamily: t.typography.fonts.UIMedium,
+    fontSize: 12,
+    color: t.colors.SupportingText,
   },
   liveTriggerError: {
     fontFamily: t.typography.fonts.Mono,
     fontSize: 11,
-    color: t.colors.FocusObjectText,
+    color: t.colors.PrimaryText,
+    marginBottom: t.spacing['3'],
+    alignSelf: 'flex-end',
+  },
+  screenHeader: {
     marginBottom: t.spacing['4'],
+  },
+  screenHeaderTense: {
+    fontFamily: t.typography.fonts.UISemi,
+    fontSize: 11,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+    color: t.colors.SupportingText,
+    marginBottom: t.spacing['1'],
+  },
+  screenHeaderTitle: {
+    fontFamily: t.typography.fonts.Display,
+    fontSize: 32,
+    lineHeight: 38,
+    color: t.colors.PrimaryText,
+    letterSpacing: -0.5,
   },
 });
