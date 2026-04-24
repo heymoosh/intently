@@ -170,36 +170,19 @@ function NewJournalEntryButton({ onPress }: { onPress: () => void }) {
   );
 }
 
-// Dev-only toggle for cycling the Present phase on camera. In production the
-// phase is clock-driven; this lives at the top of Present so we can demo all
-// three phases (pre-brief → planned → evening) in sequence without waiting
-// for real time to pass.
-function PhaseToggle({
-  phase,
-  onChange,
-}: {
-  phase: PresentPhase;
-  onChange: (p: PresentPhase) => void;
-}) {
-  const options: PresentPhase[] = ['morning', 'planned', 'evening'];
-  return (
-    <View style={styles.phaseToggle}>
-      {options.map((p) => {
-        const active = p === phase;
-        return (
-          <Pressable
-            key={p}
-            style={[styles.phaseChip, active && styles.phaseChipActive]}
-            onPress={() => onChange(p)}
-          >
-            <Text style={[styles.phaseChipLabel, active && styles.phaseChipLabelActive]}>
-              {p}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
+// Derive the Present phase from clock + URL override. Morning before 10am,
+// evening at/after 6pm, planned in between. For demo recording the user can
+// force a phase with `?phase=morning|planned|evening`. No visible dev toggle
+// — it read as primary navigation and mis-led viewers.
+function derivePhase(now: Date = new Date()): PresentPhase {
+  if (typeof window !== 'undefined' && window.location?.search) {
+    const q = new URLSearchParams(window.location.search).get('phase');
+    if (q === 'morning' || q === 'planned' || q === 'evening') return q;
+  }
+  const h = now.getHours();
+  if (h < 10) return 'morning';
+  if (h >= 18) return 'evening';
+  return 'planned';
 }
 
 // Morning/evening phase CTA — larger, visually weighted as the focal
@@ -262,9 +245,8 @@ export default function App() {
   const [liveBrief, setLiveBrief] = useState<LiveState>({ kind: 'idle' });
   const [liveReview, setLiveReview] = useState<LiveState>({ kind: 'idle' });
   const [liveWeekly, setLiveWeekly] = useState<LiveState>({ kind: 'idle' });
-  // Default to 'planned' so the brief lands visible on first open for demo.
-  // In production, clock-driven: morning before brief, evening after ~7pm.
-  const [phase, setPhase] = useState<PresentPhase>('planned');
+  // Clock-derived phase with URL override; see derivePhase().
+  const [phase, setPhase] = useState<PresentPhase>(() => derivePhase());
   const [voiceOpen, setVoiceOpen] = useState(false);
 
   useEffect(() => {
@@ -396,7 +378,6 @@ export default function App() {
       banner={<ConnectionBanner status={status} />}
       content={
         <View>
-          <PhaseToggle phase={phase} onChange={setPhase} />
           <ScreenHeader tense="Today" title={todayLabel} />
           {phase === 'morning' ? (
             <View>
@@ -478,7 +459,13 @@ export default function App() {
   // Each slot needs explicit height on web: horizontal ScrollView children
   // collapse to content height otherwise, breaking the inner vertical scroll.
   // `flex: 1` + `height: '100%'` gives us the scroll-view height either way.
-  const slotStyle = { width: pageWidth, height: '100%' as const };
+  // scrollSnapAlign lands in the DOM via react-native-web passthrough — fixes
+  // the "drags like a whiteboard" feel where pagingEnabled alone doesn't snap.
+  const slotStyle = {
+    width: pageWidth,
+    height: '100%' as const,
+    scrollSnapAlign: 'start',
+  };
 
   return (
     <View style={styles.container}>
@@ -519,7 +506,11 @@ const t = theme.light;
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: t.colors.PrimarySurface, paddingTop: 60 },
-  pager: { flex: 1 },
+  // scrollSnapType: react-native-web passes this through to the scrolling
+  // <div>, which makes horizontal paging SNAP on web instead of dragging.
+  // Combined with scrollSnapAlign on each slot, fixes the "whiteboard pan"
+  // feel on Chrome/Safari/Edge. pagingEnabled alone isn't enough on web.
+  pager: { flex: 1, scrollSnapType: 'x mandatory' } as any,
   screen: { flex: 1, backgroundColor: t.colors.PrimarySurface },
   scroll: { padding: t.spacing['5'], paddingBottom: 140 },
   banner: {
