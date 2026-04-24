@@ -6,10 +6,11 @@
 
 ## Status
 
-**Phase:** Build — Friday is the agent-to-UI wiring critical day.
-**Status:** 🟡 On track.
-**Last:** Large infra day. ~27 PRs merged: parallel-tracks workflow (#11 + follow-ups), agent-runner base (#24), tools scaffolds (#3), design tokens port (#26), seed data v1 (#40), Claude-as-judge scorer (#39), app README (#38), launch-plan + branch-first enforcement + doc-map CI (#41, #42), Michael Cohen MA session architecture docs (`docs/architecture/managed-agents-*.md`). Overnight build-loop second flight shipped PRs #46–#50 (markdown fork swap, journal editor stub, evals dataset+rubric+baseline).
-**Next:** Friday critical path — replace `agent-runner`'s direct `messages.create` with MA `POST /v1/sessions`; wire `session.status_idle` → Expo UI refresh; render one agent output as a card against seed data.
+**Phase:** Build — Friday pivot day: shipped a mobile-responsive web demo.
+**Status:** 🟢 Demo URL live, unblocking live-MA wiring.
+**Live demo:** https://intently-eta.vercel.app (seed data rendered; MA wiring pending Track B merge)
+**Last:** **Pivot to mobile-responsive web.** Expo Web target was already scaffolded; only PagerView blocked the bundle. Swapped for horizontal ScrollView, deployed to Vercel. Three tracks fanned out in parallel: Track A (daily-brief evals), Track B (MA proxy Edge function, PR #62), Track C (submission deliverables). Spec catch-up for daily-review tomorrow-shaping + drop Weekly Goals shipped as PR #61.
+**Next:** Merge PRs #61 (spec) + #62 (ma-proxy) + web-pivot. Deploy ma-proxy to Supabase (user-only). Swap seed-data fixture for live `fetch(/ma-proxy)` call. Render real agent output on Present screen.
 **Last updated:** 2026-04-24.
 
 ### Today's Go/No-Go (2026-04-24)
@@ -42,8 +43,9 @@
 
 ## Critical items awaiting review
 
-1. **Spec catch-up: daily-review tomorrow-shaping + Weekly Goals read.** User approved tomorrow-shaping for daily-review. PR #19 added steps 5a (pattern detection) and 5b (tomorrow-shaping) to `agents/daily-review/SKILL.md`; criterion CR-dr-05 matches ("factual next-day preview"). The spec (`life-ops-plugin-spec.md:548-580`) still has the 4-step flow without a next-day preview step, and its Reads list still includes Weekly Goals (criterion drops it). Fix direction: **update the spec** to add the next-day preview step + decide Weekly Goals inclusion, then `/derive-criteria daily-review`. Queue for a live session — spec wording is sensitive, not overnight-safe. *(Clarified 2026-04-23 evening: user's position is "keep tomorrow-shaping"; prior TRACKER entry was worded as "consider revert" which inverted the direction.)*
-2. **npm audit `moderate` threshold blocked by Expo upstream.** Root 1 (markdown-it chain) resolved via fork swap (commit `4001c977`). Root 2 (Expo SDK → xcode → uuid < 14) upstream-blocked. No action available — threshold stays at `high` until Expo ships patched `@expo/config-plugins`.
+1. **~~Spec catch-up: daily-review tomorrow-shaping + Weekly Goals read.~~** Resolved 2026-04-24 via PR #61 — spec step 4 (pattern detection) + step 5 (tomorrow-shaping) added, Weekly Goals dropped from Reads. Follow-up: run `/derive-criteria daily-review` after merge.
+2. **~~npm audit `moderate` threshold blocked by Expo upstream.~~** Moved to Follow-ups as tracking-only; not a blocker. Pivot to web demo supersedes the iOS-specific Expo constraint.
+3. **Three parallel-track PRs open, need review + merge.** #62 ma-proxy Edge function (enables live MA calls from the web app), #63 daily-brief evals (scenarios + rubric), submission-deliverables PR pending from Track C. Merge order: #61 spec → #62 ma-proxy → #63 evals → submission-deliverables → web-pivot branch.
 
 *(Stale item removed 2026-04-23 evening: "Spec decision: weekly-review scoring" — current CR-wr-02, spec step 2, and `agents/weekly-review/SKILL.md:25-27` all agree on qualitative-surface/quantitative-internal. No gap. Release-readiness report was reading a pre-PR-#23 criteria-sync snapshot.)*
 
@@ -61,12 +63,14 @@
 
 ## Next (in order — start here)
 
-1. **[Friday] MA session-wrap + UI wiring.** In `app/lib/agent-runner.ts`, swap direct `client.messages.create` for MA `POST /v1/sessions` per `docs/architecture/managed-agents-event-topology.md`. Wire `session.status_idle` event → Expo UI refresh. Card pipeline shipped (#59, merged); remaining is to swap `app/fixtures/daily-brief-seed.ts` for the live MA session response on the Present screen. First end-to-end smoke: trigger daily-brief manually → see live output in the card in simulator.
-2. **[Friday] First eval dataset for daily-brief.** Author `evals/datasets/daily-brief/cases.json` + `evals/rubrics/daily-brief/rubric.json` + baseline. Pairs with the judge-scorer (PR #39).
-3. **[Sat] Second demo flow.** Wire daily-review if Friday held.
-4. **[Sat] Submission prep.** Generate `THIRD_PARTY_LICENSES.md` via `npx license-checker`. Rewrite `README.md` (root) with demo narrative + MA story; PR #38's `app/README.md` is scaffold.
-5. **[Sat] Practice demo cuts.** Record test takes of the 3-minute script on physical device / simulator with seed data.
-6. **[Sun] Record final demo video** (3-min hard cap). Write 100–200 word summary. Verify public repo has README + LICENSE + THIRD_PARTY_LICENSES. **Submit via CV platform by 8:00 PM EDT.**
+1. **[Fri, done] Web-pivot deploy** — live at https://intently-eta.vercel.app, seed data rendering.
+2. **[Fri, done] Eval dataset (#63), ma-proxy (#62), spec catch-up (#61)** — parallel-tracks shipped. Needs review + merge.
+3. **[Fri] Merge PRs + deploy ma-proxy.** Muxin: `supabase functions deploy ma-proxy` + `supabase secrets set ANTHROPIC_API_KEY=... MA_AGENT_ID_daily_brief=...`. See Follow-ups bullet.
+4. **[Fri] Swap seed fixture for live MA call.** In `app/App.tsx` Present screen: replace `dailyBriefSeed` import with a `fetch` to the deployed ma-proxy endpoint. Stream/idle event → card render. Re-export to web + redeploy.
+5. **[Sat] Second demo flow.** Wire daily-review if Friday held.
+6. **[Sat] Submission prep.** Track C shipping `README.md` rewrite + `THIRD_PARTY_LICENSES.md` — fill in live URL post-merge.
+7. **[Sat] Practice demo cuts.** Record test takes of the 3-min script against the live URL.
+8. **[Sun] Record final demo video** (3-min hard cap). Write 100–200 word summary. Verify public repo has README + LICENSE + THIRD_PARTY_LICENSES. **Submit via CV platform by 8:00 PM EDT.**
 
 ## Stretch (skip if time-pressed)
 

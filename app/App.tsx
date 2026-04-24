@@ -4,9 +4,16 @@ import { JetBrainsMono_400Regular } from '@expo-google-fonts/jetbrains-mono';
 import { SourceSerif4_400Regular } from '@expo-google-fonts/source-serif-4';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  Dimensions,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import Markdown from '@ronradtke/react-native-markdown-display';
-import PagerView from 'react-native-pager-view';
 import AgentOutputCard from './components/AgentOutputCard';
 import JournalEditor from './components/JournalEditor';
 import { dailyBriefSeed } from './fixtures/daily-brief-seed';
@@ -115,7 +122,8 @@ export default function App() {
     Inter_600SemiBold,
     JetBrainsMono_400Regular,
   });
-  const pager = useRef<PagerView>(null);
+  const pager = useRef<ScrollView>(null);
+  const [screenWidth, setScreenWidth] = useState(() => Dimensions.get('window').width);
   const [status, setStatus] = useState<ConnStatus>({ kind: 'idle' });
   const [journalOpen, setJournalOpen] = useState(false);
 
@@ -135,25 +143,45 @@ export default function App() {
     };
   }, []);
 
+  // Track viewport width so the three screens resize on rotation / browser resize.
+  // Dimensions.addEventListener is polyfilled by react-native-web.
+  useEffect(() => {
+    const sub = Dimensions.addEventListener('change', ({ window }) => {
+      setScreenWidth(window.width);
+    });
+    return () => sub?.remove();
+  }, []);
+
   if (!fontsLoaded) return null;
+
+  const pageWidth = screenWidth;
 
   return (
     <View style={styles.container}>
-      <PagerView ref={pager} style={styles.pager} initialPage={1}>
-        <View key="past">
+      <ScrollView
+        ref={pager}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        style={styles.pager}
+        contentOffset={{ x: pageWidth, y: 0 }}
+      >
+        <View key="past" style={{ width: pageWidth }}>
           <Screen
             md={pastMd}
             header={<NewJournalEntryButton onPress={() => setJournalOpen(true)} />}
           />
         </View>
-        <View key="present">
+        <View key="present" style={{ width: pageWidth }}>
           <Screen
             content={<AgentOutputCard output={dailyBriefSeed} />}
             banner={<ConnectionBanner status={status} />}
           />
         </View>
-        <View key="future"><Screen md={futureMd} /></View>
-      </PagerView>
+        <View key="future" style={{ width: pageWidth }}>
+          <Screen md={futureMd} />
+        </View>
+      </ScrollView>
       <JournalEditor
         visible={journalOpen}
         onClose={() => setJournalOpen(false)}
