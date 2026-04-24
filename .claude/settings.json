@@ -30,7 +30,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash $CLAUDE_PROJECT_DIR/scripts/session-precheck.sh"
+            "command": "bash scripts/session-precheck.sh"
           }
         ]
       }
