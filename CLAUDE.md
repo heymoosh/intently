@@ -6,7 +6,9 @@ Stable context for every Claude session in this repo. If guidance drifts from re
 
 **Response style:** concise, to the point, layman's terms. When explaining technical details, lead with a 1-line primer of the concept — Muxin is learning.
 
-**Manual work → TRACKER.md.** Whenever a task has a step Claude can't do automatically (manual smoke tests, user-only credentials, shared-infra writes, decisions only the user can make), add a bullet to `TRACKER.md` § Follow-ups in the same turn. Otherwise the user won't know it exists.
+**Autonomy default: act, don't ask.** Execute by default. Pause and confirm ONLY when (a) the user would need to paste a secret / API key / ID into chat, (b) the action is destructive and hard to reverse (rm -rf, disk wipe, force-push main, db drop, delete prod resources), or (c) the move is obviously dumb / severe and a reasonable engineer would pause. Otherwise: run the command, merge the PR, deploy, commit, iterate on errors empirically. Don't stall with "should I…?" unless (a)–(c) applies. Shared-infra writes the user has already authorized mid-session (e.g. supabase deploy after they said "run the commands") count as pre-authorized — keep moving.
+
+**Manual work → TRACKER.md.** Whenever a task has a step Claude can't do automatically (user-only credentials, console actions Claude can't reach, decisions only the user can make), add a bullet to `TRACKER.md` § Follow-ups in the same turn. Otherwise the user won't know it exists.
 
 ## Product intent
 
