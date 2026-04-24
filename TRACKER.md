@@ -52,6 +52,10 @@
 - **Apply pg_cron migration (`supabase/migrations/0002_schedules.sql`) to remote.** Needs `supabase db push` — user-only, destructive shared-infra write.
 - **Fix `--clean` squash-merge false-positive.** `git cherry` misses squash-merged work (false positive on claude-judge-scorer today). Replace with `git diff --quiet main HEAD` in `scripts/intently-track.sh`. ~2-line fix.
 - **Promote overnight build loop to recurring.** First flight 2026-04-22/23 shipped 6 PRs clean. Add `build-loop` case to `~/.intently/bin/intently-routine.sh` + launchd plist at 23:30 daily. Watch first weeknight run for working-tree conflicts with human branches.
+- **Smoke overnight UI merges (#46 markdown fork, #47 journal modal).** Past/Present/Future markdown still renders; journal modal Edit/Preview/Cancel flow works; decide modal-vs-route before Saturday. Full checklist: [issue #52](https://github.com/heymoosh/intently/issues/52).
+- **Author review overnight evals (#48 scenario-01, #49 rubric).** Does scenario-01 cover cascade/pacing/left-off mechanics convincingly? Do the 8 rubric axes cover observable regressions — any redundant or missing? Then compile the markdown dataset + rubric to runner-loadable `cases.json` / `rubric.json` paths (feeds Friday Next #2).
+- **Post-first-live-run baseline floor (#50).** After Friday's first `daily-brief` run against `scenario-01`, raise per-axis `minScores` in `evals/baselines/daily-brief.json` from 0 to the observed floor; flip each `axisStatus` from `unknown` to `baselined`; bump `updatedAt`.
+- **Stewards leave working-tree mods uncommitted.** release-readiness + spec-conformance stewards modified TRACKER.md + acceptance-criteria/*.md overnight without committing — required a rescue PR (#51) in the morning. Design fix: auto-commit to `auto/steward/*` branches + draft PR, mirroring the build-loop pattern.
 
 ## Next (in order — start here)
 
