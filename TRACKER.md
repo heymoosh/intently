@@ -6,28 +6,25 @@
 
 ## Status
 
-**Phase:** Build — Friday pivot day: shipped a mobile-responsive web demo.
-**Status:** 🟢 Demo URL live, unblocking live-MA wiring.
-**Live demo:** https://intently-eta.vercel.app (seed data rendered; MA wiring pending Track B merge)
-**Last:** **Pivot to mobile-responsive web.** Expo Web target was already scaffolded; only PagerView blocked the bundle. Swapped for horizontal ScrollView, deployed to Vercel. Three tracks fanned out in parallel: Track A (daily-brief evals), Track B (MA proxy Edge function, PR #62), Track C (submission deliverables). Spec catch-up for daily-review tomorrow-shaping + drop Weekly Goals shipped as PR #61.
-**Next:** Merge PRs #61 (spec) + #62 (ma-proxy) + web-pivot. Deploy ma-proxy to Supabase (user-only). Swap seed-data fixture for live `fetch(/ma-proxy)` call. Render real agent output on Present screen.
+**Phase:** Build — Friday afternoon: pivot shipped, live-MA wiring in flight.
+**Status:** 🟢 Demo URL live; critical path is user-action (MA setup + ma-proxy deploy) + live-MA wiring.
+**Live demo:** https://intently-eta.vercel.app (seed data renders; live MA call not yet wired)
+**Last:** **Web pivot + parallel tracks merged.** PR #61 (spec catch-up), #62 (ma-proxy Edge function), #63 (daily-brief evals + `cases.json`/`rubric.json`), #64 (web pivot), #65 (submission deliverables). PR #66 (default-to-Present + README URL) open.
+**Next:** Merge PR #66. Muxin: create MA agents in Anthropic console + deploy `ma-proxy` to Supabase with secrets. Wire live `fetch(/ma-proxy)` on Present (branch `chat/live-ma-wiring` in flight). Circular carousel polish.
 **Last updated:** 2026-04-24.
 
 ### Today's Go/No-Go (2026-04-24)
 
 | Flow | Verdict | Top risk |
 |---|---|---|
-| Daily Brief | **BLOCK** | 5 demo-critical criteria `unknown`; `cases.json` missing — no eval baseline; CR-daily-brief-01 architecture decision pending |
-| Daily Review | **BLOCK** | Standing FAIL on CR-daily-review-03 (SKILL.md step 5a contradicts criterion); 2 HIGH fidelity findings block re-derivation |
+| Daily Brief | **BLOCK** | No live MA wired yet — seed fixture renders but no real agent call; ma-proxy not deployed; MA agent not created in console |
+| Daily Review | **BLOCK** | Not yet wired; follows daily-brief once live path proven. `/derive-criteria daily-review` still owed post-#61 (routine follow-up, not a blocker for demo) |
 | Weekly Review | **SHIP WITH CAVEATS** | CR-weekly-review-05 unverified pending live run; 4/5 criteria pass in static analysis |
 
-**Top 3 blockers:**
-1. **Spec decisions needed** — H1 (CR-daily-review-01 drops Weekly Goals) + H2 (CR-setup-03 Ops Plan section removed) must resolve before eval authoring; H2 needs only `/derive-criteria setup`
-2. **CR-daily-review-03 standing FAIL** — delete `agents/daily-review/SKILL.md` step 5a (multi-day synthesis); fix ready, needs git access
-3. **cases.json absent for daily-brief** — blocks all eval runs; author today to establish floor before Sat demo cut
-
-**Auto-fix PRs:** `gh pr list` blocked in automated context — check `auto/privacy/2026-04-24` and build-loop PRs #46/#47/#50 manually
-**Missing signals:** agent-memory off-day (expected, using 2026-04-23 report); `gh pr list` unavailable
+**Top 3 blockers (all user-action or in-flight):**
+1. **MA agents not yet created in Anthropic console** — required before any live call; one agent per skill (daily-brief first). User-only.
+2. **`ma-proxy` Edge function not deployed to Supabase** — `supabase functions deploy ma-proxy` + `supabase secrets set ANTHROPIC_API_KEY=... MA_AGENT_ID_daily_brief=...`. Shared-infra write; user-only.
+3. **Live-MA wiring on Present screen** — in flight as `chat/live-ma-wiring`; swap `dailyBriefSeed` import for `fetch('/ma-proxy')`, stream idle event → card render.
 
 <details>
 <summary>Go/No-Go Archive — 2026-04-23</summary>
@@ -43,34 +40,28 @@
 
 ## Critical items awaiting review
 
-1. **~~Spec catch-up: daily-review tomorrow-shaping + Weekly Goals read.~~** Resolved 2026-04-24 via PR #61 — spec step 4 (pattern detection) + step 5 (tomorrow-shaping) added, Weekly Goals dropped from Reads. Follow-up: run `/derive-criteria daily-review` after merge.
-2. **~~npm audit `moderate` threshold blocked by Expo upstream.~~** Moved to Follow-ups as tracking-only; not a blocker. Pivot to web demo supersedes the iOS-specific Expo constraint.
-3. **Three parallel-track PRs open, need review + merge.** #62 ma-proxy Edge function (enables live MA calls from the web app), #63 daily-brief evals (scenarios + rubric), submission-deliverables PR pending from Track C. Merge order: #61 spec → #62 ma-proxy → #63 evals → submission-deliverables → web-pivot branch.
-
-*(Stale item removed 2026-04-23 evening: "Spec decision: weekly-review scoring" — current CR-wr-02, spec step 2, and `agents/weekly-review/SKILL.md:25-27` all agree on qualitative-surface/quantitative-internal. No gap. Release-readiness report was reading a pre-PR-#23 criteria-sync snapshot.)*
+_None open as of 2026-04-24. Recent resolutions: PR #61 (spec catch-up), PRs #61–#65 merged, web pivot to iOS-specific Expo constraint no longer applies. Hot items live in Next queue below._
 
 ## Follow-ups (pending manual or flight-test)
 
 - **Apply pg_cron migration (`supabase/migrations/0002_schedules.sql`) to remote.** Needs `supabase db push` — user-only, destructive shared-infra write.
 - **Fix `--clean` squash-merge false-positive.** `git cherry` misses squash-merged work (false positive on claude-judge-scorer today). Replace with `git diff --quiet main HEAD` in `scripts/intently-track.sh`. ~2-line fix.
 - **Promote overnight build loop to recurring.** First flight 2026-04-22/23 shipped 6 PRs clean. Add `build-loop` case to `~/.intently/bin/intently-routine.sh` + launchd plist at 23:30 daily. Watch first weeknight run for working-tree conflicts with human branches.
-- **Smoke overnight UI merges (#46 markdown fork, #47 journal modal).** Past/Present/Future markdown still renders; journal modal Edit/Preview/Cancel flow works; decide modal-vs-route before Saturday. Full checklist: [issue #52](https://github.com/heymoosh/intently/issues/52).
-- **Author review overnight evals (#48 scenario-01, #49 rubric).** Does scenario-01 cover cascade/pacing/left-off mechanics convincingly? Do the 8 rubric axes cover observable regressions — any redundant or missing? Then compile the markdown dataset + rubric to runner-loadable `cases.json` / `rubric.json` paths (feeds Friday Next #2).
-- **Post-first-live-run baseline floor (#50).** After Friday's first `daily-brief` run against `scenario-01`, raise per-axis `minScores` in `evals/baselines/daily-brief.json` from 0 to the observed floor; flip each `axisStatus` from `unknown` to `baselined`; bump `updatedAt`.
-- **Smoke iter-3 agent output card (#59).** Open the app → swipe to Present → verify `AgentOutputCard` renders with a sage-tinted surface, the "Good morning, Sam" title, markdown body (bold meeting callouts + inline code like `read_calendar`), and two trace chips (Calendar + Journal) in the footer. Same modal-vs-route taste call from #47 applies if anything feels off.
+- **Post-first-live-run baseline floor (#50).** After the first live `daily-brief` run against `scenario-01`, raise per-axis `minScores` in `evals/baselines/daily-brief.json` from 0 to the observed floor; flip each `axisStatus` from `unknown` to `baselined`; bump `updatedAt`.
+- **Smoke iter-3 agent output card (#59) post-#66.** Open https://intently-eta.vercel.app on phone; verify Present loads by default, `AgentOutputCard` renders with sage-tinted surface, "Good morning, Sam" title, markdown body (bold meeting callouts + inline code like `read_calendar`), two trace chips (Calendar + Journal) in footer.
 - **Stewards leave working-tree mods uncommitted.** release-readiness + spec-conformance stewards modified TRACKER.md + acceptance-criteria/*.md overnight without committing — required a rescue PR (#51) in the morning. Design fix: auto-commit to `auto/steward/*` branches + draft PR, mirroring the build-loop pattern.
-- **Deploy `ma-proxy` Edge Function + set Supabase secrets.** Run `supabase functions deploy ma-proxy`, then `supabase secrets set ANTHROPIC_API_KEY=<bitwarden-value>` and the per-skill `MA_AGENT_ID_*` vars (see `supabase/functions/ma-proxy/README.md`). Smoke test with curl from localhost: `curl -X POST https://<project-ref>.supabase.co/functions/v1/ma-proxy -H 'Content-Type: application/json' -d '{"skill":"daily-brief","input":"smoke test"}'`. User-only — shared-infra write.
+- **Deploy `ma-proxy` + create MA agents.** See Next #2–#3 for the command sequence; smoke-test post-deploy with `curl -X POST https://<project-ref>.supabase.co/functions/v1/ma-proxy -H 'Content-Type: application/json' -d '{"skill":"daily-brief","input":"smoke test"}'`.
 
 ## Next (in order — start here)
 
-1. **[Fri, done] Web-pivot deploy** — live at https://intently-eta.vercel.app, seed data rendering.
-2. **[Fri, done] Eval dataset (#63), ma-proxy (#62), spec catch-up (#61)** — parallel-tracks shipped. Needs review + merge.
-3. **[Fri] Merge PRs + deploy ma-proxy.** Muxin: `supabase functions deploy ma-proxy` + `supabase secrets set ANTHROPIC_API_KEY=... MA_AGENT_ID_daily_brief=...`. See Follow-ups bullet.
-4. **[Fri] Swap seed fixture for live MA call.** In `app/App.tsx` Present screen: replace `dailyBriefSeed` import with a `fetch` to the deployed ma-proxy endpoint. Stream/idle event → card render. Re-export to web + redeploy.
-5. **[Sat] Second demo flow.** Wire daily-review if Friday held.
-6. **[Sat] Submission prep.** Track C shipping `README.md` rewrite + `THIRD_PARTY_LICENSES.md` — fill in live URL post-merge.
-7. **[Sat] Practice demo cuts.** Record test takes of the 3-min script against the live URL.
-8. **[Sun] Record final demo video** (3-min hard cap). Write 100–200 word summary. Verify public repo has README + LICENSE + THIRD_PARTY_LICENSES. **Submit via CV platform by 8:00 PM EDT.**
+1. **[Fri] Merge PR #66** (default-to-Present + README URL fill).
+2. **[Fri, user] Create MA agent for daily-brief in Anthropic console.** Paste `agents/daily-brief/SKILL.md` prompt; note agent ID.
+3. **[Fri, user] Deploy `ma-proxy` + set secrets.** `supabase functions deploy ma-proxy`; `supabase secrets set ANTHROPIC_API_KEY=... MA_AGENT_ID_daily_brief=...`. See `supabase/functions/ma-proxy/README.md`.
+4. **[Fri] Finish `chat/live-ma-wiring`.** Swap `dailyBriefSeed` import for `fetch('/ma-proxy')` on Present; render streamed output as `AgentOutputCard`. Redeploy to Vercel.
+5. **[Fri] Circular carousel polish** (in flight) — wrap-around swipe on Past/Present/Future.
+6. **[Sat] Second demo flow.** Wire daily-review if Friday held.
+7. **[Sat] Practice demo cuts** against live URL; script the 3-min video.
+8. **[Sun] Record + submit.** See `launch-plan.md` § Milestones for the full Sunday checklist.
 
 ## Stretch (skip if time-pressed)
 
@@ -79,10 +70,6 @@
 - Visual UI polish beyond consuming ported tokens.
 - Voice input (text input is fine for demo).
 - Hindsight self-host on Fly.
-
-## Open questions
-
-- **Demo target surface:** physical phone, simulator screencap, or web browser. Changes polish budget.
 
 ## Locked decisions (do not re-litigate — see ADRs + `launch-plan.md` § "Locked cuts")
 
@@ -98,8 +85,8 @@
 ## Timeline
 
 - Hackathon: 2026-04-21 → 2026-04-26 (submission deadline 2026-04-26, 8:00 PM EDT)
-- Today: 2026-04-23 (Thursday evening)
-- Days remaining: 3
+- Today: 2026-04-24 (Friday afternoon)
+- Days remaining: 2
 
 ## Done (recent)
 
