@@ -182,7 +182,7 @@ export default function VoiceModal({ visible, onClose, supabaseUrl }: Props) {
           ) : (
             <View style={styles.body}>
               <Pressable style={styles.primaryBtn} onPress={voice.start}>
-                <Text style={styles.primaryBtnLabel}>🎙 Start listening</Text>
+                <Text style={styles.primaryBtnLabel}>Start listening</Text>
               </Pressable>
               <Text style={styles.fallbackHint}>
                 Or type it below.

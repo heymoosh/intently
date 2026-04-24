@@ -4,11 +4,12 @@
 
 ## Read first (in order)
 
-1. **`docs/design/Intently - App/README-design-handoff.md`** — the canonical spec. Start here. The TL;DR, product model (§1), data model (§2), screen map (§3), state machines (§4), file map (§5), key flows (§6), design system (§7), scope (§8).
-2. **Any supplementary guide** Muxin drops into `docs/design/Intently - App/` — check for new files like `README-supplement*.md` or `design-fidelity-notes*.md`. These extend or override the main handoff.
-3. **`docs/design/Intently - App/intently-*.jsx`** — the visual prototype. `intently-shell.jsx`, `intently-screens.jsx`, `intently-cards.jsx`, `intently-hero.jsx`, `intently-journal.jsx`, `intently-projects.jsx` are the ones to mine for pattern reference.
-4. **`app/App.tsx`** — current state. Read what's there before changing anything.
-5. **`CLAUDE.md`** — house rules. "Act, don't ask" is the default; branch-first for tracked file edits.
+1. **`docs/design/Intently - App/CLAUDE.md`** — design-owner's "start here" for this app. The five things that matter most. Read before any code.
+2. **`docs/design/Intently - App/BUILD-RULES.md`** — **the non-negotiables and anti-patterns**. This is the sharpest doc in the folder — read it especially carefully if you catch yourself about to add a tab bar, a segmented control, a phase toggle, a "generate X" button, or any top-level chrome you don't see in the canvas's Three-tense system section. The previous session (this one) shipped code that violated several of these; see "What the previous session already fixed" below.
+3. **`docs/design/Intently - App/HANDOFF.md`** — the full spec. Product model (§1), data model (§2), screen map (§3), state machines (§4), file map (§5), key flows (§6), design system (§7), scope (§8).
+4. **`docs/design/Intently - App/intently-*.jsx`** — the visual prototype. `intently-shell.jsx`, `intently-screens.jsx`, `intently-cards.jsx`, `intently-hero.jsx`, `intently-journal.jsx`, `intently-projects.jsx`. The source of truth for patterns.
+5. **`app/App.tsx`** — current state. Read what's there before changing anything.
+6. **Root `CLAUDE.md`** — repo-wide house rules. "Act, don't ask" is the default; branch-first for tracked file edits.
 
 ## What's functional — DO NOT BREAK
 
@@ -21,31 +22,48 @@
 - **Agent output card** — `app/components/AgentOutputCard.tsx` with `kind: 'brief' | 'journal' | 'chat' | 'review'` and `inputTraces` chips. Keep this component; it's the "agent did something" visual.
 - **Phase driven Present** — `phase: 'morning' | 'planned' | 'evening'` state. The dev-toggle UI may be relocated/restyled or moved to a URL query param; the **underlying phase state must remain** because it drives what CTA shows when.
 
-## What's wrong and needs a design-fidelity pass
+## What the previous session already fixed (as of commit before this prompt)
 
-From Muxin's direct eyeball of the current build (2026-04-24 build-day):
+- **Swipe snap on web** — CSS scroll-snap (`scrollSnapType: 'x mandatory'` + `scrollSnapAlign: 'start'`) passed through to react-native-web so pages actually snap. Verify on current code before "fixing" again.
+- **PhaseToggle removed entirely** — was a pill row reading as primary top nav. Replaced with `derivePhase()`: clock-driven, with URL override `?phase=morning|planned|evening` for demo recording. No user-facing phase switcher (per BUILD-RULES non-negotiable #2).
+- **"Generate X" pills removed** — `LiveAgentTrigger` pills for weekly-review (Past) and brief (Present planned/evening) are gone per BUILD-RULES anti-pattern "A 'Generate brief' / 'Start review' button that isn't the hero." The `LiveAgentTrigger` component function still exists in `App.tsx` (safe to keep or remove); it's just not rendered on any screen.
+- **"+ New journal entry" button removed** — journal entries go through hero per §1.3 / §6.2.
+- **Emojis removed from labels** — `☀`, `🌙`, `✨`, `🗓` gone from copy. One remaining visual emoji: the `🎙` mic glyph on the hero button itself. That's icon-chrome (visual, not copy), a stopgap pending a proper Lucide/glyph component import. Replace with a real Mic glyph when you do the hero polish pass.
 
-1. **Swipe feel** — on react-native-web, `pagingEnabled` on horizontal `ScrollView` doesn't snap cleanly; it drags like a pan/whiteboard. Fix with CSS scroll-snap (`scrollSnapType: 'x mandatory'` on container, `scrollSnapAlign: 'start'` on each slot). May have been partially addressed in a prior pass — verify on current code.
-2. **PhaseToggle reads as primary top nav.** Currently a pill row with Morning / Planned / Evening — too prominent. Per spec there's no tense label chrome at all; the tense dots-nav (← · · · →) lives at the **bottom**. The phase switch is a dev-only affordance — tuck it, hide behind a dev flag, or drive from URL query param (`?phase=evening`). Not a top nav element.
-3. **Past screen layout is wrong per §3.1.** Should be default Week view: 7-day strip, Weekly Review summary + outcomes list + key moments, with Day view chronologically listing Entries (brief → journal → chat → review) for the tapped day. Year/Month zoom levels are in scope for MVP per §8 but can stay as a stretch — Week view is the bar.
-4. **Future is too sparse.** Three goal cards are there, but no Projects band, no painterly atmosphere, no "Name a new goal" ghost button. §3.3 spells it out.
-5. **Hero affordance is a plain emoji button.** Size, position, visual weight, states (idle / listening / processing / expanded) — all need polish. Full press-and-hold radial menu is in scope per §8; at minimum the idle disc + listening takeover should read as the spec describes.
-6. **TenseNav (bottom arrow-dot pattern)** — not implemented. Three dots + left/right arrows at the bottom per §1.1. No text labels for tenses in production chrome.
-7. **Typography** — Fraunces italic display + Source Serif 4 reading + Inter UI are all loaded but not consistently applied. Screen titles should be 44px italic Fraunces (§7.1). Current titles look too close to UI weight.
-8. **Confirmation card pattern** — the agent-did-something atomic unit (§1.3). `AgentOutputCard` is the bones; the spec calls for sage surface, cream serif, undo pill action. Harmonize.
+## What's wrong and still needs a design-fidelity pass
+
+From HANDOFF spec + BUILD-RULES anti-patterns, remaining gaps:
+
+1. **No phone frame.** Spec §5 + BUILD-RULES non-negotiable #5: "The app is one iPhone 16 Pro-sized surface. Design at 393×852. Use `<Phone>` from `intently-shell.jsx`." Current app renders full-width in browser. Port the `<Phone>` wrapper or build a simpler RN-Web equivalent that constrains width to 393px (or viewport if smaller) and applies the iPhone bezel visuals.
+2. **No `TenseNav` at bottom.** Per §1.1 / BUILD-RULES non-negotiable #4: `← · · · →` — three dots for position, arrows to step, **no text labels** ("Past / Present / Future" labels are an anti-pattern). Must be persistent across all three tenses.
+3. **Hero affordance state machine incomplete.** §1.2 / §4.1 spec out four visible states: idle / listening (fullscreen takeover) / processing / chat / expanded (radial quick-action menu). Current is a plain Pressable with an emoji. At minimum land: proper idle disc with a real Mic glyph, listening takeover styling. Full press-and-hold radial menu is stretch.
+4. **Past screen structure.** §3.1 calls for zoomable Year/Month/Week/Day. Current only renders Week-ish — weekly-review summary + today's Entries chronologically. Need: 7-day strip header, key moments list, top-right zoom chip, tap-to-drill-one-level gesture. Full Year (365-tile grid) + Month (5×7 grid) + Day view are in MVP scope per §8. Minimum Viable: proper Week view with 7-day strip and key moments; Day view stubbed.
+5. **Future screen missing Projects band.** §3.3: goals + "Name a new goal" ghost button + Projects band below (compact cards → ProjectDetail on tap). Current has goal cards but nothing else.
+6. **Solid CTA buttons.** BUILD-RULES anti-pattern: "CTAs are painterly: sunrise gradient (morning) / midnight gradient (evening)." Current `PhaseCta` uses solid `PrimaryText` / `UndoAffordance`. Need painterly gradients — probably via the `PainterlyBlock` component from `intently-imagery.jsx` (port to RN Web if not already), or via a React Native `LinearGradient`.
+7. **Typography inconsistent.** §7.1: screen titles 40–48px italic Fraunces. Current titles 32px via `screenHeaderTitle` style. Reading-mode bodies need 17–18px Source Serif at 30px line-height and ~42px side margins per §7.1. Consistent application across all screens.
+8. **Painterly backgrounds missing.** Goal cards are flat tints. Per §3.3 + §7.4: painterly palettes with `PainterlyBlock` (4-stop palette, seed → deterministic blob SVGs). Port from `intently-imagery.jsx` to RN Web (or RN-equivalent). Apply to Future goal cards, Past key moments, Present yesterday-highlight.
+9. **Glyph system missing.** ~40 Lucide-sourced glyphs per §7.5. Port from `intently-glyphs.jsx` (or install `lucide-react-native` and wire equivalent names). Day marks, entry tags, goal atmospheres all need these.
+10. **Grain overlay missing.** `.intently-grain` CSS class defined in `intently-imagery.jsx` — dithered noise overlay 20–30% opacity inside painterly/tinted blocks. Port to RN Web.
+11. **`AgentOutputCard` → `ConfirmationCard` harmony.** §1.3 calls out the `ConfirmationCard` (sage surface, cream serif, two pill actions including Undo) as the "agent did something" atomic unit. Current `AgentOutputCard` is adjacent but not identical. Either evolve `AgentOutputCard` to match the `ConfirmationCard` spec, or split the two components (confirmation for hero-originated commits, output for agent-originated brief/review drops).
+12. **Entry store abstraction missing.** §9.4 "what to build next" step 1: one flat array of typed Entries. Every screen reads from it; every hero commit writes to it. Currently daily-brief/daily-review/weekly-review live as three separate `LiveState` slots. Post-skeleton this should consolidate so Past's Day view can render chronologically across entry kinds.
 
 ## Priority order (do in this order; skip later items if time runs short)
 
-1. Read the spec + supplementary guide (if any).
-2. Fix **swipe snap** and **PhaseToggle demotion** — these are the most viscerally wrong current-state issues. Small changes, big polish return.
-3. **Bottom TenseNav** (arrow-dot pattern) — pervasive visual chrome per spec.
-4. **Hero affordance polish** — at minimum correct position, size, idle/listening visual states. Full state machine is stretch.
-5. **Past → Week view** restructure: 7-day strip, weekly-review summary, outcomes, key moments.
-6. **Future → add Projects band + "Name a new goal"**.
-7. **Typography pass** — apply Fraunces italic / Source Serif / Inter per §7.1 wherever text is used.
-8. **Present phase polish** — morning sunrise CTA + evening midnight CTA visual weight per §7.2.
-9. **Year/Month/Day zoom views on Past** if time.
-10. **Press-and-hold radial hero menu** if time.
+1. Read CLAUDE.md + BUILD-RULES.md + HANDOFF.md.
+2. **Phone frame wrapper** — constrain the app to 393×852 with iPhone bezel. Everything else depends on this because layout/typography only reads right at phone dimensions.
+3. **Bottom TenseNav** (`← · · · →`) — pervasive chrome per spec. No text tense labels.
+4. **Painterly CTAs** — replace solid `PhaseCta` with sunrise/midnight gradients (port `PainterlyBlock` or use `LinearGradient`).
+5. **Hero affordance polish** — idle disc with proper Mic glyph (install `lucide-react-native` if not already), correct size/position, listening takeover styling.
+6. **Past → full Week view** — 7-day strip header, weekly-review summary + outcomes + key moments, top-right zoom chip, tap-to-drill-one-level.
+7. **Future → Projects band + "Name a new goal"** ghost row.
+8. **Glyph system** — install `lucide-react-native`, wire the ~40-glyph set per §7.5.
+9. **Typography pass** — 44px italic Fraunces for screen titles; Source Serif 17–18px / 30px line-height for reading bodies.
+10. **Painterly goal cards** on Future, painterly yesterday-highlight on Present morning.
+11. **Grain overlay** — port `.intently-grain` to RN Web.
+12. **`ConfirmationCard` unification** — align `AgentOutputCard` with the spec's `ConfirmationCard` pattern.
+13. **Year/Month/Day zoom on Past** — if time.
+14. **Press-and-hold radial hero menu** — if time.
+15. **Entry store abstraction** — if time.
 
 ## Verification
 

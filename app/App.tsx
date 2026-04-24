@@ -342,6 +342,8 @@ export default function App() {
   // Past — Week view per design §3.1: default is this week. Shows the
   // weekly-review summary/outcomes, then today's Entries (brief + review)
   // chronologically beneath. Year/Month/Day zoom levels deferred to post-V1.
+  // No trigger pills per BUILD-RULES: weekly-review runs Sunday evening or
+  // via hero; journal entries are created through the hero affordance.
   const todayEntries: Array<{ key: string; output: AgentOutput }> = [
     { key: 'brief', output: briefOutput },
     ...(liveReview.kind === 'ok' ? [{ key: 'review', output: liveReview.output }] : []),
@@ -352,11 +354,6 @@ export default function App() {
         <View>
           <ScreenHeader tense="Past · Week 17" title="Apr 20 — 26" />
           <Text style={styles.sectionEyebrow}>THIS WEEK'S OUTCOMES</Text>
-          <LiveAgentTrigger
-            state={liveWeekly}
-            onPress={handleGenerateLiveWeekly}
-            idleLabel="🗓 Generate weekly review"
-          />
           <AgentOutputCard output={weeklyOutput} />
           <Text style={[styles.sectionEyebrow, styles.sectionEyebrowSpaced]}>
             TODAY · {todayLabel.toUpperCase()}
@@ -364,7 +361,6 @@ export default function App() {
           {todayEntries.map((e) => (
             <AgentOutputCard key={e.key} output={e.output} />
           ))}
-          <NewJournalEntryButton onPress={() => setJournalOpen(true)} />
         </View>
       }
     />
@@ -386,7 +382,7 @@ export default function App() {
                 when you're ready, start the brief.
               </Text>
               <PhaseCta
-                label="☀ Start your daily brief"
+                label="Start your daily brief"
                 loading={liveBrief.kind === 'loading'}
                 onPress={() => {
                   handleGenerateLiveBrief();
@@ -396,15 +392,10 @@ export default function App() {
             </View>
           ) : (
             <View>
-              <LiveAgentTrigger
-                state={liveBrief}
-                onPress={handleGenerateLiveBrief}
-                idleLabel="✨ Generate live brief"
-              />
               <AgentOutputCard output={briefOutput} />
               {phase === 'evening' ? (
                 <PhaseCta
-                  label="🌙 Start your daily review"
+                  label="Start your daily review"
                   loading={liveReview.kind === 'loading'}
                   onPress={handleGenerateLiveReview}
                   variant="evening"
