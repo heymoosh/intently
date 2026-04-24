@@ -4,6 +4,8 @@ Stable context for every Claude session in this repo. If guidance drifts from re
 
 **House rule:** pointers > content. CLAUDE.md is capped at 100 lines (soft target 75). Enforced by `.githooks/pre-commit` and `.github/workflows/docs-check.yml`. If a rule belongs in another doc, link it — don't restate it.
 
+**Response style:** concise, to the point, layman's terms. When explaining technical details, lead with a 1-line primer of the concept — Muxin is learning.
+
 ## Product intent
 
 Intently is a mobile app that turns recurring life operations (daily triage, morning briefing, weekly review, meal planning, monthly review) into an agent-native experience. Scheduled managed agents do the work; the mobile UI reflects state, triggers runs, and renders output.
