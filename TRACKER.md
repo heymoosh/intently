@@ -22,7 +22,7 @@
 
 ## Critical items awaiting review
 
-1. **Design scope decision — OPEN.** User feedback: current app does not match the design system in `docs/design/Intently - App/` (~3,400 lines JSX across 10 files). Friday polish kept tokens + added screen headers but didn't port layouts. **Options for Saturday:** (a) accept current state, focus on daily-review + video; (b) port 1–3 specific pieces (user names them: card style, hero, screen-header pattern, etc.); (c) full port — not feasible in remaining window. User will decide at start of next session.
+1. **Design scope — RESOLVED: functionality first, polish layered later.** User direction (end-of-Friday): ship all skills working before any visual polish pass. Visual layer (colors, typography, component styling) is fully retrofittable because tokens are already wired. **UX flow** (structural patterns like modal vs in-flow, card stack vs scroll list, full-takeover vs embedded) has caveats — cheaper to get right upfront. **Next-session start:** spend ~20 min classifying `docs/design/Intently - App/` flows as structural (bake in now) vs cosmetic (later), then prioritize wiring skills. See Next queue.
 
 ## Follow-ups (pending manual or flight-test)
 
@@ -44,11 +44,14 @@ Three bugs found during Friday's first live smoke tests. Fixes shipped in #68, #
 
 ## Next (in order — start here)
 
-1. **[Sat AM] Resolve design scope decision** (Critical item #1). Either accept current state or name specific files to port.
-2. **[Sat] Daily-review wiring.** Create MA agent from `agents/daily-review/ma-agent-config.json`; set `MA_AGENT_ID_DAILY_REVIEW` secret; add button to Past screen (or Present toggle); same fetch pattern as daily-brief.
-3. **[Sat] Video script.** Draft the 3-min narrative: open on Present, tap Generate, read output, swipe to show rotation, voice-over on Managed Agents story.
-4. **[Sat PM] Practice takes.** Record 2–3 cuts on phone browser.
-5. **[Sun] Final recording + submission.** Verify README + LICENSE + THIRD_PARTY_LICENSES present. Submit via CV platform by 8:00 PM EDT.
+1. **[Sat AM] Classify design-folder flows: structural vs cosmetic.** ~20 min read of `docs/design/Intently - App/`. Flag any patterns that are expensive to retrofit (modal vs in-flow, card stack vs scroll list, takeover vs embedded). Bake the structural ones in; defer cosmetic.
+2. **[Sat] Daily-review wiring.** Create MA agent from `agents/daily-review/ma-agent-config.json`; set `MA_AGENT_ID_DAILY_REVIEW` secret; same fetch pattern as daily-brief. Completes one full day's cycle — the core product proof.
+3. **[Sat] Weekly-review wiring** (if time). Second synthesis beat — Sunday reflection pattern recognition.
+4. **[Sat] Update-tracker + setup** (stretch, only if demo-relevant; seed data covers setup).
+5. **[Sat] Visual polish pass.** Now that functionality works, port specific design pieces the user names. Token values already match.
+6. **[Sat] Video script.** Draft 3-min narrative: Present → Generate brief → read output → swipe rotation → tap daily-review later → voice-over on MA story.
+7. **[Sat PM] Practice takes.** 2–3 recorded cuts on phone browser.
+8. **[Sun] Final recording + submission.** README + LICENSE + THIRD_PARTY_LICENSES present. Submit via CV platform by 8:00 PM EDT.
 
 ## Stretch (skip if time-pressed)
 
