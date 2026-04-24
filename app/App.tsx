@@ -37,6 +37,34 @@ type LiveState =
   | { kind: 'ok'; output: AgentOutput }
   | { kind: 'error'; message: string };
 
+// Present has three data-driven phases per design handoff §3.2.
+// morning = pre-brief sunrise CTA. planned = brief + plan visible.
+// evening = planned + midnight CTA for daily-review. In production this is
+// clock-driven; for demo we expose a dev toggle so we can record each beat.
+type PresentPhase = 'morning' | 'planned' | 'evening';
+
+// Three goals at a time per MVP spec (§2.1). Each has a monthly slice that
+// refreshes on month boundary. Painterly palettes deferred to post-V1; flat
+// card-surface tokens carry the visual load for now, varied so the three
+// cards read as distinct.
+const GOALS = [
+  {
+    title: 'Move to Japan.',
+    monthly: 'April: finish the visa checklist and book the scouting trip for June.',
+    tint: 'ConfirmationCardSurface' as const,
+  },
+  {
+    title: 'Start a side hustle that pays my rent.',
+    monthly: 'April: ship the landing page and get 10 waitlist signups from real conversations.',
+    tint: 'QuestCardSurface' as const,
+  },
+  {
+    title: 'Be someone I would want to work with.',
+    monthly: 'April: one 1:1 a week, and say the hard thing out loud when it matters.',
+    tint: 'UncertainCardSurface' as const,
+  },
+];
+
 // Dev-only Supabase status pill. Hidden in normal state so the demo surface
 // isn't cluttered; we only surface an error (user-meaningful).
 function ConnectionBanner({ status }: { status: ConnStatus }) {
@@ -139,6 +167,69 @@ function NewJournalEntryButton({ onPress }: { onPress: () => void }) {
   );
 }
 
+// Dev-only toggle for cycling the Present phase on camera. In production the
+// phase is clock-driven; this lives at the top of Present so we can demo all
+// three phases (pre-brief → planned → evening) in sequence without waiting
+// for real time to pass.
+function PhaseToggle({
+  phase,
+  onChange,
+}: {
+  phase: PresentPhase;
+  onChange: (p: PresentPhase) => void;
+}) {
+  const options: PresentPhase[] = ['morning', 'planned', 'evening'];
+  return (
+    <View style={styles.phaseToggle}>
+      {options.map((p) => {
+        const active = p === phase;
+        return (
+          <Pressable
+            key={p}
+            style={[styles.phaseChip, active && styles.phaseChipActive]}
+            onPress={() => onChange(p)}
+          >
+            <Text style={[styles.phaseChipLabel, active && styles.phaseChipLabelActive]}>
+              {p}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+// Morning/evening phase CTA — larger, visually weighted as the focal
+// affordance on the screen. Sunrise for morning, midnight for evening.
+// Gradient is deferred per "functionality first"; solid tint carries intent.
+function PhaseCta({
+  label,
+  onPress,
+  loading,
+  variant = 'morning',
+}: {
+  label: string;
+  onPress: () => void;
+  loading?: boolean;
+  variant?: 'morning' | 'evening';
+}) {
+  const bg =
+    variant === 'evening' ? t.colors.PrimaryText : t.colors.UndoAffordance;
+  const fg = t.colors.InverseText;
+  return (
+    <Pressable
+      style={[styles.phaseCta, { backgroundColor: bg }]}
+      onPress={loading ? undefined : onPress}
+    >
+      {loading ? (
+        <ActivityIndicator size="small" color={fg} />
+      ) : (
+        <Text style={[styles.phaseCtaLabel, { color: fg }]}>{label}</Text>
+      )}
+    </Pressable>
+  );
+}
+
 // Infinite-ish rotation: repeat [Past, Present, Future] across many slots so
 // the user can keep swiping in either direction through the rotation. Start
 // scrolled to the middle cycle's Present. Clone-slot wrap logic was fragile on
@@ -168,6 +259,9 @@ export default function App() {
   const [liveBrief, setLiveBrief] = useState<LiveState>({ kind: 'idle' });
   const [liveReview, setLiveReview] = useState<LiveState>({ kind: 'idle' });
   const [liveWeekly, setLiveWeekly] = useState<LiveState>({ kind: 'idle' });
+  // Default to 'planned' so the brief lands visible on first open for demo.
+  // In production, clock-driven: morning before brief, evening after ~7pm.
+  const [phase, setPhase] = useState<PresentPhase>('planned');
 
   useEffect(() => {
     let cancelled = false;
@@ -258,49 +352,120 @@ export default function App() {
   const weeklyOutput = liveWeekly.kind === 'ok' ? liveWeekly.output : weeklyReviewSeed;
 
   const todayLabel = formatDateHeader();
+
+  // Past — Week view per design §3.1: default is this week. Shows the
+  // weekly-review summary/outcomes, then today's Entries (brief + review)
+  // chronologically beneath. Year/Month/Day zoom levels deferred to post-V1.
+  const todayEntries: Array<{ key: string; output: AgentOutput }> = [
+    { key: 'brief', output: briefOutput },
+    ...(liveReview.kind === 'ok' ? [{ key: 'review', output: liveReview.output }] : []),
+  ];
   const pastScreen = (
     <Screen
       content={
         <View>
-          <ScreenHeader tense="Past" title="Today, in review" />
-          <LiveAgentTrigger
-            state={liveReview}
-            onPress={handleGenerateLiveReview}
-            idleLabel="🌙 Generate today's review"
-          />
-          <AgentOutputCard output={reviewOutput} />
-          <NewJournalEntryButton onPress={() => setJournalOpen(true)} />
-        </View>
-      }
-    />
-  );
-  const presentScreen = (
-    <Screen
-      banner={<ConnectionBanner status={status} />}
-      content={
-        <View>
-          <ScreenHeader tense="Today" title={todayLabel} />
-          <LiveAgentTrigger
-            state={liveBrief}
-            onPress={handleGenerateLiveBrief}
-            idleLabel="✨ Generate live brief"
-          />
-          <AgentOutputCard output={briefOutput} />
-        </View>
-      }
-    />
-  );
-  const futureScreen = (
-    <Screen
-      content={
-        <View>
-          <ScreenHeader tense="Future" title="This week ahead" />
+          <ScreenHeader tense="Past · Week 17" title="Apr 20 — 26" />
+          <Text style={styles.sectionEyebrow}>THIS WEEK'S OUTCOMES</Text>
           <LiveAgentTrigger
             state={liveWeekly}
             onPress={handleGenerateLiveWeekly}
             idleLabel="🗓 Generate weekly review"
           />
           <AgentOutputCard output={weeklyOutput} />
+          <Text style={[styles.sectionEyebrow, styles.sectionEyebrowSpaced]}>
+            TODAY · {todayLabel.toUpperCase()}
+          </Text>
+          {todayEntries.map((e) => (
+            <AgentOutputCard key={e.key} output={e.output} />
+          ))}
+          <NewJournalEntryButton onPress={() => setJournalOpen(true)} />
+        </View>
+      }
+    />
+  );
+
+  // Present — phase-driven per design §3.2. morning = pre-brief sunrise CTA;
+  // planned = brief + plan; evening = planned + midnight CTA for daily-review.
+  // Dev toggle at top lets us flip between phases on camera.
+  const presentScreen = (
+    <Screen
+      banner={<ConnectionBanner status={status} />}
+      content={
+        <View>
+          <PhaseToggle phase={phase} onChange={setPhase} />
+          <ScreenHeader tense="Today" title={todayLabel} />
+          {phase === 'morning' ? (
+            <View>
+              <Text style={styles.bodyLead}>
+                A quiet opening. Yesterday's highlight and this week's outcomes are below;
+                when you're ready, start the brief.
+              </Text>
+              <PhaseCta
+                label="☀ Start your daily brief"
+                loading={liveBrief.kind === 'loading'}
+                onPress={() => {
+                  handleGenerateLiveBrief();
+                  setPhase('planned');
+                }}
+              />
+            </View>
+          ) : (
+            <View>
+              <LiveAgentTrigger
+                state={liveBrief}
+                onPress={handleGenerateLiveBrief}
+                idleLabel="✨ Generate live brief"
+              />
+              <AgentOutputCard output={briefOutput} />
+              {phase === 'evening' ? (
+                <PhaseCta
+                  label="🌙 Start your daily review"
+                  loading={liveReview.kind === 'loading'}
+                  onPress={handleGenerateLiveReview}
+                  variant="evening"
+                />
+              ) : null}
+              {liveReview.kind === 'ok' ? (
+                <View style={styles.reviewInlineNote}>
+                  <Text style={styles.reviewInlineNoteText}>
+                    Review written. Swipe to Past to read it alongside today's brief.
+                  </Text>
+                </View>
+              ) : null}
+              {liveReview.kind === 'error' ? (
+                <Text style={styles.liveTriggerError}>{liveReview.message}</Text>
+              ) : null}
+            </View>
+          )}
+        </View>
+      }
+    />
+  );
+
+  // Future — three goal cards + monthly slice per design §3.3. Projects band
+  // deferred; goals are the primary content here.
+  const futureScreen = (
+    <Screen
+      content={
+        <View>
+          <ScreenHeader tense="Future" title="What this month is for." />
+          <Text style={styles.bodyLead}>
+            Three long-term visions. Each one gets a monthly slice — the agent cascades
+            it into weekly and daily moves on Present.
+          </Text>
+          {GOALS.map((g, i) => (
+            <View
+              key={i}
+              style={[styles.goalCard, { backgroundColor: t.colors[g.tint] }]}
+            >
+              <Text style={styles.goalTitle}>{g.title}</Text>
+              <View style={styles.goalDivider} />
+              <Text style={styles.goalMonthlyEyebrow}>APRIL</Text>
+              <Text style={styles.goalMonthly}>
+                {g.monthly.replace(/^April:\s*/, '')}
+              </Text>
+            </View>
+          ))}
         </View>
       }
     />
@@ -436,5 +601,115 @@ const styles = StyleSheet.create({
     lineHeight: 38,
     color: t.colors.PrimaryText,
     letterSpacing: -0.5,
+  },
+  sectionEyebrow: {
+    fontFamily: t.typography.fonts.UISemi,
+    fontSize: 11,
+    letterSpacing: 1.2,
+    color: t.colors.SupportingText,
+    marginBottom: t.spacing['3'],
+  },
+  sectionEyebrowSpaced: {
+    marginTop: t.spacing['6'],
+  },
+  bodyLead: {
+    fontFamily: t.typography.fonts.Reading,
+    fontSize: 15,
+    lineHeight: 22,
+    color: t.colors.SupportingText,
+    marginBottom: t.spacing['4'],
+  },
+  phaseToggle: {
+    flexDirection: 'row',
+    alignSelf: 'flex-end',
+    gap: 4,
+    padding: 3,
+    borderRadius: t.radius.Pill,
+    backgroundColor: t.colors.SecondarySurface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: t.colors.EdgeLine,
+    marginBottom: t.spacing['4'],
+  },
+  phaseChip: {
+    paddingHorizontal: t.spacing['3'],
+    paddingVertical: t.spacing['1'],
+    borderRadius: t.radius.Pill,
+  },
+  phaseChipActive: {
+    backgroundColor: t.colors.PrimaryText,
+  },
+  phaseChipLabel: {
+    fontFamily: t.typography.fonts.UIMedium,
+    fontSize: 11,
+    letterSpacing: 0.4,
+    color: t.colors.SupportingText,
+    textTransform: 'capitalize' as const,
+  },
+  phaseChipLabelActive: {
+    color: t.colors.InverseText,
+  },
+  phaseCta: {
+    marginTop: t.spacing['4'],
+    paddingVertical: t.spacing['4'],
+    paddingHorizontal: t.spacing['5'],
+    borderRadius: t.radius.Pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 56,
+    ...t.elevation.Raised,
+  },
+  phaseCtaLabel: {
+    fontFamily: t.typography.fonts.UISemi,
+    fontSize: 16,
+    letterSpacing: 0.2,
+  },
+  reviewInlineNote: {
+    marginTop: t.spacing['3'],
+    padding: t.spacing['3'],
+    borderRadius: t.radius.Chip,
+    backgroundColor: t.colors.SecondarySurface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: t.colors.EdgeLine,
+  },
+  reviewInlineNoteText: {
+    fontFamily: t.typography.fonts.Reading,
+    fontSize: 13,
+    lineHeight: 18,
+    color: t.colors.SupportingText,
+    fontStyle: 'italic',
+  },
+  goalCard: {
+    padding: t.spacing['5'],
+    borderRadius: t.radius.Card,
+    marginBottom: t.spacing['4'],
+    ...t.elevation.Raised,
+  },
+  goalTitle: {
+    fontFamily: t.typography.fonts.Display,
+    fontSize: 24,
+    lineHeight: 28,
+    color: t.colors.PrimaryText,
+    letterSpacing: -0.3,
+  },
+  goalDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: t.colors.EdgeLine,
+    marginVertical: t.spacing['3'],
+    opacity: 0.5,
+  },
+  goalMonthlyEyebrow: {
+    fontFamily: t.typography.fonts.UISemi,
+    fontSize: 10,
+    letterSpacing: 1.2,
+    color: t.colors.PrimaryText,
+    opacity: 0.55,
+    marginBottom: t.spacing['1'],
+  },
+  goalMonthly: {
+    fontFamily: t.typography.fonts.Reading,
+    fontSize: 15,
+    lineHeight: 22,
+    color: t.colors.PrimaryText,
+    opacity: 0.86,
   },
 });
