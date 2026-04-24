@@ -81,39 +81,46 @@ These are stretch, not bar. Skip if time-pressed:
 
 Hot work tracked in TRACKER.md. This section is the rollup. When milestones drift, re-read this doc first.
 
-### Thursday 2026-04-23 — Managed Agents path cleared (TODAY)
+### Thursday 2026-04-23 — Managed Agents path cleared ✅
 
 - [x] Michael Cohen MA session attended
 - [x] MA architecture docs written (`docs/architecture/managed-agents-*.md`)
-- [x] Agent-runner base merged (PR #24)
-- [x] Seed data merged (PR #40)
-- [x] Design tokens ported (PR #26)
-- [x] Claude-judge scorer merged (PR #39)
-- [x] App README merged (PR #38)
-- [x] npm audit CI merged (PR #29)
+- [x] Agent-runner base, seed data, design tokens, judge scorer, app README, npm audit CI all merged
 - [x] Parallel-tracks workflow operational (tracks now auto-merge on green CI)
-- [ ] This PR lands (branch-first enforcement + launch plan + doc-map check)
+- [x] Branch-first enforcement + launch plan + doc-map check landed
 
-### Friday 2026-04-24 — Agent → UI wiring (THE critical day)
+### Friday 2026-04-24 — Agent → UI wiring (daily-brief live) ✅
 
-- [ ] Replace agent-runner's direct `messages.create` with MA `POST /v1/sessions` for scheduled skills
-- [ ] Wire event stream (`session.status_idle` → UI refresh) in the Expo app
-- [ ] Render at least one agent output as a card on the Present screen
-- [ ] First end-to-end smoke: trigger daily-brief manually → see output in mobile UI against seed data
-- [ ] First eval dataset for daily-brief authored (`evals/datasets/daily-brief/`)
-- [ ] Draft the 100–200 word submission summary
+- [x] Web pivot: Expo Web target shipped; PagerView swap; Vercel deploy at https://intently-eta.vercel.app
+- [x] ma-proxy deployed with correct MA API schema (3 empirical fixes)
+- [x] daily-brief MA agent created in console; live Opus 4.7 synthesis confirmed on-camera
+- [x] Infinite swipe rotation (21-slot repeat pattern)
+- [x] All 5 MA agent configs shipped as JSON (PR #69)
+- [x] First eval dataset for daily-brief authored (`evals/datasets/daily-brief/`)
 
-### Saturday 2026-04-25 — Polish, stretch, prep
+### BUILD DAY — wire all remaining skills end-to-end
 
-- [ ] Second demo flow (daily-review) wired if Friday went well
+Scope change: no "polish Saturday." Today is pure build. Functionality first, polish only if layered on without blocking record.
+
+- [ ] **Design-folder classification** (~20 min) — `docs/design/Intently - App/` structural vs cosmetic; bake structural in, defer cosmetic
+- [ ] **daily-review** wired — MA agent created, secret set, fetch pattern matches daily-brief
+- [ ] **weekly-review** wired — second synthesis beat, Sunday-reflection pattern
+- [ ] **update-tracker** wired — demonstrates state-mutation loop
+- [ ] **setup** wired (or verified seed-data-only path is demo-sufficient)
+- [ ] Video narrative bullets captured (user is drafting script in parallel in a separate section)
+- [ ] Smoke-test every wired flow end-to-end once against seed data
+
+### RECORD DAY — demo takes + submission prep
+
+- [ ] Test full demo flow on browser with seed data, any-device
+- [ ] 2–3 practice cuts of the 3-min demo
 - [ ] `THIRD_PARTY_LICENSES.md` generated + committed (`npx license-checker --production --csv > third-party.csv`)
 - [ ] README rewrite with demo narrative + MA story
-- [ ] Test full demo flow on physical device / simulator with seed data
-- [ ] Practice cuts of the 3-minute demo video — write the script, don't improvise
+- [ ] Draft the 100–200 word submission summary
 
 ### Sunday 2026-04-26 — Submit
 
-- [ ] Final demo video recording (3-min hard cap)
+- [ ] Final demo video recording (3-min hard cap) if not finalized on record day
 - [ ] Written summary finalized (100–200 words)
 - [ ] Public repo verified: README, LICENSE, THIRD_PARTY_LICENSES present
 - [ ] Submit via Cerebral Valley platform
@@ -125,19 +132,7 @@ Post-hackathon: repo can be made private after judging completes (Apr 28), per h
 
 ## How TRACKER.md rolls up here
 
-TRACKER's "Next (in order)" items map to these milestones:
-
-| TRACKER Next item | Milestone day | Status |
-|---|---|---|
-| #1 Managed Agents TS SDK wiring | Thursday (partial: agent-runner base done) → Friday (MA session-based calls) | In progress |
-| #2 Google OAuth app registration | Saturday (stretch — seed data covers demo) | Deferred (user task) |
-| #3 Tool implementations (real wiring) | Saturday stretch | Scaffolds done |
-| #4 pg_cron schedules tied to config | Friday optional (MA scheduling may replace) | Blocked pending Friday design |
-| #5 Demo seed data | Thursday ✅ | Done (PR #40) |
-| #6 Record three demo flows end-to-end | Sunday | Blocked on all prior |
-| #7 Submission (README, video, summary) | Sunday | Not started |
-
-TRACKER stays the hot queue (what to do today, what's blocked, what just merged). This file is the slow sanity check (is TRACKER aimed at the right horizon).
+TRACKER stays the hot queue (what to do today, what's blocked, what just merged). This file is the slow sanity check (is TRACKER aimed at the right horizon). If TRACKER's "Next" order stops matching the milestone labels above, fix launch-plan first, then re-order TRACKER.
 
 ---
 

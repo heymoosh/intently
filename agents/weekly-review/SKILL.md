@@ -10,7 +10,17 @@ The compounding engine. This is a conversation, not a report — pause and wait 
 
 ## 0. Read the past week's journal
 
-Read the journal file (filename from `reflection_filename` in config). Pull entries from the past 7 days — both freeform reflections and any `#gtj` structured entries. Surface emotional threads, patterns, and insights before any tactical step.
+Read the journal file (filename from `reflection_filename` in config). Pull entries from the past 7 days — both freeform reflections and tagged entries. Surface emotional threads, patterns, and insights before any tactical step.
+
+**Read by tag type first.** Journal entries from daily-review are tagged with the category they captured. Scan each type separately before combining into themes:
+
+- `#grow` — lessons from the week. What kept coming up? What did the user keep learning?
+- `#self` — self-knowledge entries. What drained or energized them? Any pattern across days?
+- `#brag` — wins. Are there wins the user might have already forgotten by Friday?
+- `#ant` — limiting beliefs that surfaced. Did the same one appear more than once?
+- `#ideas` — ideas flagged for development. Any that gained momentum this week?
+
+Surface the strongest 1–2 signals per tag type that appear across **multiple days** — single-day entries are data; multi-day recurrence is a pattern worth naming.
 
 These extracted patterns will be written into the "Review of Last Week → Reflection patterns" section of the new `Weekly Goals.md` at step 8. **The journal stays pure; Weekly Goals carries the operational load.**
 
