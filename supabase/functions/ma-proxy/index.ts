@@ -35,7 +35,9 @@
 
 const ANTHROPIC_API_BASE = 'https://api.anthropic.com';
 const ANTHROPIC_BETA = 'managed-agents-2026-04-01';
-const STREAM_PATH = (sessionId: string) => `/v1/sessions/${sessionId}/stream`;
+// Paths verified against anthropics/skills/managed-agents-events.md (2026-04-24).
+// The repo webinar note said `/stream`; the actual path is `/events/stream`.
+const STREAM_PATH = (sessionId: string) => `/v1/sessions/${sessionId}/events/stream`;
 const EVENTS_PATH = (sessionId: string) => `/v1/sessions/${sessionId}/events`;
 const SESSIONS_PATH = '/v1/sessions';
 
@@ -150,12 +152,20 @@ async function sendUserMessage(
   // context without waiting on a multi-block contract.
   const text = typeof input === 'string' ? input : JSON.stringify(input);
 
+  // Verified schema (anthropics/skills repo, 2026-04-24): events are submitted
+  // as a batch array, and `user.message` uses a flat `text` field — NOT the
+  // content-blocks grammar of the Messages API. Empirical trial before this
+  // rejected both `content` at root and `message: {content: [...]}` wrapping.
   const res = await fetch(`${ANTHROPIC_API_BASE}${EVENTS_PATH(sessionId)}`, {
     method: 'POST',
     headers: anthropicHeaders(apiKey),
     body: JSON.stringify({
-      type: 'user.message',
-      content: [{ type: 'text', text }],
+      events: [
+        {
+          type: 'user.message',
+          content: [{ type: 'text', text }],
+        },
+      ],
     }),
   });
 
