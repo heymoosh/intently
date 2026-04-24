@@ -30,22 +30,15 @@ Execution rule: scheduled or cross-step stateful → Managed Agent. One-shot tra
 
 ## Non-functional requirements
 
-- **Security:** scope in `docs/security/asvs-scope.md`; threat model in `docs/security/threat-model.md`; builder rules in `docs/security/privacy-policy-for-builders.md`. **Hard rule: Bitwarden Secrets Manager is the only allowed secrets store. No `.env` commits, no hardcoded literals, no exceptions.**
-- **Privacy:** Privacy Steward on every push + pre-release. **V1 is single-user (Muxin dogfoods); per-user isolation checks deferred until multi-user lands.**
-- **Performance / accessibility:** treated as UX signal during the sprint, not release gates.
-- **Observability:** TBD — defined in Session 4.
+**Hard rule: Bitwarden Secrets Manager only** — no `.env` commits, no hardcoded literals, no exceptions. V1 is single-user (Muxin dogfoods); per-user isolation deferred. Perf / a11y / observability are UX signals during sprint, not release gates. Details: `docs/security/`.
 
 ## Release gates
 
 Full checklist and enforcement: `docs/process/release-gates.md`. `release-gate.yml` enforces in CI (deferred to Apr 25); Release-Readiness Steward produces the plain-English summary.
 
-## Acceptance criteria authoring rule
+## Acceptance criteria
 
-Full process: `docs/process/acceptance-criteria.md`. Short form:
-
-- Criteria derive from `docs/product/requirements/life-ops-plugin-spec.md` at authoring time, in their own PR, **before** implementation for the same skill.
-- During build, only `Status` and `Last checked` may change. If implementation can't satisfy a criterion, mark it `fail`/`partial` — **do not rewrite the criterion to match what was built.**
-- Enforcement: `.githooks/pre-commit` (Layer A), Thursday CI gate (Layer C), Spec Conformance Steward task 7 (Layer B).
+Criteria are **immutable during build** — only `Status` and `Last checked` may change; if code can't satisfy a criterion, mark it `fail`/`partial`, never rewrite. Derive criteria from the spec in a separate PR before implementation. Full process + enforcement: `docs/process/acceptance-criteria.md`.
 
 ## Branch and PR standards
 
@@ -55,41 +48,15 @@ See `CONTRIBUTING.md`. PR-Readiness loop verifies diff readiness on demand.
 
 ## Test scope ceiling (hackathon)
 
-- **Unit:** agent memory schema + deterministic business logic.
-- **E2E:** the three demo flows (daily brief, daily review, weekly review).
-- **Integration:** skip for MVP.
+Unit (agent memory + deterministic logic) + E2E (three demo flows). **Skip integration tests for MVP.** Cap exists so coverage doesn't grow into time we don't have.
 
-Cap exists so the Test Gap Steward doesn't grow coverage into time we don't have.
+## Doc upkeep
 
-## What Claude updates as implementation evolves
+Implementation changes → `docs/architecture/`, `docs/decisions/` (ADRs for non-obvious calls), `evals/reports/`, `.claude/session-handoff.md`. CLAUDE.md updates only when guidance drifts from reality — any routine that spots drift proposes the fix.
 
-- `docs/architecture/` — architecture notes and caveats.
-- `docs/decisions/` — ADRs for non-obvious calls.
-- `CHANGELOG.md` (to be created) — fragments on meaningful changes.
-- `evals/reports/` — eval run outputs; migration + rollback notes beside any schema change.
-- `.claude/session-handoff.md` — rolling handoff (convention: `docs/process/session-handoff.md`).
+## Routine and loop pack
 
-CLAUDE.md is updated when guidance drifts from reality. Any routine/loop that spots drift proposes the fix.
-
-## Routine and loop pack (MVP-10)
-
-Structural authority: `docs/Claude Code Repo-Ready Blueprint.md`. All jobs auto-run via launchd (`~/Library/LaunchAgents/com.intently.*.plist`). Loops gated to 07:30–22:30 local; routines fire at fixed times. Sonnet 4.6 default; Opus 4.7 for Agent Memory. Auto-fix routines push only to `auto/*` branches and open draft PRs — never commit to `main`.
-
-- `.claude/routines/ai-eval-batch-steward.md` — 02:07 daily.
-- `.claude/routines/spec-conformance-steward.md` — 02:13 daily (report-only; criteria Behavior is immutable).
-- `.claude/routines/privacy-steward.md` — 02:19 daily (auto-fixes LOW/MEDIUM).
-- `.claude/routines/agent-memory-steward.md` — 02:25 every 2 days (Opus 4.7).
-- `.claude/routines/release-readiness-steward.md` — 03:00 daily; morning go/no-go synthesis into `TRACKER.md`.
-- `.claude/routines/scope-overnight-steward.md` — 21:00 daily; proposes tonight's overnight build-loop scope (Opus 4.7).
-- `.claude/routines/session-handoff-steward.md` — 22:45 daily; overwrites `.claude/session-handoff.md`.
-- `.claude/loops/build-watchdog.md` — every 30 min (shell-first; LLM only on fail).
-- `.claude/loops/critical-flow-check.md` — every 30 min; rotates demo flows.
-- `.claude/loops/eval-spot-check.md` — every 60 min; gated on `agents/*/SKILL.md` mtime.
-- `.claude/loops/criteria-sync-loop.md` — every 2 h; report-only fidelity audit.
-
-Plus the deterministic gitleaks push gate in `.github/workflows/security.yml` and the criteria-creation gate in `.githooks/pre-commit`.
-
-**Cost discipline:** a loop producing nothing actionable 3 sessions running gets demoted or killed; a routine whose report goes unread for a week gets paused.
+7 routines + 4 loops auto-run via launchd. Full list, schedules, models, and the `docs/Claude Code Repo-Ready Blueprint.md` structural authority live in that blueprint — read it when reasoning about a specific routine. **Invariant:** auto-fix routines push only to `auto/*` branches and open draft PRs — never commit to `main`.
 
 ## Session handoff
 
