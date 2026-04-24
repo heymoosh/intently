@@ -22,16 +22,21 @@ Bounded, unsupervised implementation work while Muxin sleeps. Picks the highest-
 - **Drop to Sonnet 4.6 medium** if: the scope is purely high-volume repetitive edits (codemods, batch tests).
 - **Re-check each time this loop is scheduled:** consult `/Users/Muxin/Documents/Personal Obsidian/Projects/Opus 4-7 Hackathon/Claude Code Practices/When to use opus 4.6, 4.7, and sonnet 4.6.md` before configuring.
 
-## Tonight's scope (2026-04-22 → 23)
+## Tonight's scope — where to read it
 
-Priority order. Skip any item whose preconditions aren't met.
+Scope is dynamic and authored by the **Scope Overnight Steward** (21:00 daily launchd routine, `.claude/routines/scope-overnight-steward.md`).
 
-1. **Skill loader** (`app/lib/skill-loader.ts` + unit tests). Concatenates `agents/_shared/life-ops-conventions.md` + `agents/<skill>/SKILL.md` → one agent definition string. Pure function, fully testable without network. TRACKER Next #1.
-2. **Tool scaffolds with mocks** — `read_calendar`, `read_emails`, `read_file`, `write_file`. Function signatures, input/output types, fake implementations returning fixture data, unit tests proving the contract. **No real Google API or Supabase wiring.** TRACKER Next #3 (partial — real wiring is blocked on OAuth).
-3. **`pg_cron` migration draft** — `supabase/migrations/0002_schedules.sql` stub with the schedule row inserts for `daily_brief_time`, `daily_review_time`, `weekly_review_day`/`weekly_review_time`. Config-table reads only; no backend function wiring. TRACKER Next #4 (partial).
-4. **Eval harness scaffold** — `evals/runner/` directory with a minimal runner that reads a dataset + rubric + baseline and reports pass/fail. No real evals; just the shape.
-5. **Skill loader hardening** — edge cases: missing SKILL.md, malformed frontmatter, unknown skill name, shared file too large.
-6. **Free slot** — next unblocked TRACKER item or a quality improvement (e.g., test coverage gaps from iterations 1–5).
+**Read scope from:** `routine-output/scope-overnight-<YYYY-MM-DD>.md` where `<YYYY-MM-DD>` is today's date (the day the loop starts, before midnight).
+
+Before the first iteration:
+
+1. Open `routine-output/scope-overnight-<today>.md`.
+2. If it does not exist, the Scope Overnight Steward did not fire (or was skipped). Exit immediately with a failure note at `routine-output/build-loop-<today>-00.md` explaining: "No scope file found. Overnight scope routine must fire before the build loop runs."
+3. Read the iteration chain. Each iteration in the chain gets one loop iteration in order. The scope file's iteration numbers map 1:1 to the loop iteration numbers.
+4. If an iteration has `status: approved` or `status: edited` annotations Muxin added after the 21:00 routine fired, honor them. If an iteration is marked `status: skipped` by Muxin, skip it and move to the next.
+5. If the scope file flags fewer than 3 READY iterations at the top, log the warning but proceed — Muxin may have approved a short night.
+
+**Fallback (pre-routine night, e.g. 2026-04-23 before the steward's first fire):** a one-off scope file may be hand-authored by Claude or Muxin during the evening session. Same file path, same schema. The loop treats hand-authored and routine-authored files identically.
 
 ## Hard stops
 
