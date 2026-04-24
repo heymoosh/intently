@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Markdown from '@ronradtke/react-native-markdown-display';
 import PagerView from 'react-native-pager-view';
+import JournalEditor from './components/JournalEditor';
 import { supabase } from './lib/supabase';
 import { theme } from './lib/tokens';
 
@@ -73,11 +74,20 @@ function ConnectionBanner({ status }: { status: ConnStatus }) {
   );
 }
 
-function Screen({ md, banner }: { md: string; banner?: React.ReactNode }) {
+function Screen({
+  md,
+  banner,
+  header,
+}: {
+  md: string;
+  banner?: React.ReactNode;
+  header?: React.ReactNode;
+}) {
   return (
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.scroll}>
         {banner}
+        {header}
         <Markdown>{md}</Markdown>
       </ScrollView>
       <Pressable
@@ -89,6 +99,14 @@ function Screen({ md, banner }: { md: string; banner?: React.ReactNode }) {
         <Text style={styles.voiceIcon}>🎙</Text>
       </Pressable>
     </View>
+  );
+}
+
+function NewJournalEntryButton({ onPress }: { onPress: () => void }) {
+  return (
+    <Pressable style={styles.newEntryButton} onPress={onPress}>
+      <Text style={styles.newEntryLabel}>+ New journal entry</Text>
+    </Pressable>
   );
 }
 
@@ -104,6 +122,7 @@ export default function App() {
   });
   const pager = useRef<PagerView>(null);
   const [status, setStatus] = useState<ConnStatus>({ kind: 'idle' });
+  const [journalOpen, setJournalOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -126,10 +145,19 @@ export default function App() {
   return (
     <View style={styles.container}>
       <PagerView ref={pager} style={styles.pager} initialPage={1}>
-        <View key="past"><Screen md={pastMd} /></View>
+        <View key="past">
+          <Screen
+            md={pastMd}
+            header={<NewJournalEntryButton onPress={() => setJournalOpen(true)} />}
+          />
+        </View>
         <View key="present"><Screen md={presentMd} banner={<ConnectionBanner status={status} />} /></View>
         <View key="future"><Screen md={futureMd} /></View>
       </PagerView>
+      <JournalEditor
+        visible={journalOpen}
+        onClose={() => setJournalOpen(false)}
+      />
       <StatusBar style="auto" />
     </View>
   );
@@ -169,4 +197,21 @@ const styles = StyleSheet.create({
     ...t.elevation.Hero,
   },
   voiceIcon: { fontSize: 32, color: t.colors.FocusObjectText },
+  newEntryButton: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: t.spacing['4'],
+    paddingVertical: t.spacing['3'],
+    borderRadius: t.radius.Chip,
+    backgroundColor: t.colors.SecondarySurface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: t.colors.EdgeLine,
+    marginBottom: t.spacing['4'],
+    minHeight: t.a11y.MinTapTarget,
+    justifyContent: 'center',
+  },
+  newEntryLabel: {
+    fontFamily: t.typography.fonts.UIMedium,
+    fontSize: 13,
+    color: t.colors.PrimaryText,
+  },
 });
