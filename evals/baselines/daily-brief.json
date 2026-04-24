@@ -1,0 +1,38 @@
+{
+  "skill": "daily-brief",
+  "generated_at": "2026-04-24T05:31:54Z",
+  "updatedAt": "2026-04-24T05:31:54Z",
+  "status": "unknown",
+  "status_note": "No live agent runs yet; Friday's first run produces the initial scoreable diff. All minScores are set to 0 (the rubric's fail threshold) so the harness executes without rejecting the baseline. Raise per-axis mins after the first accepted run.",
+  "spec_version": {
+    "criteria_file": "docs/product/acceptance-criteria/daily-brief.md",
+    "commit": "88342ded6bd3d6b4d27da084e988cc5866caf7f2"
+  },
+  "rubric_ref": "evals/rubrics/daily-brief.md",
+  "scale": { "min": 0, "max": 2 },
+  "minScores": {
+    "prior_context": 0,
+    "pattern_surfacing": 0,
+    "narrative_tone": 0,
+    "first_run_graceful": 0,
+    "cascade_adherence": 0,
+    "pacing_calibration": 0,
+    "integration_grace": 0,
+    "conversation_first": 0
+  },
+  "axisStatus": {
+    "prior_context": "unknown",
+    "pattern_surfacing": "unknown",
+    "narrative_tone": "unknown",
+    "first_run_graceful": "unknown",
+    "cascade_adherence": "unknown",
+    "pacing_calibration": "unknown",
+    "integration_grace": "unknown",
+    "conversation_first": "unknown"
+  },
+  "maintenance": {
+    "on_criteria_edit": "bump spec_version.commit to the new commit hash of the criteria file",
+    "on_baseline_edit": "bump updatedAt; flip axisStatus entries to 'baselined' as each axis gets a real floor",
+    "on_axis_add_or_remove": "keep minScores, axisStatus, and the rubric's axes list in lockstep — the runner's passesBaseline iterates minScores directly"
+  }
+}
