@@ -123,6 +123,7 @@ export default function App() {
     JetBrainsMono_400Regular,
   });
   const pager = useRef<ScrollView>(null);
+  const initialized = useRef(false);
   const [screenWidth, setScreenWidth] = useState(() => Dimensions.get('window').width);
   const [status, setStatus] = useState<ConnStatus>({ kind: 'idle' });
   const [journalOpen, setJournalOpen] = useState(false);
@@ -156,6 +157,15 @@ export default function App() {
 
   const pageWidth = screenWidth;
 
+  // contentOffset is unreliable on react-native-web; scroll to Present on
+  // first layout so the app opens on the agent-output card, not Past.
+  const onPagerContentSized = () => {
+    if (!initialized.current && pageWidth > 0) {
+      pager.current?.scrollTo({ x: pageWidth, animated: false });
+      initialized.current = true;
+    }
+  };
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -164,7 +174,7 @@ export default function App() {
         pagingEnabled
         showsHorizontalScrollIndicator={false}
         style={styles.pager}
-        contentOffset={{ x: pageWidth, y: 0 }}
+        onContentSizeChange={onPagerContentSized}
       >
         <View key="past" style={{ width: pageWidth }}>
           <Screen
