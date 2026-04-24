@@ -57,6 +57,7 @@
 - **Post-first-live-run baseline floor (#50).** After Friday's first `daily-brief` run against `scenario-01`, raise per-axis `minScores` in `evals/baselines/daily-brief.json` from 0 to the observed floor; flip each `axisStatus` from `unknown` to `baselined`; bump `updatedAt`.
 - **Smoke iter-3 agent output card (#59).** Open the app → swipe to Present → verify `AgentOutputCard` renders with a sage-tinted surface, the "Good morning, Sam" title, markdown body (bold meeting callouts + inline code like `read_calendar`), and two trace chips (Calendar + Journal) in the footer. Same modal-vs-route taste call from #47 applies if anything feels off.
 - **Stewards leave working-tree mods uncommitted.** release-readiness + spec-conformance stewards modified TRACKER.md + acceptance-criteria/*.md overnight without committing — required a rescue PR (#51) in the morning. Design fix: auto-commit to `auto/steward/*` branches + draft PR, mirroring the build-loop pattern.
+- **Deploy `ma-proxy` Edge Function + set Supabase secrets.** Run `supabase functions deploy ma-proxy`, then `supabase secrets set ANTHROPIC_API_KEY=<bitwarden-value>` and the per-skill `MA_AGENT_ID_*` vars (see `supabase/functions/ma-proxy/README.md`). Smoke test with curl from localhost: `curl -X POST https://<project-ref>.supabase.co/functions/v1/ma-proxy -H 'Content-Type: application/json' -d '{"skill":"daily-brief","input":"smoke test"}'`. User-only — shared-infra write.
 
 ## Next (in order — start here)
 
