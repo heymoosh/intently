@@ -8,8 +8,6 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -155,15 +153,16 @@ function NewJournalEntryButton({ onPress }: { onPress: () => void }) {
   );
 }
 
-// Circular carousel: 5 virtual slots [FutureClone, Past, Present, Future, PastClone].
-// Initial scroll is SLOT_PRESENT. onMomentumScrollEnd jumps silently from clone
-// slots back to real equivalents so swiping off either edge wraps to the
-// opposite side — 1 swipe from any screen to any other.
-const SLOT_FUTURE_CLONE = 0;
-const SLOT_PAST = 1;
-const SLOT_PRESENT = 2;
-const SLOT_FUTURE = 3;
-const SLOT_PAST_CLONE = 4;
+// Infinite-ish rotation: repeat [Past, Present, Future] across many slots so
+// the user can keep swiping in either direction through the rotation. Start
+// scrolled to the middle cycle's Present. Clone-slot wrap logic was fragile on
+// react-native-web; the repeat pattern eliminates the wrap handler entirely.
+// 7 cycles × 3 screens = 21 slots. Middle Present = slot 10.
+const CYCLES = 7;
+const SCREENS_PER_CYCLE = 3;
+const TOTAL_SLOTS = CYCLES * SCREENS_PER_CYCLE;
+const INITIAL_SLOT = Math.floor(TOTAL_SLOTS / 2); // 10
+// slot % 3: 0 = Past, 1 = Present, 2 = Future
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -177,7 +176,6 @@ export default function App() {
   });
   const pager = useRef<ScrollView>(null);
   const initialized = useRef(false);
-  const wrapGuard = useRef(false);
   const [screenWidth, setScreenWidth] = useState(() => Dimensions.get('window').width);
   const [status, setStatus] = useState<ConnStatus>({ kind: 'idle' });
   const [journalOpen, setJournalOpen] = useState(false);
@@ -210,40 +208,12 @@ export default function App() {
 
   const pageWidth = screenWidth;
 
-  // Initial scroll to SLOT_PRESENT on first layout. contentOffset is unreliable
-  // on react-native-web; onContentSizeChange is the canonical fallback.
+  // Initial scroll to INITIAL_SLOT (middle cycle's Present) on first layout.
   const onPagerContentSized = () => {
     if (!initialized.current && pageWidth > 0) {
-      pager.current?.scrollTo({ x: SLOT_PRESENT * pageWidth, animated: false });
+      pager.current?.scrollTo({ x: INITIAL_SLOT * pageWidth, animated: false });
       initialized.current = true;
     }
-  };
-
-  // Circular wrap: when user lands on a clone slot, silently jump to the real
-  // equivalent. Wired on both onMomentumScrollEnd (native + most web) AND
-  // onScrollEndDrag (belt & suspenders for react-native-web, which sometimes
-  // skips momentum-end after a programmatic scrollTo). wrapGuard prevents
-  // both handlers from double-firing.
-  const maybeWrap = (x: number) => {
-    if (pageWidth <= 0 || wrapGuard.current) return;
-    const slot = Math.round(x / pageWidth);
-    if (slot === SLOT_FUTURE_CLONE) {
-      wrapGuard.current = true;
-      pager.current?.scrollTo({ x: SLOT_FUTURE * pageWidth, animated: false });
-      setTimeout(() => (wrapGuard.current = false), 50);
-    } else if (slot === SLOT_PAST_CLONE) {
-      wrapGuard.current = true;
-      pager.current?.scrollTo({ x: SLOT_PAST * pageWidth, animated: false });
-      setTimeout(() => (wrapGuard.current = false), 50);
-    }
-  };
-  const onMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    maybeWrap(e.nativeEvent.contentOffset.x);
-  };
-  const onScrollEndDrag = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    // Fires when finger lifts. On web after a programmatic scrollTo the
-    // momentum-end often doesn't fire; drag-end is our fallback.
-    maybeWrap(e.nativeEvent.contentOffset.x);
   };
 
   const handleGenerateLiveBrief = async () => {
@@ -324,14 +294,16 @@ export default function App() {
         showsHorizontalScrollIndicator={false}
         style={styles.pager}
         onContentSizeChange={onPagerContentSized}
-        onMomentumScrollEnd={onMomentumScrollEnd}
-        onScrollEndDrag={onScrollEndDrag}
       >
-        <View key="future-clone" style={slotStyle}>{futureScreen}</View>
-        <View key="past" style={slotStyle}>{pastScreen}</View>
-        <View key="present" style={slotStyle}>{presentScreen}</View>
-        <View key="future" style={slotStyle}>{futureScreen}</View>
-        <View key="past-clone" style={slotStyle}>{pastScreen}</View>
+        {Array.from({ length: TOTAL_SLOTS }, (_, i) => {
+          const kind = i % SCREENS_PER_CYCLE; // 0 Past, 1 Present, 2 Future
+          const screen = kind === 0 ? pastScreen : kind === 1 ? presentScreen : futureScreen;
+          return (
+            <View key={i} style={slotStyle}>
+              {screen}
+            </View>
+          );
+        })}
       </ScrollView>
       <JournalEditor
         visible={journalOpen}
