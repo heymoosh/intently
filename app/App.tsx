@@ -7,7 +7,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Markdown from '@ronradtke/react-native-markdown-display';
 import PagerView from 'react-native-pager-view';
+import AgentOutputCard from './components/AgentOutputCard';
 import JournalEditor from './components/JournalEditor';
+import { dailyBriefSeed } from './fixtures/daily-brief-seed';
 import { supabase } from './lib/supabase';
 import { theme } from './lib/tokens';
 
@@ -22,15 +24,6 @@ _Journal entries and prior reviews will render here._
 
 ### 2026-04-22
 - Wrote the Supabase schema; shipped the Expo shell.
-`;
-
-const presentMd = `# Today
-
-_Your morning briefing will appear here once the \`daily-brief\` agent runs._
-
-**Primary block (P1):** ship the Expo shell.
-**Secondary block (P2):** Managed Agents SDK wiring.
-**Admin block (P3):** inbox, tracker sync.
 `;
 
 const futureMd = `# Future
@@ -76,10 +69,12 @@ function ConnectionBanner({ status }: { status: ConnStatus }) {
 
 function Screen({
   md,
+  content,
   banner,
   header,
 }: {
-  md: string;
+  md?: string;
+  content?: React.ReactNode;
   banner?: React.ReactNode;
   header?: React.ReactNode;
 }) {
@@ -88,7 +83,7 @@ function Screen({
       <ScrollView contentContainerStyle={styles.scroll}>
         {banner}
         {header}
-        <Markdown>{md}</Markdown>
+        {content ?? (md ? <Markdown>{md}</Markdown> : null)}
       </ScrollView>
       <Pressable
         style={styles.voiceButton}
@@ -151,7 +146,12 @@ export default function App() {
             header={<NewJournalEntryButton onPress={() => setJournalOpen(true)} />}
           />
         </View>
-        <View key="present"><Screen md={presentMd} banner={<ConnectionBanner status={status} />} /></View>
+        <View key="present">
+          <Screen
+            content={<AgentOutputCard output={dailyBriefSeed} />}
+            banner={<ConnectionBanner status={status} />}
+          />
+        </View>
         <View key="future"><Screen md={futureMd} /></View>
       </PagerView>
       <JournalEditor
