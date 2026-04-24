@@ -18,30 +18,12 @@ import Markdown from '@ronradtke/react-native-markdown-display';
 import AgentOutputCard from './components/AgentOutputCard';
 import JournalEditor from './components/JournalEditor';
 import { AgentOutput } from './lib/agent-output';
-import { callMaProxy, MaProxyError, toAgentOutput } from './lib/ma-client';
+import { callMaProxy, MaProxyError, MaSkill, toAgentOutput } from './lib/ma-client';
 import { DAILY_BRIEF_DEMO_INPUT, dailyBriefSeed } from './fixtures/daily-brief-seed';
+import { DAILY_REVIEW_DEMO_INPUT, dailyReviewSeed } from './fixtures/daily-review-seed';
+import { WEEKLY_REVIEW_DEMO_INPUT, weeklyReviewSeed } from './fixtures/weekly-review-seed';
 import { supabase } from './lib/supabase';
 import { theme } from './lib/tokens';
-
-const pastMd = `# Past
-
-_Journal entries and prior reviews will render here._
-
-### 2026-04-21
-- Scaffolded the Intently skills, ADRs, and architecture docs.
-
-### 2026-04-22
-- Wrote the Supabase schema; shipped the Expo shell.
-`;
-
-const futureMd = `# Future
-
-## Goals
-- Intently demo ready by 2026-04-26
-
-## Projects
-- **Intently** · 🟡 · Next: Expo shell
-`;
 
 type ConnStatus =
   | { kind: 'idle' }
@@ -49,7 +31,7 @@ type ConnStatus =
   | { kind: 'ok'; rows: number }
   | { kind: 'error'; message: string };
 
-type LiveBriefState =
+type LiveState =
   | { kind: 'idle' }
   | { kind: 'loading' }
   | { kind: 'ok'; output: AgentOutput }
@@ -87,12 +69,16 @@ function formatDateHeader(now: Date = new Date()): string {
   return `${day}, ${month} ${now.getDate()}`;
 }
 
-function LiveBriefTrigger({
+function LiveAgentTrigger({
   state,
   onPress,
+  idleLabel,
+  regenerateLabel = '↻ Regenerate',
 }: {
-  state: LiveBriefState;
+  state: LiveState;
   onPress: () => void;
+  idleLabel: string;
+  regenerateLabel?: string;
 }) {
   if (state.kind === 'loading') {
     return (
@@ -102,7 +88,7 @@ function LiveBriefTrigger({
       </View>
     );
   }
-  const label = state.kind === 'ok' ? '↻ Regenerate' : '✨ Generate live brief';
+  const label = state.kind === 'ok' ? regenerateLabel : idleLabel;
   return (
     <View>
       <Pressable style={styles.liveTriggerPill} onPress={onPress}>
@@ -179,7 +165,9 @@ export default function App() {
   const [screenWidth, setScreenWidth] = useState(() => Dimensions.get('window').width);
   const [status, setStatus] = useState<ConnStatus>({ kind: 'idle' });
   const [journalOpen, setJournalOpen] = useState(false);
-  const [liveBrief, setLiveBrief] = useState<LiveBriefState>({ kind: 'idle' });
+  const [liveBrief, setLiveBrief] = useState<LiveState>({ kind: 'idle' });
+  const [liveReview, setLiveReview] = useState<LiveState>({ kind: 'idle' });
+  const [liveWeekly, setLiveWeekly] = useState<LiveState>({ kind: 'idle' });
 
   useEffect(() => {
     let cancelled = false;
@@ -216,26 +204,23 @@ export default function App() {
     }
   };
 
-  const handleGenerateLiveBrief = async () => {
-    setLiveBrief({ kind: 'loading' });
+  const runAgent = async (
+    skill: MaSkill,
+    input: string,
+    meta: Pick<AgentOutput, 'kind' | 'title' | 'inputTraces'>,
+    setState: (s: LiveState) => void,
+  ) => {
+    setState({ kind: 'loading' });
     try {
-      const res = await callMaProxy({
-        skill: 'daily-brief',
-        input: DAILY_BRIEF_DEMO_INPUT,
-      });
+      const res = await callMaProxy({ skill, input });
       if (res.status !== 'idle' || !res.finalText) {
-        setLiveBrief({
+        setState({
           kind: 'error',
           message: `Agent returned status "${res.status}" with no text. Try again.`,
         });
         return;
       }
-      const output = toAgentOutput(res.finalText, {
-        kind: 'brief',
-        title: 'Good morning, Sam',
-        inputTraces: ['calendar', 'journal'],
-      });
-      setLiveBrief({ kind: 'ok', output });
+      setState({ kind: 'ok', output: toAgentOutput(res.finalText, meta) });
     } catch (err) {
       const message =
         err instanceof MaProxyError
@@ -243,21 +228,49 @@ export default function App() {
           : err instanceof Error
           ? err.message
           : 'Unknown error calling ma-proxy.';
-      setLiveBrief({ kind: 'error', message });
+      setState({ kind: 'error', message });
     }
   };
 
-  const displayOutput = liveBrief.kind === 'ok' ? liveBrief.output : dailyBriefSeed;
+  const handleGenerateLiveBrief = () =>
+    runAgent('daily-brief', DAILY_BRIEF_DEMO_INPUT, {
+      kind: 'brief',
+      title: 'Good morning, Sam',
+      inputTraces: ['calendar', 'journal'],
+    }, setLiveBrief);
+
+  const handleGenerateLiveReview = () =>
+    runAgent('daily-review', DAILY_REVIEW_DEMO_INPUT, {
+      kind: 'review',
+      title: 'Today, in review',
+      inputTraces: ['calendar', 'journal'],
+    }, setLiveReview);
+
+  const handleGenerateLiveWeekly = () =>
+    runAgent('weekly-review', WEEKLY_REVIEW_DEMO_INPUT, {
+      kind: 'review',
+      title: 'Week in review',
+      inputTraces: ['calendar', 'journal'],
+    }, setLiveWeekly);
+
+  const briefOutput = liveBrief.kind === 'ok' ? liveBrief.output : dailyBriefSeed;
+  const reviewOutput = liveReview.kind === 'ok' ? liveReview.output : dailyReviewSeed;
+  const weeklyOutput = liveWeekly.kind === 'ok' ? liveWeekly.output : weeklyReviewSeed;
 
   const todayLabel = formatDateHeader();
   const pastScreen = (
     <Screen
-      md={pastMd}
-      header={
-        <>
-          <ScreenHeader tense="Past" title="Earlier" />
+      content={
+        <View>
+          <ScreenHeader tense="Past" title="Today, in review" />
+          <LiveAgentTrigger
+            state={liveReview}
+            onPress={handleGenerateLiveReview}
+            idleLabel="🌙 Generate today's review"
+          />
+          <AgentOutputCard output={reviewOutput} />
           <NewJournalEntryButton onPress={() => setJournalOpen(true)} />
-        </>
+        </View>
       }
     />
   );
@@ -267,16 +280,29 @@ export default function App() {
       content={
         <View>
           <ScreenHeader tense="Today" title={todayLabel} />
-          <LiveBriefTrigger state={liveBrief} onPress={handleGenerateLiveBrief} />
-          <AgentOutputCard output={displayOutput} />
+          <LiveAgentTrigger
+            state={liveBrief}
+            onPress={handleGenerateLiveBrief}
+            idleLabel="✨ Generate live brief"
+          />
+          <AgentOutputCard output={briefOutput} />
         </View>
       }
     />
   );
   const futureScreen = (
     <Screen
-      md={futureMd}
-      header={<ScreenHeader tense="Future" title="What's ahead" />}
+      content={
+        <View>
+          <ScreenHeader tense="Future" title="This week ahead" />
+          <LiveAgentTrigger
+            state={liveWeekly}
+            onPress={handleGenerateLiveWeekly}
+            idleLabel="🗓 Generate weekly review"
+          />
+          <AgentOutputCard output={weeklyOutput} />
+        </View>
+      }
     />
   );
 
