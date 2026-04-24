@@ -2,9 +2,7 @@
 
 **Life Ops as a mobile app — your recurring operations, done by scheduled Claude agents.**
 
-Live demo: [LIVE_DEMO_URL] · Demo video: [DEMO_VIDEO_URL]
-
-<!-- TODO(web-pivot PR): replace placeholders above with deployed Expo Web URL + Loom/YouTube link -->
+Live demo: **https://intently-eta.vercel.app** · Demo video: _[recording Sunday; link lands in final submission]_
 
 ## The demo in 30 seconds
 
