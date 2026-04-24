@@ -1,8 +1,37 @@
 import { AgentOutput } from '../lib/agent-output';
 
-// Seed output used by the Present screen before live Managed Agents wiring
-// lands. Shape matches what a real daily-brief agent run will produce so the
-// card rendering pipeline is proven before Friday's live integration.
+// Context passed to the daily-brief agent when the user triggers a live run
+// from the Present screen. V1 has no tool wiring (calendar/email), so all
+// context the agent needs sits in the input text. Matches the scenario below.
+export const DAILY_BRIEF_DEMO_INPUT = `Today: 2026-04-24 (Friday)
+User: Sam
+
+## Weekly Goals (current week)
+- Wire agent to UI integration
+- Get daily-brief and daily-review producing real output against seed data
+
+## Yesterday's Daily Log
+- Done: skill loader merged (PR #2); started tool scaffolds
+- Journal: "Leaned hard today. Body talking. Need to wrap clean."
+
+## Today's Calendar
+- 09:00 Pairing with Kaya
+- 15:30 Anya 1:1
+
+## Email
+- not_connected
+
+## Recent project state
+- skill-loader: PR #2 merged
+- tool-scaffolds: ~50% — read_calendar mocked, read_emails deferred
+- tokens-compile: mid-stream, font-family translation still biting
+
+Write today's morning brief following your skill instructions. Lead with the
+day's shape, not a checklist.`;
+
+// Seed output used by the Present screen before the user triggers a live run.
+// Shape matches what a real daily-brief agent returns so the card render
+// pipeline is proven against real data before live-MA wiring lands.
 //
 // Persona + scenario mirror evals/datasets/daily-brief/scenario-01.md.
 export const dailyBriefSeed: AgentOutput = {
