@@ -8,9 +8,37 @@
 
 **Phase:** Build — Friday is the agent-to-UI wiring critical day.
 **Status:** 🟡 On track.
-**Last:** Large infra day. ~27 PRs merged: parallel-tracks workflow (#11 + follow-ups), agent-runner base (#24), tools scaffolds (#3), design tokens port (#26), seed data v1 (#40), Claude-as-judge scorer (#39), app README (#38), launch-plan + branch-first enforcement + doc-map CI (#41, #42), Michael Cohen MA session architecture docs (`docs/architecture/managed-agents-*.md`).
+**Last:** Large infra day. ~27 PRs merged: parallel-tracks workflow (#11 + follow-ups), agent-runner base (#24), tools scaffolds (#3), design tokens port (#26), seed data v1 (#40), Claude-as-judge scorer (#39), app README (#38), launch-plan + branch-first enforcement + doc-map CI (#41, #42), Michael Cohen MA session architecture docs (`docs/architecture/managed-agents-*.md`). Overnight build-loop second flight shipped PRs #46–#50 (markdown fork swap, journal editor stub, evals dataset+rubric+baseline).
 **Next:** Friday critical path — replace `agent-runner`'s direct `messages.create` with MA `POST /v1/sessions`; wire `session.status_idle` → Expo UI refresh; render one agent output as a card against seed data.
-**Last updated:** 2026-04-23.
+**Last updated:** 2026-04-24.
+
+### Today's Go/No-Go (2026-04-24)
+
+| Flow | Verdict | Top risk |
+|---|---|---|
+| Daily Brief | **BLOCK** | 5 demo-critical criteria `unknown`; `cases.json` missing — no eval baseline; CR-daily-brief-01 architecture decision pending |
+| Daily Review | **BLOCK** | Standing FAIL on CR-daily-review-03 (SKILL.md step 5a contradicts criterion); 2 HIGH fidelity findings block re-derivation |
+| Weekly Review | **SHIP WITH CAVEATS** | CR-weekly-review-05 unverified pending live run; 4/5 criteria pass in static analysis |
+
+**Top 3 blockers:**
+1. **Spec decisions needed** — H1 (CR-daily-review-01 drops Weekly Goals) + H2 (CR-setup-03 Ops Plan section removed) must resolve before eval authoring; H2 needs only `/derive-criteria setup`
+2. **CR-daily-review-03 standing FAIL** — delete `agents/daily-review/SKILL.md` step 5a (multi-day synthesis); fix ready, needs git access
+3. **cases.json absent for daily-brief** — blocks all eval runs; author today to establish floor before Sat demo cut
+
+**Auto-fix PRs:** `gh pr list` blocked in automated context — check `auto/privacy/2026-04-24` and build-loop PRs #46/#47/#50 manually
+**Missing signals:** agent-memory off-day (expected, using 2026-04-23 report); `gh pr list` unavailable
+
+<details>
+<summary>Go/No-Go Archive — 2026-04-23</summary>
+
+| Flow | Verdict | Top risk |
+|---|---|---|
+| Daily Brief | **BLOCK** | All 5 demo-critical criteria `unknown`; F-DB-03/04 need rework before evals can be authored |
+| Daily Review | **BLOCK** | 5 demo-critical criteria `unknown`; 3 criteria have spec scope drift |
+| Weekly Review | **BLOCK** | CR-wr-01 + CR-wr-02 directly contradict spec — must re-derive before any evals |
+
+**Top 3 (2026-04-23):** (1) CR-wr-01/02 contradict spec; (2) 11 demo-critical criteria `unknown`; (3) stable-ID columns missing from Supabase
+</details>
 
 ## Critical items awaiting review
 
