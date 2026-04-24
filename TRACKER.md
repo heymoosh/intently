@@ -32,6 +32,13 @@
 
 ## Follow-ups (pending manual or flight-test)
 
+- **[Design] Session Handoff Steward redesign — per-session, not nightly.** Current state: runs once at 22:45 nightly, overwrites a single `.claude/session-handoff.md`. New design (per Muxin 2026-04-24):
+  - **Trigger:** every session on exit (Stop hook / manual `/handoff` command / `SessionEnd` hook in `.claude/settings.json`), not a single daily launchd fire.
+  - **Output:** one file per session at `.claude/session-handoffs/<timestamp>-<slug>.md`. Captures deep context: goals, decisions made, learnings, process details, *how* TRACKER queue items actually got done.
+  - **TRACKER pointer:** TRACKER.md gets an "Active session docs" list linking to in-flight session-handoff files. TRACKER stays the hot queue ("things we gotta do"); session-handoff holds the implementation depth ("how we actually do them").
+  - **Lifecycle:** delete the session-handoff file when (a) the work it covers is completed, or (b) Muxin exits the session and confirms close-out. Avoids `.claude/session-handoffs/` becoming a graveyard.
+  - **Doc hierarchy update:** explicitly: `launch-plan.md` = high-level milestones (slow, "what does shipped mean"); `TRACKER.md` = live hot queue ("what we gotta do"); `.claude/session-handoffs/<slug>.md` = per-session implementation depth ("how we do it"). Update CLAUDE.md and TRACKER's own header to reflect this triad once built.
+  - **Implementation work:** update `.claude/routines/session-handoff-steward.md` brief; change/disable the daily launchd job for it; build the per-session trigger (Stop hook is most natural fit); build cleanup logic that prompts for delete-on-close.
 - **[BLOCKING today] Create MA agents for daily-review + weekly-review in console.** Configs at `agents/daily-review/ma-agent-config.json`, `agents/weekly-review/ma-agent-config.json`. Paste → Save → copy ID → `supabase secrets set MA_AGENT_ID_DAILY_REVIEW=<id>` and `MA_AGENT_ID_WEEKLY_REVIEW=<id>`. User-only (Claude can't reach MA console).
 - **update-tracker + setup MA agents** — deferred. update-tracker = small confirmation-card surface only, setup = seed-data-covered for demo. Create if time permits.
 - **Accidental direct-to-main commit `5b95d51`** (swipe fix). Branch-first rule violated because `gh pr merge --delete-branch` dropped me back to main and next commit went there. Change is correct + deployed, left in place. Consider adding a post-merge hook that refuses commits on main to prevent recurrence.
