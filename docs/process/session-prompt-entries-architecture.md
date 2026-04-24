@@ -1,26 +1,97 @@
-# Session Prompt — Entries-as-Canonical-Store Architecture
+# Session Prompt — Entries-Architecture Reconciliation (Planning + Orchestration)
 
-> **⚠ STOP — READ BEFORE BUILDING ⚠**
+> **⚠ THIS SESSION DOES NOT BUILD ⚠**
 >
-> This prompt was written **2026-04-24 ~14:30 local**. Shortly after, Muxin **completely replaced** the contents of `docs/design/Intently - App/` with a new version that includes an interactive prototype + updated `CLAUDE.md`, `BUILD-RULES.md`, and `HANDOFF.md`. **This prompt's recommendations may not match the new design content.**
+> This is a **planning + orchestration** session. You produce a reconciled plan and spawn parallel `intently-track` worktrees that do the actual implementation. You do not write schema migrations, edit `app/`, or rewrite edge functions yourself. Your deliverable is the plan in §A and the spawned tracks in §B.
 >
-> **First task, before any schema / code / tests:**
->
-> 1. Read the *new* `docs/design/Intently - App/CLAUDE.md` + `BUILD-RULES.md` + `HANDOFF.md` end-to-end. Note any change in the Entry data model, hero affordance behavior, capture flow, or reminders semantics versus what's described below.
-> 2. Apply the **"Spec intent > spec letter"** rule from root `CLAUDE.md`: ask Muxin in his own words how Entry + reminders should *feel* — what's the user beat, not the data shape.
-> 3. **Reconcile** this prompt's recommendations against the new design content + Muxin's stated intent. Specifically:
->    - Is "Entry as canonical, reminders as projection" still right?
->    - Is the two-table approach still right (vs. one table, vs. some other structure)?
->    - Does manual-add still route through hero chat per BUILD-RULES non-negotiable #1?
->    - Are there new entity types or flows in the new design folder that affect the migration?
-> 4. State back one sentence of the **revised plan** before touching schema. If your revised plan diverges from this prompt's "What to build" section, surface it explicitly: *"This prompt said X; new design says Y; user confirmed Y; building Y."*
-> 5. Update this prompt file in-place with the corrections (or supersede it with a new file `session-prompt-entries-architecture-v2.md` if changes are large) so future sessions don't re-derive.
->
-> **Only after that reconciliation lands** do you touch any schema, edge function, or app code. The cost of building from a stale prompt is the *same* drift that produced the original "reminders = narrow date-anchored" misread; this banner exists to break that loop.
+> **Why:** the original prompt prescribed monolithic sequential build phases. After the design folder was replaced 2026-04-24 (interactive prototype + new HANDOFF/BUILD-RULES/CLAUDE.md) and Muxin's reminders intent surfaced as broader than the doc letter, the right move is a reconciliation pass that *produces* the build plan rather than executing one written cold.
+
+## §A. The reconciliation deliverable (produce this BEFORE any tracks spawn)
+
+Write your output as a new file `docs/process/session-prompt-entries-architecture-v2.md` (supersedes this file once Muxin signs off). The file has five sections, in order:
+
+### Section 1 — What the new design says
+A 5–10 bullet summary of `docs/design/Intently - App/HANDOFF.md` + `BUILD-RULES.md` + `CLAUDE.md` re: **entries, capture, reminders, hero affordance, and any new entity types or flows**. Quote where useful. If the new design folder includes interactive-prototype JSX/HTML files demonstrating capture or entry behavior, run/inspect them and capture what they show.
+
+### Section 2 — What's currently in the codebase
+Concrete state, not aspirational. Probe each:
+- `entries` table — exists? schema?
+- `reminders` table — exists, schema, what data is in it
+- `supabase/functions/reminders/index.ts` — what endpoints, what classify behavior
+- `app/lib/reminders.ts`, `app/components/VoiceModal.tsx`, `app/App.tsx` — what's the read/write path today
+- The 4 live MA agents (daily-brief, daily-review, weekly-review, monthly-review) — how do they currently consume context
+
+### Section 3 — The gap
+Where (1) and (2) disagree. **Specific.** Format each as: *"New design says X; code does Y; reconcile by Z."* Aim for 4–8 gaps, not a wishlist.
+
+### Section 4 — Clarifying questions for Muxin
+Anchored, not open-ended. Bad: "How should reminders work?" Good: "The new HANDOFF describes a 'Capture' beat where the user drops something loose and the agent stashes it. Should that map to: (a) every utterance writes an Entry and capture is a special-case Entry kind, or (b) capture is a peer entity to Entry with its own table?"
+
+Apply the **"Spec intent > spec letter"** rule from root `CLAUDE.md`: ask Muxin in his own words about the user beats, not the data shape. State back one sentence per question and confirm before logging the answer.
+
+### Section 5 — Proposed parallel-track slicing
+Independent worktrees that don't collide on files. Identify, for each track:
+- **Slug** (will become `feat/track-<slug>` and `~/worktrees/intently/<slug>`)
+- **Owns** (the directories/files that track is allowed to write)
+- **Depends on** (which other tracks must land first)
+- **Initial prompt** (a self-contained brief for that track — what to build, scope, verification)
+
+Example partitioning (illustrative, not prescriptive — actual slicing depends on what reconciliation surfaces):
+- Track A: schema + edge-function rewrite (`supabase/migrations/`, `supabase/functions/`)
+- Track B: app-side capture lib + VoiceModal updates (`app/lib/`, `app/components/VoiceModal.tsx`) — depends on A
+- Track C: render migration on Past/Present/Future (`app/App.tsx`, `app/components/AgentOutputCard.tsx`) — depends on B
+
+For each pair of tracks, flag file-overlap risk. If two tracks must touch the same file, sequence them; do not run them parallel.
+
+## §B. After Muxin signs off on §A
+
+For each track in §A.5:
+
+1. From the main repo dir, spawn the worktree with the initial prompt:
+   ```
+   bash scripts/intently-track.sh <slug> "$(cat <prompt-file-for-that-track>)"
+   ```
+   Or if the prompt is short, pass it inline. Each track's prompt should be a standalone file under `docs/process/session-prompt-<slug>.md` so it's auditable.
+2. Note the spawned worktree branches in TRACKER.md "In-flight tracks" so future sessions see what's running.
+3. **Stop.** Don't enter the worktrees yourself. Each worktree session will pick up its own prompt and execute. Auto-merge handles landing them via CI.
+
+## §C. Constraints (non-negotiable)
+
+- Do **not** start a track until reconciliation §A is signed off by Muxin.
+- Do **not** kick off all tracks simultaneously if any have a `Depends on` — sequence them.
+- Do **not** write schema, app code, or edge function changes in this session. If you find yourself opening a `.sql` or `.ts` file in edit mode, stop. That belongs in a downstream track.
+- Do honor the **"Spec intent > spec letter"** rule from root CLAUDE.md throughout.
+- Do honor the design folder's **BUILD-RULES.md non-negotiables** (hero is the ONE interaction surface; phase/zoom is data not UI; no tabs; mobile-first phone frame; no emoji in copy; etc.) when proposing track scopes.
+
+## §D. Inputs you should read
+
+In order:
+1. **Root `CLAUDE.md`** — the "Spec intent > spec letter" rule and other behavioral defaults.
+2. **`docs/design/Intently - App/CLAUDE.md`** — design-owner's "start here."
+3. **`docs/design/Intently - App/BUILD-RULES.md`** — non-negotiables. Read carefully.
+4. **`docs/design/Intently - App/HANDOFF.md`** — full spec.
+5. **`docs/design/Intently - App/intently-*.jsx` + interactive prototype HTML** — pattern reference.
+6. **Current code** — `app/App.tsx`, `app/components/VoiceModal.tsx`, `app/lib/voice.ts`, `app/lib/reminders.ts`, `supabase/functions/reminders/index.ts`, `supabase/migrations/0003_reminders.sql`.
+7. **Project memory** at `~/.claude/projects/-Users-Muxin-Documents-GitHub-intently/memory/` — especially `project-design-folder-replaced-2026-04-24.md`, `project-memory-tiers.md`, `feedback-spec-intent-elicitation.md`.
+
+## §E. Muxin's intent — captured 2026-04-24 (carry into reconciliation, but verify)
+
+**On reminders:**
+> "reminders was more like, 'keep track of this and surface it in daily briefing' not specifically 'you asked me to remind you to...' so that if i say, dropped in a 'hey add this somewhere' and leave a voice memo the agent's like 'cool got it' and it stashes it somewhere where it will pull it up again during our daily briefing when we're planning the day, it tracks time sensitivity (so like if the deadline is tomorrow or in a few days it pulls it up in today's daily briefing but it doesn't do something like that for something that's way out in the future), or if I ever ask the agent 'hey what's that thing i had to do again' and it just pulls it up. i was saying before we should use a more durable DB for this kind of thing and not make managed agent memory try and hold it cause it's a waste of the memory functionality."
+
+**On entries:**
+> "what you mean by 'entry' — is, any time I talk to the AI agent. Whether that's through the voice input or chat input. I just talk to it. Oh there may be a function somewhere in the design docs about letting me manually add something, too — but go by what we've got in the intently app design folder."
+
+These are the words from before the design folder replacement. Verify whether the new design folder reframes either; surface any reframe in §3 (Gap).
 
 ---
 
-**Goal (subject to reconciliation per banner above):** rebuild the capture/persistence layer in Intently around the design-spec's `Entry` type as the canonical store of every user-agent utterance, with `reminders` becoming a typed projection of certain entries (the time-sensitive ones). Replaces the current narrow "reminders = date-anchored commitments" model.
+## When done
+
+- Commit `docs/process/session-prompt-entries-architecture-v2.md` (the reconciliation deliverable).
+- Update `TRACKER.md` Critical items: clear the reconciliation entry, add an "In-flight tracks" section listing each spawned track + its `feat/track-<slug>` branch.
+- Push, open PR for the reconciliation document. Do not include code in this PR — docs only.
+- Then spawn the tracks per §B. Each track's PR is owned by that track's session.
 
 ## Read first (in order)
 
