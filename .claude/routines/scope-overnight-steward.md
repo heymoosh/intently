@@ -52,6 +52,8 @@ Many overnight items naturally stack (e.g., swap library → build feature on th
 - **Stacked**: N+1 depends on N's PR being in the branch chain. The build-loop already stacks iteration branches (see the overnight-build-loop brief's "Branching strategy"), so a stacked proposal is just a linearly ordered list.
 - **Parallel not supported**: the overnight build-loop is sequential (one iteration at a time). If two items are mutually independent, still sequence them — order by value × confidence.
 
+**Prefer domain separation across iteration chains.** Group iterations by directory domain when possible (`app/`, `evals/`, `supabase/`). Chains within the same domain stack naturally; chains across different domains should be declared independent even if they run in the same loop. This makes the scope resilient to mid-run working-tree disruption — a branch-hop or reset only breaks the domain it touched.
+
 Flag dependencies explicitly in the output so Muxin can see the chain reasoning.
 
 ## Hard stops — do NOT include these in tonight's scope
