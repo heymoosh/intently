@@ -22,5 +22,18 @@
     "additionalDirectories": [
       "/Users/Muxin/Documents/GitHub/intently/.claude/routine-output"
     ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash $CLAUDE_PROJECT_DIR/scripts/session-precheck.sh"
+          }
+        ]
+      }
+    ]
   }
 }

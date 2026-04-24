@@ -94,3 +94,5 @@ Plus the deterministic gitleaks push gate in `.github/workflows/security.yml` an
 ## Session handoff
 
 Convention: `docs/process/session-handoff.md`. The rolling file is `.claude/session-handoff.md` and is the first thing the next session reads. At session start, if `TRACKER.md` has a "Critical items awaiting review" section with items in it, walk through those with Muxin before substantive work.
+
+**Drift check.** A `SessionStart` hook runs `scripts/session-precheck.sh` and may inject a `[session-precheck]` report into context. If present, surface it and offer to walk the fix playbook (`/precheck`) before substantive work.
