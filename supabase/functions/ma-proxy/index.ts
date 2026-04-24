@@ -54,9 +54,10 @@ const SKILL_ENV: Record<string, string> = {
   setup: 'MA_AGENT_ID_SETUP',
 };
 
-// Optional shared environment ID (one environment per use case, per the demo
-// workflow doc). Fine to leave unset during dev — upstream will use the
-// agent's default environment.
+// Required shared environment ID. Per the demo workflow doc, one environment
+// per use case. Anthropic API empirically requires it on create-session — a
+// missing value returns `environment_id: Field required`. Set via:
+//   supabase secrets set MA_ENVIRONMENT_ID=<env-id-from-console>
 const ENV_ID_VAR = 'MA_ENVIRONMENT_ID';
 
 type ProxyRequest = {
@@ -105,12 +106,19 @@ function anthropicHeaders(apiKey: string): Record<string, string> {
 
 // ---------- upstream calls ----------
 
-async function createSession(apiKey: string, agentId: string, environmentId: string | null) {
-  // Anthropic MA `POST /v1/sessions` takes `agent` (not `agent_id`). Verified
-  // against the live 400 response during first smoke test on 2026-04-24:
-  // `agent_id: Extra inputs are not permitted. Did you mean 'agent'?`
-  const body: Record<string, unknown> = { agent: agentId };
-  if (environmentId) body.environment = environmentId;
+async function createSession(apiKey: string, agentId: string, environmentId: string) {
+  // Anthropic MA `POST /v1/sessions` field names (empirical, 2026-04-24):
+  //   - `agent`        — identifier WITHOUT _id suffix
+  //   - `environment_id` — identifier WITH _id suffix, AND required
+  // Both were wrong in our first inference. First smoke test returned:
+  //   `agent_id: Extra inputs are not permitted. Did you mean 'agent'?`
+  // Second smoke test returned:
+  //   `environment_id: Field required`
+  // So the API is internally inconsistent on naming. Trust empirical.
+  const body: Record<string, unknown> = {
+    agent: agentId,
+    environment_id: environmentId,
+  };
 
   const res = await fetch(`${ANTHROPIC_API_BASE}${SESSIONS_PATH}`, {
     method: 'POST',
@@ -349,13 +357,23 @@ Deno.serve(async (req: Request) => {
     }
   }
 
+  // environment_id is required by the Anthropic MA API (empirical 2026-04-24).
+  // Fail fast with a clear error if the secret isn't set — better than a
+  // cryptic upstream 400.
   const environmentId = Deno.env.get(ENV_ID_VAR) ?? null;
+  if (!parsed.sessionId && !environmentId) {
+    console.error(`[ma-proxy] ${ENV_ID_VAR} not set — run \`supabase secrets set ${ENV_ID_VAR}=...\``);
+    return errResp(
+      500,
+      `server misconfigured: missing ${ENV_ID_VAR} (required by Anthropic MA API)`,
+    );
+  }
 
   // Orchestrate: create (or resume) session, send user.message, collect until idle.
   try {
     const sessionId = parsed.sessionId
       ? parsed.sessionId
-      : await createSession(apiKey, agentId!, environmentId);
+      : await createSession(apiKey, agentId!, environmentId!);
 
     await sendUserMessage(apiKey, sessionId, parsed.input);
 

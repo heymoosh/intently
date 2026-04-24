@@ -65,7 +65,9 @@ supabase secrets set MA_AGENT_ID_WEEKLY_REVIEW=<agent-id>
 supabase secrets set MA_AGENT_ID_UPDATE_TRACKER=<agent-id>
 supabase secrets set MA_AGENT_ID_SETUP=<agent-id>
 
-# Optional: shared environment ID (one per use case).
+# REQUIRED: shared environment ID (one per use case). Anthropic MA rejects
+# create-session with `environment_id: Field required` if this is unset.
+# Create an Environment in console.anthropic.com → Environments, then:
 supabase secrets set MA_ENVIRONMENT_ID=<env-id>
 ```
 
