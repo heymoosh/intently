@@ -6,15 +6,16 @@
 
 ## Iteration chain (sequential, stacked)
 
-### Iteration 1 — expensify-markdown-swap
+### Iteration 1 — markdown-fork-swap-ronradtke
 
-- **TRACKER ref:** Critical Item #2 (actionable arm: markdown library swap)
-- **Scope:** Swap `react-native-markdown-display` → `@expensify/react-native-markdown-display` in `app/package.json`; update the import in `app/App.tsx:8`; run `npm install` to regenerate `package-lock.json`; verify `npx tsc --noEmit` passes in `app/`; confirm `npm audit` reports the `markdown-it` / GHSA-6vfc-qv3f-vr6c advisory chain cleared.
+- **TRACKER ref:** Critical Item #2 (note: main's TRACKER claims commit `4001c977` resolved this, but that commit is on abandoned branch `origin/feat/npm-audit-precommit-dependabot` and is NOT in main — package.json on main still has the vulnerable package)
+- **Scope:** Swap `react-native-markdown-display` → `@ronradtke/react-native-markdown-display` in `app/package.json` (same API, drop-in per commit `4001c977`'s message). Add `overrides.markdown-it: ">=14.1.1"` to `app/package.json` to force the safe version transitively. Update the import in `app/App.tsx` (line 8). Run `npm install` to regenerate `package-lock.json`. Verify `npx tsc --noEmit` passes in `app/`. Confirm `npm audit --audit-level=high` exits 0; note the moderate vuln count should drop from 12 to ~10 (remaining are Expo SDK `xcode`/`uuid` chain, upstream-blocked).
+- **Reference:** `git show 4001c977` — Muxin already authored this exact swap locally (to `@ronradtke`, not `@expensify`). Follow that commit's approach.
 - **Key files:** `app/package.json`, `app/package-lock.json`, `app/App.tsx`
-- **Model + effort:** Sonnet 4.6 medium — mechanical swap, one import, typecheck-gated
+- **Model + effort:** Sonnet 4.6 medium — mechanical swap with a working reference commit
 - **LOC estimate:** ~10 LOC + lockfile churn
 - **Depends on:** independent
-- **Session-prompt:** will derive from TRACKER (simple enough; no prompt file needed)
+- **Session-prompt:** none; use `git show 4001c977` as the template
 
 ### Iteration 2 — journal-editor-stub
 
