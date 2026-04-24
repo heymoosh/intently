@@ -4,13 +4,15 @@
 
 **Doc hierarchy:** `launch-plan.md` (strategy, slow) → `TRACKER.md` (queue, hot) → `docs/product/acceptance-criteria/` (done-definition, per skill).
 
+**Submission tracking** (video, artifacts, deadline): `docs/hackathon/Submission Tracker.md`.
+
 ## Status
 
-**Phase:** Build day — wiring daily-review + weekly-review + update-tracker end-to-end.
-**Status:** 🟢 daily-brief runs live against Opus 4.7 via Supabase proxy. Web app at https://intently-eta.vercel.app.
-**Last:** Launch plan refocused (stale "Saturday polish" removed). Design-folder classification complete: screen-semantic mapping is the one structural call worth baking in (daily-review→Past, weekly-review→Future). Scope held to 5 skills; update-tracker as a small confirmation card; setup stays seed-covered.
-**Next:** Today is pure build. Tomorrow: record. Sunday: submit.
-**Last updated:** 2026-04-24 (second build session, pre-wiring).
+**Phase:** Reconcile — design folder fully replaced 2026-04-24; entries-architecture plan needs sanity-check against new design before any build.
+**Status:** 🟢 daily-brief + 4 MA agents (daily/weekly/monthly review + brief) live; reminders backend deployed; voice modal wired; UX skeleton committed. Web app at https://intently-eta.vercel.app.
+**Last:** PR #75 (UX skeleton + voice + reminders + memory loop) and PR #76 (stranded build artifacts + entries session prompt) merged. Worktree `~/worktrees/intently/entries-architecture` exists but no work done in it yet — parked pending reconciliation.
+**Next:** **Reconciliation pass first** (see Critical items below) → revised entries plan → only then kick off the entries-architecture worktree session for implementation.
+**Last updated:** 2026-04-24 (planning-handoff session, pre-reconciliation).
 
 ### Go/No-Go (2026-04-24 EOD)
 
@@ -22,7 +24,11 @@
 
 ## Critical items awaiting review
 
-_(none — design classification resolved, see Locked decisions below)_
+1. **Design folder was completely replaced 2026-04-24.** New version at `docs/design/Intently - App/` ships an interactive prototype + updated `CLAUDE.md`, `BUILD-RULES.md`, `HANDOFF.md`. Prior plans (including the entries-architecture session prompt at `docs/process/session-prompt-entries-architecture.md`) were written against the *old* version. **First action of next session:** read the new design folder end-to-end, apply the "Spec intent > spec letter" rule with Muxin (elicit intent in his own words), reconcile the entries-architecture plan against new content. The session prompt has a STOP banner at the top that walks through this protocol — follow it.
+
+2. **Reminders intent reconciliation.** Muxin's stated intent (in his own words, captured in the entries-architecture session prompt): "*reminders was more like, 'keep track of this and surface it in daily briefing' not specifically 'you asked me to remind you to...' so that if i say, dropped in a 'hey add this somewhere' and leave a voice memo the agent's like 'cool got it' and it stashes it somewhere where it will pull it up again during our daily briefing... it tracks time sensitivity.*" Current shipped reminders flow is still narrow date-anchored (classify prompt rejects anything without a clear date). The reconciliation pass needs to confirm whether the new design folder has a different/better model for this — and whether "Entry as canonical, reminders as projection" still holds.
+
+3. **Worktree at `~/worktrees/intently/entries-architecture` is parked.** It was created via `intently-track entries-architecture` but no Claude session has done work in it. After reconciliation, decide: continue in that worktree, destroy + recreate fresh, or skip the worktree pattern entirely if the new plan doesn't fit it. Don't run `claude` in it until the reconciliation is done; otherwise that session starts building from a stale plan.
 
 ## Follow-ups (pending manual or flight-test)
 
@@ -45,13 +51,18 @@ Three bugs found during Friday's first live smoke tests. Fixes shipped in #68, #
 
 ## Next (in order — start here)
 
-1. **Daily-review wiring → Past screen.** Seed + fetch + trigger pill. Reuses AgentOutputCard w/ `kind:'review'`. Output lands on Past (structural demo beat).
-2. **Weekly-review wiring → Future screen.** Same pattern. Output lands on Future beneath the goals.
-3. **Present → "Start daily review" affordance once brief exists.** Auto-scrolls to Past slot on completion (or just adds pill; see wiring choice).
-4. **Update-tracker as small confirmation card** (optional — only if demo-relevant).
-5. **Video script.** User drafting in parallel section.
-6. **Practice takes** (tomorrow).
-7. **Final recording + submission** (Sunday).
+1. **[BLOCKING] Read the new `docs/design/Intently - App/` folder end-to-end** — `CLAUDE.md`, `BUILD-RULES.md`, `HANDOFF.md`, plus the interactive prototype files. Take notes on anything that diverges from current shipped behavior or from the entries-architecture plan.
+
+2. **[BLOCKING] Apply "Spec intent > spec letter" with Muxin.** Per the rule in root `CLAUDE.md`: ask Muxin in his own words how Entry + capture/reminders should *feel* — what's the user beat. State back one sentence, get confirmation. The reminders narrow-vs-capture misread came from skipping this step; don't repeat it.
+
+3. **[BLOCKING] Reconcile** — does the new design content support "Entry as canonical, reminders as projection"? Two tables vs one? Hero-mediated capture? Update or supersede `docs/process/session-prompt-entries-architecture.md` with the revised plan. The STOP banner at the top of that prompt walks through the reconciliation protocol.
+
+4. **Then** — kick off (or resume in) the `~/worktrees/intently/entries-architecture` worktree with the revised plan. If the worktree's branching point is now stale relative to a revised plan, destroy + recreate.
+
+5. **Other in-flight items** (do after reconciliation lands):
+   - Design-fidelity pass per `docs/process/session-prompt-design-fidelity.md` (phone frame, TenseNav, painterly CTAs, hero state machine, typography).
+   - Video script + practice takes.
+   - Final recording + submission (Sunday 8 PM EDT).
 
 ## Stretch (skip if time-pressed)
 

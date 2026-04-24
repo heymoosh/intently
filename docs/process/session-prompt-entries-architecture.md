@@ -1,6 +1,26 @@
 # Session Prompt — Entries-as-Canonical-Store Architecture
 
-**Goal:** rebuild the capture/persistence layer in Intently around the design-spec's `Entry` type as the canonical store of every user-agent utterance, with `reminders` becoming a typed projection of certain entries (the time-sensitive ones). Replaces the current narrow "reminders = date-anchored commitments" model.
+> **⚠ STOP — READ BEFORE BUILDING ⚠**
+>
+> This prompt was written **2026-04-24 ~14:30 local**. Shortly after, Muxin **completely replaced** the contents of `docs/design/Intently - App/` with a new version that includes an interactive prototype + updated `CLAUDE.md`, `BUILD-RULES.md`, and `HANDOFF.md`. **This prompt's recommendations may not match the new design content.**
+>
+> **First task, before any schema / code / tests:**
+>
+> 1. Read the *new* `docs/design/Intently - App/CLAUDE.md` + `BUILD-RULES.md` + `HANDOFF.md` end-to-end. Note any change in the Entry data model, hero affordance behavior, capture flow, or reminders semantics versus what's described below.
+> 2. Apply the **"Spec intent > spec letter"** rule from root `CLAUDE.md`: ask Muxin in his own words how Entry + reminders should *feel* — what's the user beat, not the data shape.
+> 3. **Reconcile** this prompt's recommendations against the new design content + Muxin's stated intent. Specifically:
+>    - Is "Entry as canonical, reminders as projection" still right?
+>    - Is the two-table approach still right (vs. one table, vs. some other structure)?
+>    - Does manual-add still route through hero chat per BUILD-RULES non-negotiable #1?
+>    - Are there new entity types or flows in the new design folder that affect the migration?
+> 4. State back one sentence of the **revised plan** before touching schema. If your revised plan diverges from this prompt's "What to build" section, surface it explicitly: *"This prompt said X; new design says Y; user confirmed Y; building Y."*
+> 5. Update this prompt file in-place with the corrections (or supersede it with a new file `session-prompt-entries-architecture-v2.md` if changes are large) so future sessions don't re-derive.
+>
+> **Only after that reconciliation lands** do you touch any schema, edge function, or app code. The cost of building from a stale prompt is the *same* drift that produced the original "reminders = narrow date-anchored" misread; this banner exists to break that loop.
+
+---
+
+**Goal (subject to reconciliation per banner above):** rebuild the capture/persistence layer in Intently around the design-spec's `Entry` type as the canonical store of every user-agent utterance, with `reminders` becoming a typed projection of certain entries (the time-sensitive ones). Replaces the current narrow "reminders = date-anchored commitments" model.
 
 ## Read first (in order)
 
