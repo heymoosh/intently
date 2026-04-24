@@ -6,6 +6,8 @@ Stable context for every Claude session in this repo. If guidance drifts from re
 
 **Response style:** concise, to the point, layman's terms. When explaining technical details, lead with a 1-line primer of the concept — Muxin is learning.
 
+**Manual work → TRACKER.md.** Whenever a task has a step Claude can't do automatically (manual smoke tests, user-only credentials, shared-infra writes, decisions only the user can make), add a bullet to `TRACKER.md` § Follow-ups in the same turn. Otherwise the user won't know it exists.
+
 ## Product intent
 
 Intently is a mobile app that turns recurring life operations (daily triage, morning briefing, weekly review, meal planning, monthly review) into an agent-native experience. Scheduled managed agents do the work; the mobile UI reflects state, triggers runs, and renders output.
