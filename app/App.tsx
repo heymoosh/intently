@@ -6,7 +6,6 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Dimensions,
   Pressable,
   ScrollView,
@@ -17,6 +16,7 @@ import {
 import Markdown from '@ronradtke/react-native-markdown-display';
 import AgentOutputCard from './components/AgentOutputCard';
 import JournalEditor from './components/JournalEditor';
+import VoiceModal from './components/VoiceModal';
 import { AgentOutput } from './lib/agent-output';
 import { callMaProxy, MaProxyError, MaSkill, toAgentOutput } from './lib/ma-client';
 import { DAILY_BRIEF_DEMO_INPUT, dailyBriefSeed } from './fixtures/daily-brief-seed';
@@ -147,15 +147,18 @@ function Screen({
         {header}
         {content ?? (md ? <Markdown>{md}</Markdown> : null)}
       </ScrollView>
-      <Pressable
-        style={styles.voiceButton}
-        onPress={() =>
-          Alert.alert('Voice capture', 'Stub — STT wiring lands with the agent pipeline.')
-        }
-      >
-        <Text style={styles.voiceIcon}>🎙</Text>
-      </Pressable>
     </View>
+  );
+}
+
+// Hero affordance per design handoff §1.2 — persistent bottom-right surface,
+// tap opens the listening takeover. Press-and-hold radial menu deferred to
+// post-V1; tap is the primary gesture for hackathon.
+function HeroButton({ onPress }: { onPress: () => void }) {
+  return (
+    <Pressable style={styles.voiceButton} onPress={onPress}>
+      <Text style={styles.voiceIcon}>🎙</Text>
+    </Pressable>
   );
 }
 
@@ -262,6 +265,7 @@ export default function App() {
   // Default to 'planned' so the brief lands visible on first open for demo.
   // In production, clock-driven: morning before brief, evening after ~7pm.
   const [phase, setPhase] = useState<PresentPhase>('planned');
+  const [voiceOpen, setVoiceOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -496,6 +500,12 @@ export default function App() {
           );
         })}
       </ScrollView>
+      <HeroButton onPress={() => setVoiceOpen(true)} />
+      <VoiceModal
+        visible={voiceOpen}
+        onClose={() => setVoiceOpen(false)}
+        supabaseUrl={process.env.EXPO_PUBLIC_SUPABASE_URL}
+      />
       <JournalEditor
         visible={journalOpen}
         onClose={() => setJournalOpen(false)}
