@@ -52,6 +52,7 @@ const SKILL_ENV: Record<string, string> = {
   'daily-brief': 'MA_AGENT_ID_DAILY_BRIEF',
   'daily-review': 'MA_AGENT_ID_DAILY_REVIEW',
   'weekly-review': 'MA_AGENT_ID_WEEKLY_REVIEW',
+  'monthly-review': 'MA_AGENT_ID_MONTHLY_REVIEW',
   'update-tracker': 'MA_AGENT_ID_UPDATE_TRACKER',
   setup: 'MA_AGENT_ID_SETUP',
 };
