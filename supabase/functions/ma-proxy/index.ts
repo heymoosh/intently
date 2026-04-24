@@ -106,8 +106,11 @@ function anthropicHeaders(apiKey: string): Record<string, string> {
 // ---------- upstream calls ----------
 
 async function createSession(apiKey: string, agentId: string, environmentId: string | null) {
-  const body: Record<string, unknown> = { agent_id: agentId };
-  if (environmentId) body.environment_id = environmentId;
+  // Anthropic MA `POST /v1/sessions` takes `agent` (not `agent_id`). Verified
+  // against the live 400 response during first smoke test on 2026-04-24:
+  // `agent_id: Extra inputs are not permitted. Did you mean 'agent'?`
+  const body: Record<string, unknown> = { agent: agentId };
+  if (environmentId) body.environment = environmentId;
 
   const res = await fetch(`${ANTHROPIC_API_BASE}${SESSIONS_PATH}`, {
     method: 'POST',
