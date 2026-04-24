@@ -6,7 +6,6 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Dimensions,
   Pressable,
   ScrollView,
@@ -17,31 +16,15 @@ import {
 import Markdown from '@ronradtke/react-native-markdown-display';
 import AgentOutputCard from './components/AgentOutputCard';
 import JournalEditor from './components/JournalEditor';
+import VoiceModal from './components/VoiceModal';
 import { AgentOutput } from './lib/agent-output';
-import { callMaProxy, MaProxyError, toAgentOutput } from './lib/ma-client';
+import { callMaProxy, MaProxyError, MaSkill, toAgentOutput } from './lib/ma-client';
 import { DAILY_BRIEF_DEMO_INPUT, dailyBriefSeed } from './fixtures/daily-brief-seed';
+import { DAILY_REVIEW_DEMO_INPUT, dailyReviewSeed } from './fixtures/daily-review-seed';
+import { WEEKLY_REVIEW_DEMO_INPUT, weeklyReviewSeed } from './fixtures/weekly-review-seed';
+import { fetchDueReminders, formatRemindersForInput } from './lib/reminders';
 import { supabase } from './lib/supabase';
 import { theme } from './lib/tokens';
-
-const pastMd = `# Past
-
-_Journal entries and prior reviews will render here._
-
-### 2026-04-21
-- Scaffolded the Intently skills, ADRs, and architecture docs.
-
-### 2026-04-22
-- Wrote the Supabase schema; shipped the Expo shell.
-`;
-
-const futureMd = `# Future
-
-## Goals
-- Intently demo ready by 2026-04-26
-
-## Projects
-- **Intently** · 🟡 · Next: Expo shell
-`;
 
 type ConnStatus =
   | { kind: 'idle' }
@@ -49,11 +32,39 @@ type ConnStatus =
   | { kind: 'ok'; rows: number }
   | { kind: 'error'; message: string };
 
-type LiveBriefState =
+type LiveState =
   | { kind: 'idle' }
   | { kind: 'loading' }
   | { kind: 'ok'; output: AgentOutput }
   | { kind: 'error'; message: string };
+
+// Present has three data-driven phases per design handoff §3.2.
+// morning = pre-brief sunrise CTA. planned = brief + plan visible.
+// evening = planned + midnight CTA for daily-review. In production this is
+// clock-driven; for demo we expose a dev toggle so we can record each beat.
+type PresentPhase = 'morning' | 'planned' | 'evening';
+
+// Three goals at a time per MVP spec (§2.1). Each has a monthly slice that
+// refreshes on month boundary. Painterly palettes deferred to post-V1; flat
+// card-surface tokens carry the visual load for now, varied so the three
+// cards read as distinct.
+const GOALS = [
+  {
+    title: 'Move to Japan.',
+    monthly: 'April: finish the visa checklist and book the scouting trip for June.',
+    tint: 'ConfirmationCardSurface' as const,
+  },
+  {
+    title: 'Start a side hustle that pays my rent.',
+    monthly: 'April: ship the landing page and get 10 waitlist signups from real conversations.',
+    tint: 'QuestCardSurface' as const,
+  },
+  {
+    title: 'Be someone I would want to work with.',
+    monthly: 'April: one 1:1 a week, and say the hard thing out loud when it matters.',
+    tint: 'UncertainCardSurface' as const,
+  },
+];
 
 // Dev-only Supabase status pill. Hidden in normal state so the demo surface
 // isn't cluttered; we only surface an error (user-meaningful).
@@ -87,12 +98,16 @@ function formatDateHeader(now: Date = new Date()): string {
   return `${day}, ${month} ${now.getDate()}`;
 }
 
-function LiveBriefTrigger({
+function LiveAgentTrigger({
   state,
   onPress,
+  idleLabel,
+  regenerateLabel = '↻ Regenerate',
 }: {
-  state: LiveBriefState;
+  state: LiveState;
   onPress: () => void;
+  idleLabel: string;
+  regenerateLabel?: string;
 }) {
   if (state.kind === 'loading') {
     return (
@@ -102,7 +117,7 @@ function LiveBriefTrigger({
       </View>
     );
   }
-  const label = state.kind === 'ok' ? '↻ Regenerate' : '✨ Generate live brief';
+  const label = state.kind === 'ok' ? regenerateLabel : idleLabel;
   return (
     <View>
       <Pressable style={styles.liveTriggerPill} onPress={onPress}>
@@ -133,15 +148,18 @@ function Screen({
         {header}
         {content ?? (md ? <Markdown>{md}</Markdown> : null)}
       </ScrollView>
-      <Pressable
-        style={styles.voiceButton}
-        onPress={() =>
-          Alert.alert('Voice capture', 'Stub — STT wiring lands with the agent pipeline.')
-        }
-      >
-        <Text style={styles.voiceIcon}>🎙</Text>
-      </Pressable>
     </View>
+  );
+}
+
+// Hero affordance per design handoff §1.2 — persistent bottom-right surface,
+// tap opens the listening takeover. Press-and-hold radial menu deferred to
+// post-V1; tap is the primary gesture for hackathon.
+function HeroButton({ onPress }: { onPress: () => void }) {
+  return (
+    <Pressable style={styles.voiceButton} onPress={onPress}>
+      <Text style={styles.voiceIcon}>🎙</Text>
+    </Pressable>
   );
 }
 
@@ -149,6 +167,52 @@ function NewJournalEntryButton({ onPress }: { onPress: () => void }) {
   return (
     <Pressable style={styles.newEntryButton} onPress={onPress}>
       <Text style={styles.newEntryLabel}>+ New journal entry</Text>
+    </Pressable>
+  );
+}
+
+// Derive the Present phase from clock + URL override. Morning before 10am,
+// evening at/after 6pm, planned in between. For demo recording the user can
+// force a phase with `?phase=morning|planned|evening`. No visible dev toggle
+// — it read as primary navigation and mis-led viewers.
+function derivePhase(now: Date = new Date()): PresentPhase {
+  if (typeof window !== 'undefined' && window.location?.search) {
+    const q = new URLSearchParams(window.location.search).get('phase');
+    if (q === 'morning' || q === 'planned' || q === 'evening') return q;
+  }
+  const h = now.getHours();
+  if (h < 10) return 'morning';
+  if (h >= 18) return 'evening';
+  return 'planned';
+}
+
+// Morning/evening phase CTA — larger, visually weighted as the focal
+// affordance on the screen. Sunrise for morning, midnight for evening.
+// Gradient is deferred per "functionality first"; solid tint carries intent.
+function PhaseCta({
+  label,
+  onPress,
+  loading,
+  variant = 'morning',
+}: {
+  label: string;
+  onPress: () => void;
+  loading?: boolean;
+  variant?: 'morning' | 'evening';
+}) {
+  const bg =
+    variant === 'evening' ? t.colors.PrimaryText : t.colors.UndoAffordance;
+  const fg = t.colors.InverseText;
+  return (
+    <Pressable
+      style={[styles.phaseCta, { backgroundColor: bg }]}
+      onPress={loading ? undefined : onPress}
+    >
+      {loading ? (
+        <ActivityIndicator size="small" color={fg} />
+      ) : (
+        <Text style={[styles.phaseCtaLabel, { color: fg }]}>{label}</Text>
+      )}
     </Pressable>
   );
 }
@@ -179,7 +243,12 @@ export default function App() {
   const [screenWidth, setScreenWidth] = useState(() => Dimensions.get('window').width);
   const [status, setStatus] = useState<ConnStatus>({ kind: 'idle' });
   const [journalOpen, setJournalOpen] = useState(false);
-  const [liveBrief, setLiveBrief] = useState<LiveBriefState>({ kind: 'idle' });
+  const [liveBrief, setLiveBrief] = useState<LiveState>({ kind: 'idle' });
+  const [liveReview, setLiveReview] = useState<LiveState>({ kind: 'idle' });
+  const [liveWeekly, setLiveWeekly] = useState<LiveState>({ kind: 'idle' });
+  // Clock-derived phase with URL override; see derivePhase().
+  const [phase, setPhase] = useState<PresentPhase>(() => derivePhase());
+  const [voiceOpen, setVoiceOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -216,26 +285,23 @@ export default function App() {
     }
   };
 
-  const handleGenerateLiveBrief = async () => {
-    setLiveBrief({ kind: 'loading' });
+  const runAgent = async (
+    skill: MaSkill,
+    input: string,
+    meta: Pick<AgentOutput, 'kind' | 'title' | 'inputTraces'>,
+    setState: (s: LiveState) => void,
+  ) => {
+    setState({ kind: 'loading' });
     try {
-      const res = await callMaProxy({
-        skill: 'daily-brief',
-        input: DAILY_BRIEF_DEMO_INPUT,
-      });
+      const res = await callMaProxy({ skill, input });
       if (res.status !== 'idle' || !res.finalText) {
-        setLiveBrief({
+        setState({
           kind: 'error',
           message: `Agent returned status "${res.status}" with no text. Try again.`,
         });
         return;
       }
-      const output = toAgentOutput(res.finalText, {
-        kind: 'brief',
-        title: 'Good morning, Sam',
-        inputTraces: ['calendar', 'journal'],
-      });
-      setLiveBrief({ kind: 'ok', output });
+      setState({ kind: 'ok', output: toAgentOutput(res.finalText, meta) });
     } catch (err) {
       const message =
         err instanceof MaProxyError
@@ -243,47 +309,164 @@ export default function App() {
           : err instanceof Error
           ? err.message
           : 'Unknown error calling ma-proxy.';
-      setLiveBrief({ kind: 'error', message });
+      setState({ kind: 'error', message });
     }
   };
 
-  const displayOutput = liveBrief.kind === 'ok' ? liveBrief.output : dailyBriefSeed;
+  // The memory loop: before calling the brief agent, fetch any reminders
+  // the user committed to in prior sessions and append them to the agent's
+  // input. Graceful fallback: if the reminders endpoint isn't deployed or
+  // returns an error, we run the brief without them. The synthesis beat —
+  // "you asked me last week to remind you about X, it's due now" — is the
+  // demo moment that ties the memory architecture together on camera.
+  const handleGenerateLiveBrief = async () => {
+    const reminders = await fetchDueReminders();
+    const input = DAILY_BRIEF_DEMO_INPUT + formatRemindersForInput(reminders);
+    return runAgent('daily-brief', input, {
+      kind: 'brief',
+      title: 'Good morning, Sam',
+      inputTraces: ['calendar', 'journal'],
+    }, setLiveBrief);
+  };
+
+  const handleGenerateLiveReview = () =>
+    runAgent('daily-review', DAILY_REVIEW_DEMO_INPUT, {
+      kind: 'review',
+      title: 'Today, in review',
+      inputTraces: ['calendar', 'journal'],
+    }, setLiveReview);
+
+  const handleGenerateLiveWeekly = () =>
+    runAgent('weekly-review', WEEKLY_REVIEW_DEMO_INPUT, {
+      kind: 'review',
+      title: 'Week in review',
+      inputTraces: ['calendar', 'journal'],
+    }, setLiveWeekly);
+
+  const briefOutput = liveBrief.kind === 'ok' ? liveBrief.output : dailyBriefSeed;
+  const reviewOutput = liveReview.kind === 'ok' ? liveReview.output : dailyReviewSeed;
+  const weeklyOutput = liveWeekly.kind === 'ok' ? liveWeekly.output : weeklyReviewSeed;
 
   const todayLabel = formatDateHeader();
+
+  // Past — Week view per design §3.1: default is this week. Shows the
+  // weekly-review summary/outcomes, then today's Entries (brief + review)
+  // chronologically beneath. Year/Month/Day zoom levels deferred to post-V1.
+  // No trigger pills per BUILD-RULES: weekly-review runs Sunday evening or
+  // via hero; journal entries are created through the hero affordance.
+  const todayEntries: Array<{ key: string; output: AgentOutput }> = [
+    { key: 'brief', output: briefOutput },
+    ...(liveReview.kind === 'ok' ? [{ key: 'review', output: liveReview.output }] : []),
+  ];
   const pastScreen = (
     <Screen
-      md={pastMd}
-      header={
-        <>
-          <ScreenHeader tense="Past" title="Earlier" />
-          <NewJournalEntryButton onPress={() => setJournalOpen(true)} />
-        </>
+      content={
+        <View>
+          <ScreenHeader tense="Past · Week 17" title="Apr 20 — 26" />
+          <Text style={styles.sectionEyebrow}>THIS WEEK'S OUTCOMES</Text>
+          <AgentOutputCard output={weeklyOutput} />
+          <Text style={[styles.sectionEyebrow, styles.sectionEyebrowSpaced]}>
+            TODAY · {todayLabel.toUpperCase()}
+          </Text>
+          {todayEntries.map((e) => (
+            <AgentOutputCard key={e.key} output={e.output} />
+          ))}
+        </View>
       }
     />
   );
+
+  // Present — phase-driven per design §3.2. morning = pre-brief sunrise CTA;
+  // planned = brief + plan; evening = planned + midnight CTA for daily-review.
+  // Dev toggle at top lets us flip between phases on camera.
   const presentScreen = (
     <Screen
       banner={<ConnectionBanner status={status} />}
       content={
         <View>
           <ScreenHeader tense="Today" title={todayLabel} />
-          <LiveBriefTrigger state={liveBrief} onPress={handleGenerateLiveBrief} />
-          <AgentOutputCard output={displayOutput} />
+          {phase === 'morning' ? (
+            <View>
+              <Text style={styles.bodyLead}>
+                A quiet opening. Yesterday's highlight and this week's outcomes are below;
+                when you're ready, start the brief.
+              </Text>
+              <PhaseCta
+                label="Start your daily brief"
+                loading={liveBrief.kind === 'loading'}
+                onPress={() => {
+                  handleGenerateLiveBrief();
+                  setPhase('planned');
+                }}
+              />
+            </View>
+          ) : (
+            <View>
+              <AgentOutputCard output={briefOutput} />
+              {phase === 'evening' ? (
+                <PhaseCta
+                  label="Start your daily review"
+                  loading={liveReview.kind === 'loading'}
+                  onPress={handleGenerateLiveReview}
+                  variant="evening"
+                />
+              ) : null}
+              {liveReview.kind === 'ok' ? (
+                <View style={styles.reviewInlineNote}>
+                  <Text style={styles.reviewInlineNoteText}>
+                    Review written. Swipe to Past to read it alongside today's brief.
+                  </Text>
+                </View>
+              ) : null}
+              {liveReview.kind === 'error' ? (
+                <Text style={styles.liveTriggerError}>{liveReview.message}</Text>
+              ) : null}
+            </View>
+          )}
         </View>
       }
     />
   );
+
+  // Future — three goal cards + monthly slice per design §3.3. Projects band
+  // deferred; goals are the primary content here.
   const futureScreen = (
     <Screen
-      md={futureMd}
-      header={<ScreenHeader tense="Future" title="What's ahead" />}
+      content={
+        <View>
+          <ScreenHeader tense="Future" title="What this month is for." />
+          <Text style={styles.bodyLead}>
+            Three long-term visions. Each one gets a monthly slice — the agent cascades
+            it into weekly and daily moves on Present.
+          </Text>
+          {GOALS.map((g, i) => (
+            <View
+              key={i}
+              style={[styles.goalCard, { backgroundColor: t.colors[g.tint] }]}
+            >
+              <Text style={styles.goalTitle}>{g.title}</Text>
+              <View style={styles.goalDivider} />
+              <Text style={styles.goalMonthlyEyebrow}>APRIL</Text>
+              <Text style={styles.goalMonthly}>
+                {g.monthly.replace(/^April:\s*/, '')}
+              </Text>
+            </View>
+          ))}
+        </View>
+      }
     />
   );
 
   // Each slot needs explicit height on web: horizontal ScrollView children
   // collapse to content height otherwise, breaking the inner vertical scroll.
   // `flex: 1` + `height: '100%'` gives us the scroll-view height either way.
-  const slotStyle = { width: pageWidth, height: '100%' as const };
+  // scrollSnapAlign lands in the DOM via react-native-web passthrough — fixes
+  // the "drags like a whiteboard" feel where pagingEnabled alone doesn't snap.
+  const slotStyle = {
+    width: pageWidth,
+    height: '100%' as const,
+    scrollSnapAlign: 'start',
+  };
 
   return (
     <View style={styles.container}>
@@ -305,6 +488,12 @@ export default function App() {
           );
         })}
       </ScrollView>
+      <HeroButton onPress={() => setVoiceOpen(true)} />
+      <VoiceModal
+        visible={voiceOpen}
+        onClose={() => setVoiceOpen(false)}
+        supabaseUrl={process.env.EXPO_PUBLIC_SUPABASE_URL}
+      />
       <JournalEditor
         visible={journalOpen}
         onClose={() => setJournalOpen(false)}
@@ -318,7 +507,11 @@ const t = theme.light;
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: t.colors.PrimarySurface, paddingTop: 60 },
-  pager: { flex: 1 },
+  // scrollSnapType: react-native-web passes this through to the scrolling
+  // <div>, which makes horizontal paging SNAP on web instead of dragging.
+  // Combined with scrollSnapAlign on each slot, fixes the "whiteboard pan"
+  // feel on Chrome/Safari/Edge. pagingEnabled alone isn't enough on web.
+  pager: { flex: 1, scrollSnapType: 'x mandatory' } as any,
   screen: { flex: 1, backgroundColor: t.colors.PrimarySurface },
   scroll: { padding: t.spacing['5'], paddingBottom: 140 },
   banner: {
@@ -410,5 +603,115 @@ const styles = StyleSheet.create({
     lineHeight: 38,
     color: t.colors.PrimaryText,
     letterSpacing: -0.5,
+  },
+  sectionEyebrow: {
+    fontFamily: t.typography.fonts.UISemi,
+    fontSize: 11,
+    letterSpacing: 1.2,
+    color: t.colors.SupportingText,
+    marginBottom: t.spacing['3'],
+  },
+  sectionEyebrowSpaced: {
+    marginTop: t.spacing['6'],
+  },
+  bodyLead: {
+    fontFamily: t.typography.fonts.Reading,
+    fontSize: 15,
+    lineHeight: 22,
+    color: t.colors.SupportingText,
+    marginBottom: t.spacing['4'],
+  },
+  phaseToggle: {
+    flexDirection: 'row',
+    alignSelf: 'flex-end',
+    gap: 4,
+    padding: 3,
+    borderRadius: t.radius.Pill,
+    backgroundColor: t.colors.SecondarySurface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: t.colors.EdgeLine,
+    marginBottom: t.spacing['4'],
+  },
+  phaseChip: {
+    paddingHorizontal: t.spacing['3'],
+    paddingVertical: t.spacing['1'],
+    borderRadius: t.radius.Pill,
+  },
+  phaseChipActive: {
+    backgroundColor: t.colors.PrimaryText,
+  },
+  phaseChipLabel: {
+    fontFamily: t.typography.fonts.UIMedium,
+    fontSize: 11,
+    letterSpacing: 0.4,
+    color: t.colors.SupportingText,
+    textTransform: 'capitalize' as const,
+  },
+  phaseChipLabelActive: {
+    color: t.colors.InverseText,
+  },
+  phaseCta: {
+    marginTop: t.spacing['4'],
+    paddingVertical: t.spacing['4'],
+    paddingHorizontal: t.spacing['5'],
+    borderRadius: t.radius.Pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 56,
+    ...t.elevation.Raised,
+  },
+  phaseCtaLabel: {
+    fontFamily: t.typography.fonts.UISemi,
+    fontSize: 16,
+    letterSpacing: 0.2,
+  },
+  reviewInlineNote: {
+    marginTop: t.spacing['3'],
+    padding: t.spacing['3'],
+    borderRadius: t.radius.Chip,
+    backgroundColor: t.colors.SecondarySurface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: t.colors.EdgeLine,
+  },
+  reviewInlineNoteText: {
+    fontFamily: t.typography.fonts.Reading,
+    fontSize: 13,
+    lineHeight: 18,
+    color: t.colors.SupportingText,
+    fontStyle: 'italic',
+  },
+  goalCard: {
+    padding: t.spacing['5'],
+    borderRadius: t.radius.Card,
+    marginBottom: t.spacing['4'],
+    ...t.elevation.Raised,
+  },
+  goalTitle: {
+    fontFamily: t.typography.fonts.Display,
+    fontSize: 24,
+    lineHeight: 28,
+    color: t.colors.PrimaryText,
+    letterSpacing: -0.3,
+  },
+  goalDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: t.colors.EdgeLine,
+    marginVertical: t.spacing['3'],
+    opacity: 0.5,
+  },
+  goalMonthlyEyebrow: {
+    fontFamily: t.typography.fonts.UISemi,
+    fontSize: 10,
+    letterSpacing: 1.2,
+    color: t.colors.PrimaryText,
+    opacity: 0.55,
+    marginBottom: t.spacing['1'],
+  },
+  goalMonthly: {
+    fontFamily: t.typography.fonts.Reading,
+    fontSize: 15,
+    lineHeight: 22,
+    color: t.colors.PrimaryText,
+    opacity: 0.86,
   },
 });

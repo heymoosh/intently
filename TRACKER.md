@@ -6,11 +6,11 @@
 
 ## Status
 
-**Phase:** Build — Friday complete. Live end-to-end demo working.
-**Status:** 🟢 daily-brief runs live against Opus 4.7 via Supabase proxy. Web app at https://intently-eta.vercel.app. Infinite swipe rotation. Real synthesis on camera.
-**Last:** Monster Friday. 12 PRs merged (#61–#72 + one direct-to-main slip — see Follow-ups). Web pivot, parallel tracks, live MA wiring, event schema corrections (3 empirical API fixes), CLAUDE.md autonomy rule. End of session: user confirmed rotation works.
-**Next:** Saturday: daily-review wiring (stretch flow #2), video script + practice takes, decision on design scope. Sunday: record + submit.
-**Last updated:** 2026-04-24 (end of Friday session).
+**Phase:** Build day — wiring daily-review + weekly-review + update-tracker end-to-end.
+**Status:** 🟢 daily-brief runs live against Opus 4.7 via Supabase proxy. Web app at https://intently-eta.vercel.app.
+**Last:** Launch plan refocused (stale "Saturday polish" removed). Design-folder classification complete: screen-semantic mapping is the one structural call worth baking in (daily-review→Past, weekly-review→Future). Scope held to 5 skills; update-tracker as a small confirmation card; setup stays seed-covered.
+**Next:** Today is pure build. Tomorrow: record. Sunday: submit.
+**Last updated:** 2026-04-24 (second build session, pre-wiring).
 
 ### Go/No-Go (2026-04-24 EOD)
 
@@ -22,11 +22,12 @@
 
 ## Critical items awaiting review
 
-1. **Design scope — RESOLVED: functionality first, polish layered later.** User direction (end-of-Friday): ship all skills working before any visual polish pass. Visual layer (colors, typography, component styling) is fully retrofittable because tokens are already wired. **UX flow** (structural patterns like modal vs in-flow, card stack vs scroll list, full-takeover vs embedded) has caveats — cheaper to get right upfront. **Next-session start:** spend ~20 min classifying `docs/design/Intently - App/` flows as structural (bake in now) vs cosmetic (later), then prioritize wiring skills. See Next queue.
+_(none — design classification resolved, see Locked decisions below)_
 
 ## Follow-ups (pending manual or flight-test)
 
-- **Create MA agents for remaining 4 skills** (daily-review, weekly-review, update-tracker, setup). Canonical JSON configs live at `agents/<skill>/ma-agent-config.json` (all 5 shipped in PR #69). Paste → Save → `supabase secrets set MA_AGENT_ID_<SKILL>=<id>`. Only `daily-brief` created Friday.
+- **[BLOCKING today] Create MA agents for daily-review + weekly-review in console.** Configs at `agents/daily-review/ma-agent-config.json`, `agents/weekly-review/ma-agent-config.json`. Paste → Save → copy ID → `supabase secrets set MA_AGENT_ID_DAILY_REVIEW=<id>` and `MA_AGENT_ID_WEEKLY_REVIEW=<id>`. User-only (Claude can't reach MA console).
+- **update-tracker + setup MA agents** — deferred. update-tracker = small confirmation-card surface only, setup = seed-data-covered for demo. Create if time permits.
 - **Accidental direct-to-main commit `5b95d51`** (swipe fix). Branch-first rule violated because `gh pr merge --delete-branch` dropped me back to main and next commit went there. Change is correct + deployed, left in place. Consider adding a post-merge hook that refuses commits on main to prevent recurrence.
 - **Apply pg_cron migration** (`supabase/migrations/0002_schedules.sql`). Needs `supabase db push` — user-only.
 - **Fix `--clean` squash-merge false-positive** in `scripts/intently-track.sh`. Replace `git cherry` with `git diff --quiet main HEAD`. ~2-line fix.
@@ -44,19 +45,18 @@ Three bugs found during Friday's first live smoke tests. Fixes shipped in #68, #
 
 ## Next (in order — start here)
 
-1. **[Sat AM] Classify design-folder flows: structural vs cosmetic.** ~20 min read of `docs/design/Intently - App/`. Flag any patterns that are expensive to retrofit (modal vs in-flow, card stack vs scroll list, takeover vs embedded). Bake the structural ones in; defer cosmetic.
-2. **[Sat] Daily-review wiring.** Create MA agent from `agents/daily-review/ma-agent-config.json`; set `MA_AGENT_ID_DAILY_REVIEW` secret; same fetch pattern as daily-brief. Completes one full day's cycle — the core product proof.
-3. **[Sat] Weekly-review wiring** (if time). Second synthesis beat — Sunday reflection pattern recognition.
-4. **[Sat] Update-tracker + setup** (stretch, only if demo-relevant; seed data covers setup).
-5. **[Sat] Visual polish pass.** Now that functionality works, port specific design pieces the user names. Token values already match.
-6. **[Sat] Video script.** Draft 3-min narrative: Present → Generate brief → read output → swipe rotation → tap daily-review later → voice-over on MA story.
-7. **[Sat PM] Practice takes.** 2–3 recorded cuts on phone browser.
-8. **[Sun] Final recording + submission.** README + LICENSE + THIRD_PARTY_LICENSES present. Submit via CV platform by 8:00 PM EDT.
+1. **Daily-review wiring → Past screen.** Seed + fetch + trigger pill. Reuses AgentOutputCard w/ `kind:'review'`. Output lands on Past (structural demo beat).
+2. **Weekly-review wiring → Future screen.** Same pattern. Output lands on Future beneath the goals.
+3. **Present → "Start daily review" affordance once brief exists.** Auto-scrolls to Past slot on completion (or just adds pill; see wiring choice).
+4. **Update-tracker as small confirmation card** (optional — only if demo-relevant).
+5. **Video script.** User drafting in parallel section.
+6. **Practice takes** (tomorrow).
+7. **Final recording + submission** (Sunday).
 
 ## Stretch (skip if time-pressed)
 
-- Weekly-review wiring (after daily-review works).
-- Specific design ports from `docs/design/Intently - App/` per decision above.
+- update-tracker + setup MA agents created in console.
+- Visual polish pass beyond tokens (PainterlyBlock, LandscapePanel, painterly palettes).
 - Google OAuth + real calendar/email wiring (seed data covers demo).
 
 ## Locked decisions
@@ -67,6 +67,8 @@ Three bugs found during Friday's first live smoke tests. Fixes shipped in #68, #
 - V1 single-user (Muxin dogfoods); per-user isolation deferred.
 - Swipe: 21-slot repeat pattern (not clone-wrap). Infinite-feel rotation with no wrap handler complexity.
 - CLAUDE.md: "Autonomy default — act, don't ask" (PR #71). Pause only for secrets-in-chat, destructive actions, or obviously dumb moves.
+- **Screen-semantic mapping (structural).** Present = today's brief + plan. Past = completed reviews (daily-review output lands here). Future = goals + weekly slice (weekly-review output lands here). Enables the "swipe-to-see-yesterday's-review" demo beat.
+- **Design cosmetics deferred.** PainterlyBlock, LandscapePanel, DotGridBackdrop, italic display-font headers, journal zoom, hero affordance voice modal — all retrofittable, not blocking. Tokens already wired.
 
 ## Timeline
 

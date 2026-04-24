@@ -92,11 +92,30 @@ Anchor the suggestion in observed state, not generic advice. Examples: "Tomorrow
 
 ## 6. Prompt for reflections
 
-After the narrative, ask:
+The goal here is to help the user capture things they didn't think to think about — building a self-knowledge database over time, not just a log of what happened.
 
-> "Anything land for you today?"
+**Read the day's narrative you just wrote.** Use it to select 1–2 contextual prompts from the categories below that actually fit what today contained. Don't ask all of them — that's a survey. Pick what the day earned.
 
-If the user shares something, append to the journal file (filename from `reflection_filename` in config) at the top of the current year's section. Use the user's own words. Lightest edits only — never paraphrase, never reframe.
+| Category | Tag | Ask when... | Example prompt |
+|---|---|---|---|
+| Lessons to act on | `#grow` | A mistake, pivot, or hard lesson surfaced | "What would you do differently — or what do you want to make sure you carry forward?" |
+| Self-insight | `#self` | Something energized, frustrated, or surprised them | "What did today tell you about yourself — what you need, what drains you, what lights you up?" |
+| Wins worth remembering | `#brag` | Something went well they might minimize | "That [X] is worth remembering. What did it feel like, and what does it say about what you're capable of?" |
+| Limiting beliefs | `#ant` | Self-critical thought, hesitation, or "I can't" pattern visible | "Did any automatic negative thoughts come up today — anything worth examining or pushing back on?" |
+| Ideas worth developing | `#ideas` | An idea, observation, or creative thread came up | "You mentioned [X] — is that something worth developing? I can tag it so it doesn't get lost." |
+
+After the 1–2 contextual prompts, always close with:
+
+> "Anything else land for you today?"
+
+**Appending to the journal:** if the user shares anything, append to the journal file (filename from `reflection_filename` in config) at the top of the current year's section. Format each entry as:
+
+```
+[YYYY-MM-DD] #tag  
+<user's exact words — lightest edits only, never paraphrase, never reframe>
+```
+
+Use the tag from the category above that fits. If the user shares something that doesn't fit a category, use no tag. The tags exist so the weekly review can surface patterns by type — `#ant` entries across a week tell a different story than `#brag` entries.
 
 ## Important notes
 
