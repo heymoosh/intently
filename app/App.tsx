@@ -22,6 +22,7 @@ import { callMaProxy, MaProxyError, MaSkill, toAgentOutput } from './lib/ma-clie
 import { DAILY_BRIEF_DEMO_INPUT, dailyBriefSeed } from './fixtures/daily-brief-seed';
 import { DAILY_REVIEW_DEMO_INPUT, dailyReviewSeed } from './fixtures/daily-review-seed';
 import { WEEKLY_REVIEW_DEMO_INPUT, weeklyReviewSeed } from './fixtures/weekly-review-seed';
+import { fetchDueReminders, formatRemindersForInput } from './lib/reminders';
 import { supabase } from './lib/supabase';
 import { theme } from './lib/tokens';
 
@@ -312,12 +313,21 @@ export default function App() {
     }
   };
 
-  const handleGenerateLiveBrief = () =>
-    runAgent('daily-brief', DAILY_BRIEF_DEMO_INPUT, {
+  // The memory loop: before calling the brief agent, fetch any reminders
+  // the user committed to in prior sessions and append them to the agent's
+  // input. Graceful fallback: if the reminders endpoint isn't deployed or
+  // returns an error, we run the brief without them. The synthesis beat —
+  // "you asked me last week to remind you about X, it's due now" — is the
+  // demo moment that ties the memory architecture together on camera.
+  const handleGenerateLiveBrief = async () => {
+    const reminders = await fetchDueReminders();
+    const input = DAILY_BRIEF_DEMO_INPUT + formatRemindersForInput(reminders);
+    return runAgent('daily-brief', input, {
       kind: 'brief',
       title: 'Good morning, Sam',
       inputTraces: ['calendar', 'journal'],
     }, setLiveBrief);
+  };
 
   const handleGenerateLiveReview = () =>
     runAgent('daily-review', DAILY_REVIEW_DEMO_INPUT, {
