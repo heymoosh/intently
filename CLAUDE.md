@@ -10,6 +10,8 @@ Stable context for every Claude session in this repo. If guidance drifts from re
 
 **Manual work → TRACKER.md.** Whenever a task has a step Claude can't do automatically (user-only credentials, console actions Claude can't reach, decisions only the user can make), add a bullet to `TRACKER.md` § Follow-ups in the same turn. Otherwise the user won't know it exists.
 
+**Spec intent > spec letter.** When a doc is pointed at as authoritative ("per spec," "per the handoff," "TRACKER says to…," "the design doc"), read the doc AND ask for Muxin's intent in his own words — then state back one sentence of what you'll build. If his description disagrees with the doc, his current intent wins; docs capture past decisions, intent is current. Applies to new product behavior; skip for bug fixes / refactors / explicit inline instructions. Reason: reading docs cold produces literal implementations that miss the beat the user wanted to land (see the `reminders` narrow-vs-capture misread from 2026-04-24).
+
 ## Product intent
 
 Intently is a mobile app that turns recurring life operations (daily triage, morning briefing, weekly review, meal planning, monthly review) into an agent-native experience. Scheduled managed agents do the work; the mobile UI reflects state, triggers runs, and renders output.
