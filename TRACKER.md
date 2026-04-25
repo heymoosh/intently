@@ -73,6 +73,10 @@ Project briefs at `.claude/handoffs/<slug>.md` — persist across sessions; neve
 
 ## Follow-ups (pending manual or flight-test)
 
+- Wire `onReviewComplete` to also call ma-proxy `daily-review` if not already (out of scope for this PR — already shipped in #115). ([PR #125](https://github.com/heymoosh/intently/pull/125))
+- Persist completion flags to Supabase post-hackathon so it works across devices, not just in localStorage. ([PR #125](https://github.com/heymoosh/intently/pull/125))
+- Cosmetic: at 3pm without brief done, greeting still reads "Good morning, Maya" — copy issue, not a state issue. Post-hackathon. ([PR #125](https://github.com/heymoosh/intently/pull/125))
+- The wt-intent file format may evolve; if a tool starts parsing it programmatically, consider a stricter schema (frontmatter YAML). ([PR #125](https://github.com/heymoosh/intently/pull/125))
 - Re-run smoke against `https://intently-eta.vercel.app` after merge to verify the fix on prod. ([PR #123](https://github.com/heymoosh/intently/pull/123))
 - **[Resolved 2026-04-25] Path-aware session-locks hook.** `block-if-sibling` now reads `tool_input.file_path` from the hook event JSON and only blocks when the target is inside `REPO_ROOT`. Edits to `~/.bashrc`, `/tmp/`, and other out-of-repo paths pass through. Bash smoke test in PR description; fails open on missing jq / unparseable path / no `file_path`.
 - **[Shipped 2026-04-25] Session Handoff Steward redesign.** Implemented in `chat/handoff-steward-redesign` — replaced per-session/nightly model with **per-project** handoffs at `.claude/handoffs/<slug>.md`, conversational kickoff trigger + manual `/handoff`, never auto-deleted. Old nightly launchd job + plist removed. Full decisions and divergence-from-original-spec rationale: `.claude/handoffs/steward-redesign.md`.
