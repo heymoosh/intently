@@ -763,6 +763,9 @@ function ReviewFlow({ onClose, onComplete }) {
   const [agentTyping, setAgentTyping] = React.useState(true);
   const [draft, setDraft] = React.useState('');
   const [checkedIndex, setCheckedIndex] = React.useState(-1); // how many auto-check items have been "checked"
+  const [liveReview, setLiveReview] = React.useState(null);   // live ma-proxy daily-review response
+  const [reviewError, setReviewError] = React.useState(null); // set if the live call fails (demo still proceeds)
+  const [reviewLoading, setReviewLoading] = React.useState(false);
   const scrollRef = React.useRef(null);
 
   React.useEffect(() => {
@@ -789,7 +792,7 @@ function ReviewFlow({ onClose, onComplete }) {
 
   React.useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages, agentTyping, checkedIndex]);
+  }, [messages, agentTyping, checkedIndex, liveReview, reviewError, reviewLoading]);
 
   const s = REVIEW_SCRIPT[step];
   // For step 0 (autoCheck), auto-advance after the checklist animates in fully
@@ -800,8 +803,44 @@ function ReviewFlow({ onClose, onComplete }) {
     }
   }, [checkedIndex, s, step]);
 
+  // When we reach the confirm step, fire the live daily-review call in parallel
+  // with the agent's typing animation. Mirrors BriefFlow's pattern (slice 3).
+  // Falls back gracefully if window.callMaProxy isn't loaded or the call fails.
+  React.useEffect(() => {
+    if (!s || !s.confirm) return;
+    if (!window.callMaProxy) return;
+    if (liveReview || reviewError || reviewLoading) return;
+
+    const userAnswers = messages
+      .filter(m => m.role === 'user')
+      .map(m => m.text);
+    const input = [
+      "It's evening. The user just had this end-of-day reflection:",
+      ...userAnswers.map((a, i) => `Answer ${i + 1}: ${a}`),
+      '',
+      "Auto-checked items the agent inferred done from today's logs:",
+      ...AUTO_CHECK_ITEMS.map(it => `- ${it}`),
+      '',
+      'Generate a short evening review in plain prose (no markdown headers, no bullets — just sentences). Acknowledge what they got right today, reflect briefly on the friction without lecturing, and plant a single seed for tomorrow that connects to what they said. Keep it under 3 short paragraphs. Speak directly to them ("you"), not about them. Tone: warm, plainspoken, end-of-day.',
+    ].join('\n');
+
+    setReviewLoading(true);
+    window.callMaProxy({ skill: 'daily-review', input })
+      .then(r => {
+        setLiveReview((r && r.finalText) || '');
+        setReviewLoading(false);
+      })
+      .catch(e => {
+        setReviewError((e && e.message) || 'review call failed');
+        setReviewLoading(false);
+      });
+  }, [s, messages, liveReview, reviewError, reviewLoading]);
+
   const showInput = s && s.input && !agentTyping;
-  const showConfirm = s && s.confirm && !agentTyping;
+  // Hold the confirm card until the live review lands (or errors out).
+  const liveReviewReady = liveReview !== null || reviewError !== null;
+  const showConfirm = s && s.confirm && !agentTyping && liveReviewReady;
+  const showReviewThinking = s && s.confirm && !agentTyping && reviewLoading;
 
   const submit = (text) => {
     const t = (text && text.trim()) || (s.userDefault || '');
@@ -842,6 +881,10 @@ function ReviewFlow({ onClose, onComplete }) {
             return <ChatBubbleDark key={i} role={m.role} text={m.text} sub={m.sub} />;
           })}
           {agentTyping && <AgentTypingDark />}
+          {/* Live daily-review from ma-proxy — appears before the confirm card */}
+          {showReviewThinking && <AgentTypingDark />}
+          {liveReview && <ChatBubbleDark role="agent" text={liveReview} />}
+          {reviewError && <ChatBubbleDark role="agent" text="(I couldn't reach the review generator just now — saving what you said anyway.)" />}
           {showConfirm && <ReviewConfirmCard onAccept={() => onComplete && onComplete()} />}
         </div>
       </div>
