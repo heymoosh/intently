@@ -2,7 +2,7 @@
 
 **Life Ops as a mobile app — your recurring operations, done by scheduled Claude agents.**
 
-Live demo: **https://intently-eta.vercel.app** · Demo video: _[recording Sunday; link lands in final submission]_
+Live demo: **https://intently-eta.vercel.app** — hit `/?phase=morning` and tap *Start your daily brief*. Demo video: _[recording Sunday; link lands in final submission]_
 
 ## The demo in 30 seconds
 
@@ -68,7 +68,10 @@ For iOS Simulator or Android Emulator: `npm run start`, then press `i` / `a` fro
 |---|---|
 | `agents/` | One folder per skill — `SKILL.md` + prompts. `agents/_shared/life-ops-conventions.md` is prepended to every skill. |
 | `app/` | Expo / React Native mobile app. Three-screen swipe (Past / Present / Future). |
-| `docs/` | Product spec, architecture, ADRs, design, process. Start at [`docs/product/vision.md`](./docs/product/vision.md). |
+| `docs/product/` | Vision and the life-ops plugin spec. Start at [`docs/product/vision.md`](./docs/product/vision.md). |
+| `docs/design/Intently - App/` | Design system + interactive prototype. |
+| `docs/hackathon/` | Submission docs: demo script, summary, kickoff/rules, submission tracker. |
+| `docs/` (other) | Architecture, ADRs, process. |
 | `evals/` | Case datasets, scoring rubrics, baselines. Runner shared with `app/` test suite. |
 | `supabase/` | Schema migrations, Edge Functions, `pg_cron` scheduling. |
 

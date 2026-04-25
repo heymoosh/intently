@@ -1,3 +1,5 @@
+<!-- DRAFT: ~167 words; user reviews/edits before submission. Within the hackathon's 100-200 word band. -->
+
 # Intently — Submission Summary
 
 Intently is Life Ops as a mobile app: a thin UI over Claude Managed Agents that handle the recurring operations of a life. Three flows ship end-to-end — **daily brief**, **daily review**, **weekly review**. The agents do the work on a schedule; the phone catches up to it.
