@@ -86,6 +86,25 @@ if [ "${STALE_COUNT:-0}" -gt 0 ]; then
   WARNINGS+=("${STALE_COUNT} local branch(es) with gone remote — safe to 'git branch -D' after verifying")
 fi
 
+# Parallel git worktrees (warn-only). Shared files like TRACKER/handoffs/CLAUDE
+# auto-merge cleanly when edits don't overlap, but a session that knows other
+# tracks are active should spawn its own worktree per CONTRIBUTING.md
+# (`git worktree add ~/wt/<slug> -b chat/<slug>`) rather than touch shared
+# state from primary. Sibling-session detection inside the same checkout is
+# handled separately by session-locks.sh check.
+PARALLEL_WT=()
+PRIMARY_PATH="$(git rev-parse --show-toplevel 2>/dev/null)"
+while IFS= read -r wt; do
+  [ -z "$wt" ] && continue
+  if [ "$wt" != "$PRIMARY_PATH" ]; then
+    PARALLEL_WT+=("$wt")
+  fi
+done < <(git worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2}')
+if [ ${#PARALLEL_WT[@]} -gt 0 ]; then
+  WARNINGS+=("${#PARALLEL_WT[@]} parallel worktree(s) active — touch TRACKER/handoffs/CLAUDE only inside your own worktree")
+  for wt in "${PARALLEL_WT[@]}"; do WARNINGS+=("    $wt"); done
+fi
+
 # ---------- report ----------
 
 if [ ${#FAILURES[@]} -eq 0 ] && [ ${#WARNINGS[@]} -eq 0 ]; then

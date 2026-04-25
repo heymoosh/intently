@@ -57,6 +57,7 @@ supabase/seed.sql.bak
 .claude/launchd/logs/
 .claude/launchd/bin/
 .claude/settings.local.json
+.claude/sessions/
 
 # === User-local scratch ===
 # Files under docs/process/usr-*.md are per-user notes (command cheatsheets,
