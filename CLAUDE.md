@@ -12,7 +12,7 @@ Universal rules only — true at project start, end, and every session in betwee
 
 **Spec intent > spec letter.** When a doc is pointed at as authoritative, read the doc AND ask for Muxin's intent in his own words — then state back one sentence of what you'll build. If his description disagrees with the doc, his current intent wins; docs capture past decisions, intent is current. Applies to new product behavior; skip for bug fixes / refactors / explicit inline instructions. Reason: doc-cold reading produces literal implementations that miss the beat (see the `reminders` narrow-vs-capture misread from 2026-04-24).
 
-**Chat-driven edits — branch first.** Any conversation ask that touches a tracked file requires creating a `chat/<slug>` branch BEFORE writing. Never accumulate uncommitted changes on `main` — they won't propagate to `intently-track` worktrees and drift compounds. Pre-commit hook enforces.
+**Chat-driven edits — worktree first; never switch branches in the primary checkout.** Any conversation ask that touches a tracked file requires `git worktree add /Users/Muxin/wt/<slug> -b chat/<slug>` BEFORE writing — edit there, never on the primary tree. `git checkout`/`git switch` on the primary checkout is forbidden (breaks editor state, agent processes, parallel `intently-track` worktrees). If edits already landed uncommitted on `main`, migrate via `git stash push -- <paths>` → create worktree → `git stash pop`. Pre-commit hook enforces no-uncommitted-on-main.
 
 **No secrets in git, ever.** No `.env` commits, no hardcoded literals in tracked files, no echoing keys into chat. Where secrets currently live (BWS / Supabase env / etc.) is project-state — see `TRACKER.md § Current state` for the active store.
 
