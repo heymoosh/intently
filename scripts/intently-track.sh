@@ -107,21 +107,18 @@ cmd_clean() {
     exit 1
   fi
 
-  # Check whether the branch's work is in main by any route — regular merge,
-  # rebase, or squash merge. `git cherry main HEAD` marks each commit with
-  # `+` (not in main) or `-` (patch-equivalent commit exists in main). A
-  # squash-merged branch has all `-` lines. A non-merged branch has at least
-  # one `+` line.
-  local unmerged
-  unmerged=$(git -C "$wt" cherry main HEAD 2>/dev/null | grep -c '^+' || true)
-  if [ "$unmerged" -gt 0 ]; then
+  # Tree comparison, not per-commit patch IDs: a squash merge produces one
+  # combined commit in main that isn't patch-equivalent to any individual
+  # branch commit, so `git cherry`-based checks falsely flag squash-merged
+  # branches as unmerged.
+  if ! git -C "$wt" diff --quiet main HEAD 2>/dev/null; then
     # Work not yet in main. Only allow removal if everything is pushed —
     # otherwise we'd lose commits.
     local upstream_tip local_tip
     upstream_tip=$(git -C "$wt" rev-parse --verify '@{u}' 2>/dev/null || echo '')
     local_tip=$(git -C "$wt" rev-parse HEAD)
     if [ -z "$upstream_tip" ] || [ "$upstream_tip" != "$local_tip" ]; then
-      echo "${C_ERR}error:${C_RESET} worktree $wt has $unmerged commit(s) not in main and not pushed to origin." >&2
+      echo "${C_ERR}error:${C_RESET} worktree $wt has work not in main and not pushed to origin." >&2
       echo "Push first, then re-run --clean. Or discard the branch with: git -C $REPO_ROOT worktree remove --force $wt" >&2
       exit 1
     fi
@@ -204,7 +201,7 @@ cmd_clean_merged() {
   local removed=0
   local skipped=0
 
-  # Refresh origin so cmd_clean's squash-merge detection (git cherry main HEAD)
+  # Refresh origin so cmd_clean's squash-merge detection (git diff main HEAD)
   # compares against the latest main.
   git -C "$REPO_ROOT" fetch origin main --quiet 2>/dev/null || true
 
