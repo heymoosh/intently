@@ -38,7 +38,7 @@ Close the gap between what `auto-merge-safe.yml` can do deterministically and wh
 - Push to `main` or any non-`auto/*` / non-`feat/track-*` branch.
 - Remove `needs-user-review` label once added. Only the user takes that off.
 - Rebase a PR whose author is the user (i.e. not `auto/*` or `feat/track-*`). Their feat branches are theirs to manage.
-- Write to `TRACKER.md`, `CLAUDE.md`, or `.claude/session-handoff.md` — those are owned by other routines.
+- Write to `TRACKER.md`, `CLAUDE.md`, or any file under `.claude/handoffs/` — those are owned by other routines or interactive Claude sessions.
 - Force-push without `--force-with-lease` — never overwrite unseen upstream commits.
 
 ## Model + effort
@@ -106,7 +106,7 @@ Do NOT edit `TRACKER.md` directly — write a routine-output report and let rele
 **Manual (this session):**
 
 ```
-/loop 15m Read .claude/loops/babysit-prs.md and execute ONE iteration per the brief. Use Opus 4.7 at high effort. This loop may fire whether or not there is work; a no-op iteration should exit silently and write nothing. Honor all hard-stops in the brief, especially: do NOT merge anything auto-merge-safe.yml would merge (race conditions); do NOT push to main/feat/*/non-auto branches; do NOT remove needs-user-review labels; do NOT force-push without --force-with-lease; do NOT edit TRACKER.md, CLAUDE.md, or .claude/session-handoff.md.
+/loop 15m Read .claude/loops/babysit-prs.md and execute ONE iteration per the brief. Use Opus 4.7 at high effort. This loop may fire whether or not there is work; a no-op iteration should exit silently and write nothing. Honor all hard-stops in the brief, especially: do NOT merge anything auto-merge-safe.yml would merge (race conditions); do NOT push to main/feat/*/non-auto branches; do NOT remove needs-user-review labels; do NOT force-push without --force-with-lease; do NOT edit TRACKER.md, CLAUDE.md, or any file under .claude/handoffs/.
 ```
 
 **Recurring (via launchd, after first manual run proves clean):**

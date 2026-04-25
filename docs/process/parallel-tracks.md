@@ -29,7 +29,7 @@ Claude works, commits, pushes. A PR opens (either Claude opens it, or you push a
 - **`security.yml`** runs → gitleaks check. Always runs.
 - **`ci.yml`** runs → `npm run typecheck && npm run test:unit` in `app/`. Runs on PRs touching code.
 - **`auto-merge-safe.yml`** fires after either workflow completes:
-  - **Mechanical files only** (`.claude/routine-output/`, `TRACKER.md`, `session-handoff.md`) → auto-merge on security green.
+  - **Mechanical files only** (`routine-output/`, `TRACKER.md`) → auto-merge on security green.
   - **Docs/config only** (`docs/**`, `CLAUDE.md`, etc.) → flip ready-for-review, add `needs-user-review` label.
   - **Any code** (`agents/**`, `app/**`, `supabase/**`, `tests/**`, `evals/{datasets,rubrics,baselines,runner}/**`, `scripts/**`, `.githooks/**`, `.github/workflows/**`) → auto-merge only when BOTH security AND ci are green.
 - **Any PR labeled `needs-user-review`** → skipped entirely by the workflow. Only the user removes that label.

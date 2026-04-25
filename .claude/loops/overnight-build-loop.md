@@ -48,7 +48,7 @@ The loop **must not**:
 - Run EAS builds or anything that spends quota.
 - Push to `main`, `feat/*`, or any non-`auto/*` branch.
 - Merge any PR (all PRs open as `--draft`).
-- Edit `TRACKER.md`, `CLAUDE.md`, or `.claude/session-handoff.md` — those are owned by other routines.
+- Edit `TRACKER.md`, `CLAUDE.md`, or any file under `.claude/handoffs/` — those are owned by other routines or interactive Claude sessions.
 - Add dependencies without checking `app/package.json` first; prefer using what's already installed.
 
 If an iteration hits any of the above, skip the item, write a note to `routine-output/`, move to the next.

@@ -2,7 +2,7 @@
 
 **Purpose:** First doc a new session reads to resume. Hot state only — what's in flight, what's blocked, what just moved. For durable strategy + milestones, read `launch-plan.md` at repo root. Schema per `docs/architecture/data-model.md`. Keep slim (cap 100 lines).
 
-**Doc hierarchy:** `launch-plan.md` (strategy, slow) → `TRACKER.md` (queue, hot) → `docs/product/acceptance-criteria/` (done-definition, per skill).
+**Doc hierarchy:** `launch-plan.md` (strategy, slow) → `TRACKER.md` (queue, hot) → `.claude/handoffs/<slug>.md` (project depth, persistent) → `docs/product/acceptance-criteria/` (done-definition, per skill).
 
 **Submission tracking** (video, artifacts, deadline): `docs/hackathon/Submission Tracker.md`.
 
@@ -12,7 +12,7 @@
 **Status:** 🟢 daily-brief + 4 MA agents (daily/weekly/monthly review + brief) live; reminders backend deployed; voice modal wired; UX skeleton committed. Web app at https://intently-eta.vercel.app.
 **Last:** PR #75 (UX skeleton + voice + reminders + memory loop) and PR #76 (stranded build artifacts + entries session prompt) merged. Worktree `~/worktrees/intently/entries-architecture` exists but no work done in it yet — parked pending reconciliation.
 **Next:** **Reconciliation pass first** (see Critical items below) → revised entries plan → only then kick off the entries-architecture worktree session for implementation.
-**Last updated:** 2026-04-24 (planning-handoff session, pre-reconciliation).
+**Last updated:** 2026-04-25 (handoff-steward redesign in flight; new `.claude/handoffs/` convention live).
 
 ### Go/No-Go (2026-04-24 EOD)
 
@@ -22,25 +22,23 @@
 | Daily Review | **BLOCK** | Not wired. Agent not created in console. Wire identically to daily-brief once chosen. |
 | Weekly Review | **SHIP WITH CAVEATS** | Static-analysis pass; no live run attempted. Stretch. |
 
+## Active handoffs
+
+Project briefs at `.claude/handoffs/<slug>.md` — persist across sessions; never auto-deleted. Convention: `docs/process/session-handoff.md`. Slash command: `/handoff`.
+
+- **`steward-redesign`** → `.claude/handoffs/steward-redesign.md` — new per-project handoff system shipping in `chat/handoff-steward-redesign`. The system describing itself (dogfood). Status: active.
+
 ## Critical items awaiting review
 
-1. **[BLOCKING — DO FIRST] Session Handoff Steward redesign.** Spec captured in Follow-ups below. Why first: the entries-reconciliation session is meant to spawn parallel `intently-track` worktrees, and per Muxin's design each session needs its own `.claude/session-handoffs/<slug>.md` for deep context. Without the redesign, parallel tracks have no clean place to dump their state and pollute TRACKER instead. ~30–60 min: rewrite the steward brief, change/disable the daily launchd job, build the per-session trigger (Stop hook), build delete-on-completion lifecycle. Lands the three-tier doc hierarchy (`launch-plan` → `TRACKER` → `session-handoffs/<slug>.md`).
+1. **Design folder was completely replaced 2026-04-24.** New version at `docs/design/Intently - App/` ships an interactive prototype + updated `CLAUDE.md`, `BUILD-RULES.md`, `HANDOFF.md`. Prior plans (including the entries-architecture session prompt at `docs/process/session-prompt-entries-architecture.md`) were written against the *old* version. Read the new design folder end-to-end, apply "Spec intent > spec letter" with Muxin (elicit intent in his own words), reconcile the entries-architecture plan against new content. The session prompt has a STOP banner at the top that walks through this protocol — follow it. When the work coalesces, propose `/handoff entries-architecture`.
 
-2. **Design folder was completely replaced 2026-04-24.** New version at `docs/design/Intently - App/` ships an interactive prototype + updated `CLAUDE.md`, `BUILD-RULES.md`, `HANDOFF.md`. Prior plans (including the entries-architecture session prompt at `docs/process/session-prompt-entries-architecture.md`) were written against the *old* version. **After the steward redesign lands:** read the new design folder end-to-end, apply the "Spec intent > spec letter" rule with Muxin (elicit intent in his own words), reconcile the entries-architecture plan against new content. The session prompt has a STOP banner at the top that walks through this protocol — follow it.
+2. **Reminders intent reconciliation.** Muxin's stated intent (in his own words, captured in the entries-architecture session prompt): "*reminders was more like, 'keep track of this and surface it in daily briefing' not specifically 'you asked me to remind you to...' so that if i say, dropped in a 'hey add this somewhere' and leave a voice memo the agent's like 'cool got it' and it stashes it somewhere where it will pull it up again during our daily briefing... it tracks time sensitivity.*" Current shipped reminders flow is still narrow date-anchored (classify prompt rejects anything without a clear date). The reconciliation pass needs to confirm whether the new design folder has a different/better model for this — and whether "Entry as canonical, reminders as projection" still holds.
 
-3. **Reminders intent reconciliation.** Muxin's stated intent (in his own words, captured in the entries-architecture session prompt): "*reminders was more like, 'keep track of this and surface it in daily briefing' not specifically 'you asked me to remind you to...' so that if i say, dropped in a 'hey add this somewhere' and leave a voice memo the agent's like 'cool got it' and it stashes it somewhere where it will pull it up again during our daily briefing... it tracks time sensitivity.*" Current shipped reminders flow is still narrow date-anchored (classify prompt rejects anything without a clear date). The reconciliation pass needs to confirm whether the new design folder has a different/better model for this — and whether "Entry as canonical, reminders as projection" still holds.
-
-4. **Worktree at `~/worktrees/intently/entries-architecture` is parked.** It was created via `intently-track entries-architecture` but no Claude session has done work in it. After reconciliation, decide: continue in that worktree, destroy + recreate fresh, or skip the worktree pattern entirely if the new plan doesn't fit it. Don't run `claude` in it until the reconciliation is done; otherwise that session starts building from a stale plan.
+3. **Worktree at `~/worktrees/intently/entries-architecture` is parked.** It was created via `intently-track entries-architecture` but no Claude session has done work in it. After reconciliation, decide: continue in that worktree, destroy + recreate fresh, or skip the worktree pattern entirely if the new plan doesn't fit it. Don't run `claude` in it until the reconciliation is done; otherwise that session starts building from a stale plan.
 
 ## Follow-ups (pending manual or flight-test)
 
-- **[Design] Session Handoff Steward redesign — per-session, not nightly.** Current state: runs once at 22:45 nightly, overwrites a single `.claude/session-handoff.md`. New design (per Muxin 2026-04-24):
-  - **Trigger:** every session on exit (Stop hook / manual `/handoff` command / `SessionEnd` hook in `.claude/settings.json`), not a single daily launchd fire.
-  - **Output:** one file per session at `.claude/session-handoffs/<timestamp>-<slug>.md`. Captures deep context: goals, decisions made, learnings, process details, *how* TRACKER queue items actually got done.
-  - **TRACKER pointer:** TRACKER.md gets an "Active session docs" list linking to in-flight session-handoff files. TRACKER stays the hot queue ("things we gotta do"); session-handoff holds the implementation depth ("how we actually do them").
-  - **Lifecycle:** delete the session-handoff file when (a) the work it covers is completed, or (b) Muxin exits the session and confirms close-out. Avoids `.claude/session-handoffs/` becoming a graveyard.
-  - **Doc hierarchy update:** explicitly: `launch-plan.md` = high-level milestones (slow, "what does shipped mean"); `TRACKER.md` = live hot queue ("what we gotta do"); `.claude/session-handoffs/<slug>.md` = per-session implementation depth ("how we do it"). Update CLAUDE.md and TRACKER's own header to reflect this triad once built.
-  - **Implementation work:** update `.claude/routines/session-handoff-steward.md` brief; change/disable the daily launchd job for it; build the per-session trigger (Stop hook is most natural fit); build cleanup logic that prompts for delete-on-close.
+- **[Shipped 2026-04-25] Session Handoff Steward redesign.** Implemented in `chat/handoff-steward-redesign` — replaced per-session/nightly model with **per-project** handoffs at `.claude/handoffs/<slug>.md`, conversational kickoff trigger + manual `/handoff`, never auto-deleted. Old nightly launchd job + plist removed. Full decisions and divergence-from-original-spec rationale: `.claude/handoffs/steward-redesign.md`.
 - **[BLOCKING today] Create MA agents for daily-review + weekly-review in console.** Configs at `agents/daily-review/ma-agent-config.json`, `agents/weekly-review/ma-agent-config.json`. Paste → Save → copy ID → `supabase secrets set MA_AGENT_ID_DAILY_REVIEW=<id>` and `MA_AGENT_ID_WEEKLY_REVIEW=<id>`. User-only (Claude can't reach MA console).
 - **update-tracker + setup MA agents** — deferred. update-tracker = small confirmation-card surface only, setup = seed-data-covered for demo. Create if time permits.
 - **Accidental direct-to-main commit `5b95d51`** (swipe fix). Branch-first rule violated because `gh pr merge --delete-branch` dropped me back to main and next commit went there. Change is correct + deployed, left in place. Consider adding a post-merge hook that refuses commits on main to prevent recurrence.
@@ -60,20 +58,23 @@ Three bugs found during Friday's first live smoke tests. Fixes shipped in #68, #
 
 ## Next (in order — start here)
 
-1. **[BLOCKING #1] Session Handoff Steward redesign.** Per Muxin's spec in Follow-ups: rewrite brief, disable daily launchd cron, wire per-session trigger (Stop hook in `.claude/settings.json` is most natural), build per-session output to `.claude/session-handoffs/<timestamp>-<slug>.md`, build delete-on-completion lifecycle. Update CLAUDE.md "Session handoff" section + TRACKER.md doc-hierarchy line to reference the three-tier system. Confirm with Muxin before disabling the existing nightly job.
+1. **[BLOCKING #1] Read the new `docs/design/Intently - App/` folder end-to-end** — `CLAUDE.md`, `BUILD-RULES.md`, `HANDOFF.md`, plus the interactive prototype files. Take notes on anything that diverges from current shipped behavior or from the entries-architecture plan.
 
-2. **[BLOCKING #2] Read the new `docs/design/Intently - App/` folder end-to-end** — `CLAUDE.md`, `BUILD-RULES.md`, `HANDOFF.md`, plus the interactive prototype files. Take notes on anything that diverges from current shipped behavior or from the entries-architecture plan.
+2. **[BLOCKING #2] Apply "Spec intent > spec letter" with Muxin.** Per the rule in root `CLAUDE.md`: ask Muxin in his own words how Entry + capture/reminders should *feel* — what's the user beat. State back one sentence, get confirmation. The reminders narrow-vs-capture misread came from skipping this step; don't repeat it.
 
-3. **[BLOCKING #3] Apply "Spec intent > spec letter" with Muxin.** Per the rule in root `CLAUDE.md`: ask Muxin in his own words how Entry + capture/reminders should *feel* — what's the user beat. State back one sentence, get confirmation. The reminders narrow-vs-capture misread came from skipping this step; don't repeat it.
+3. **[BLOCKING #3] Reconcile** — produce `docs/process/session-prompt-entries-architecture-v2.md` per the 5-section deliverable in the v1 prompt's STOP banner (new-design summary / current code / gap / clarifying questions / parallel-track slicing). When this work coalesces (intent + goal + first decision), propose `/handoff entries-architecture` to capture project depth. Muxin signs off before tracks spawn.
 
-4. **[BLOCKING #4] Reconcile** — produce `docs/process/session-prompt-entries-architecture-v2.md` per the 5-section deliverable in the v1 prompt's STOP banner (new-design summary / current code / gap / clarifying questions / parallel-track slicing). Muxin signs off before tracks spawn.
+4. **Then** — spawn parallel `intently-track` worktrees per the slicing plan. Each track updates the shared `entries-architecture` handoff (or, if tracks are independent, each gets its own slug).
 
-5. **Then** — spawn parallel `intently-track` worktrees per the slicing plan in the v2 prompt. Each track gets its own session-handoff doc (now possible because of #1).
-
-6. **Other in-flight items** (do as scope permits):
+5. **Other in-flight items** (do as scope permits):
    - Design-fidelity pass per `docs/process/session-prompt-design-fidelity.md` (phone frame, TenseNav, painterly CTAs, hero state machine, typography).
    - Video script + practice takes.
    - Final recording + submission (Sunday 8 PM EDT).
+
+## Way later (someday/maybe — not blocking anything)
+
+- **Handoff pattern-review routine.** Once `.claude/handoffs/` has ≥3 completed/shipped handoffs, build a routine that periodically reviews them for repeatable patterns and surfaces candidates for promotion into routines/loops/process docs. Closes the loop on Muxin's "we shouldn't lose repeatable workflows" concern. Deferred until there's enough material to mine — premature without it.
+- **Stale `session-handoff.md` reference sweep.** The handoff-steward redesign (PR forthcoming) replaced `.claude/session-handoff.md` with `.claude/handoffs/<slug>.md` but didn't rewrite every doc. Remaining stale pointers: `docs/Claude Code Repo-Ready Blueprint.md` (4 spots — Section 9 of the routine pack, file-tree diagram, "End of every coding session" rule), `docs/design/claude-code-implementation.md` line 139, `docs/process/acceptance-criteria.md` lines 3 + 50, `docs/process/session-prompt-seed-data-v1.md` line 137 (describes the old MECHANICAL_RE regex). All doc-only, no runtime effect. Sweep when convenient.
 
 ## Stretch (skip if time-pressed)
 
