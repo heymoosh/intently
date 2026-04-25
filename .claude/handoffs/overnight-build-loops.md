@@ -52,6 +52,21 @@
 - `~/.intently/bin/intently-routine.sh` — wrapper script (outside repo). Where the launchd plist will register.
 - `TRACKER.md` § Active handoffs → points here. § Follow-ups holds only the broad pointer; details live here.
 
+## Design principle — verify, don't assume
+
+The 2026-04-25 night failed because each iteration built elaborate work on top of premises it never checked. Iter 3 declared a dependency on iter 2 in its scope, then shipped without verifying iter 2 had actually landed; it noted "may need re-checking" in its own PR body and called that resolution. Iter 2's content was committed locally but never pushed; no step asked "is the predecessor's output actually on origin?" The pattern is the same one CLAUDE.md's `Spec intent > spec letter` rule was created to prevent (the 2026-04-24 reminders narrow-vs-capture misread) — a stated premise gets accepted, work compounds on top of it, the premise turns out stale, and everything downstream is rework.
+
+This principle drives the rewrite below; every Next step is an instance of one of these.
+
+- **Verify inputs from canonical sources, not local state or session memory.** Each iter starts by running the equivalent of `gh pr list` / `git fetch origin` / `gh pr view <prev>` to confirm its declared dependencies actually exist on origin — not by trusting the scope file says so or that a file is on disk locally.
+- **Declared dependencies are enforced by the runner, not honored as documentation.** The scope saying "iter 3 depends on iter 2" must mean the loop refuses to start iter 3 until iter 2's PR is open on origin. A note in the PR body acknowledging the gap is not a substitute for the gate.
+- **A sub-agent's "may need re-checking" report IS the failure signal.** When an iter's own output flags an unverified premise, the design failed to enforce the dependency. Treat the note as evidence to tighten the gate, not as a successful handoff.
+- **Read the actual artifact, don't plan around your model of it.** If iter N references iter N-1's doc, fetch and read that doc from origin — don't reason about what it "should" contain from the scope file alone.
+- **Re-ground on current state before each iter, the way `/precheck` does at session start.** Decisions made from session memory drift; decisions made from `git status` + `gh pr list` are current.
+- **Honor authorization that's already granted.** CLAUDE.md authorizes `auto/*` docs-only merges that pass auto-merge-safe.yml gates. The loop should act on that authority for its own outputs, not punt every merge to the next morning.
+
+The safe-task gate (Next step #1), per-iter dependency assertion (#1), heartbeat + watchdog (#4), loop-aware hooks (#5), and steward auto-commit (#6) all exist to operationalize one of these against a specific failure mode observed on 2026-04-25.
+
 ## Next steps
 
 Ordered by impact + dependency. Do top-down.
