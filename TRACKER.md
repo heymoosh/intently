@@ -41,6 +41,14 @@ This section is the spine. Every topic with a "current truth" lives here as a po
 | Daily Review | **BLOCK** | Not wired. Agent not created in console. Wire identically to daily-brief once chosen. |
 | Weekly Review | **SHIP WITH CAVEATS** | Static-analysis pass; no live run attempted. Stretch. |
 
+## Active handoffs (additions)
+
+- **`decision-drift-check`** → `.claude/handoffs/decision-drift-check.md` — safety-net loop spec for the session-end decision-record discipline. Spec landed in PR #105. Implementation deferred (nice-to-have, not hackathon-blocking).
+
+## Follow-ups (post-data-loss)
+
+- **Lost files from 2026-04-25 force-remove of worktree-video-demo** — Muxin's hours of work on demo video (script + assets + visuals) was untracked inside `.claude/worktrees/video-demo/` when I force-removed the worktree. Files were never in git history. Time Machine not enabled. Recovery options exhausted. **User-only:** decide whether to attempt low-level disk recovery (Disk Drill / PhotoRec — requires stopping disk writes) or accept the loss + reconstruct.
+
 ## Active handoffs
 
 Project briefs at `.claude/handoffs/<slug>.md` — persist across sessions; never auto-deleted. Convention: `docs/process/session-handoff.md`. Slash command: `/handoff`.

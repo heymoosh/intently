@@ -19,6 +19,28 @@
       "Write(TRACKER.md)",
       "Edit(TRACKER.md)"
     ],
+    "ask": [
+      "Bash(git worktree remove --force*)",
+      "Bash(git worktree remove -f*)",
+      "Bash(git stash drop*)",
+      "Bash(git stash clear*)",
+      "Bash(git branch -D*)",
+      "Bash(git push --force*)",
+      "Bash(git push -f *)",
+      "Bash(git reset --hard*)",
+      "Bash(git clean -f*)",
+      "Bash(git clean -d*)",
+      "Bash(git clean -x*)",
+      "Bash(git checkout --*)",
+      "Bash(git restore --staged*)",
+      "Bash(rm -rf*)",
+      "Bash(rm -fr*)",
+      "Bash(supabase db push*)",
+      "Bash(supabase db reset*)",
+      "Bash(npm uninstall*)",
+      "Bash(gh pr close*)",
+      "Bash(gh repo delete*)"
+    ],
     "additionalDirectories": [
       "/Users/Muxin/Documents/GitHub/intently/.claude/routine-output"
     ]
