@@ -47,6 +47,30 @@ read_session_id() {
   echo "$input" | jq -r '.session_id // empty' 2>/dev/null
 }
 
+read_tool_file_path() {
+  local input="$1"
+  [ -z "$input" ] && return 0
+  command -v jq >/dev/null 2>&1 || return 0
+  echo "$input" | jq -r '.tool_input.file_path // .tool_input.notebook_path // empty' 2>/dev/null
+}
+
+# 0 = inside REPO_ROOT, 1 = outside. Relative paths resolve against SELF_CWD
+# (the hook runs with cwd = the Claude session's cwd). Empty/unparseable
+# paths return 1 so the caller fails open — better to miss a block than to
+# block a legitimate edit we can't classify.
+path_in_repo() {
+  local p="$1"
+  [ -z "$p" ] && return 1
+  case "$p" in
+    /*) ;;
+    *) p="$SELF_CWD/$p" ;;
+  esac
+  case "$p" in
+    "$REPO_ROOT"|"$REPO_ROOT"/*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 mtime_of() {
   stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null
 }
@@ -134,6 +158,11 @@ case "$cmd" in
   block-if-sibling)
     # Wired as a PreToolUse hook for Edit/Write tools. Exit 2 → Claude Code
     # blocks the tool call and feeds stderr back to the model so it adapts.
+    # Scope: only block edits to files inside REPO_ROOT. Edits to ~/.bashrc,
+    # /tmp/, or anywhere else outside the repo can't clobber project state,
+    # so the sibling-protection rationale doesn't apply.
+    target_path="$(read_tool_file_path "$HOOK_INPUT")"
+    path_in_repo "$target_path" || exit 0
     find_siblings
     [ ${#siblings[@]} -eq 0 ] && exit 0
     {

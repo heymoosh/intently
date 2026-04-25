@@ -29,11 +29,11 @@ This section is the spine. Every topic with a "current truth" lives here as a po
 
 ## Status
 
-**Phase:** Submission — `web/` daily arc live in code (BriefFlow + ReviewFlow → real ma-proxy), Vercel cutover staged via `vercel.json`, dashboard/MCP step + demo recording remaining.
-**Status:** 🟢 web/ live-wired end-to-end. Voice (Web Speech), morning brief, evening review all call live ma-proxy. ⚠️ `intently-eta.vercel.app` STILL serves the old Expo build until Vercel project Root Directory is cleared from `app/`.
-**Last:** 5 PRs landed in the web-wiring sprint — #111 (web/lib port), #112 (live voice in HeroListening), #113 (live brief in BriefFlow), #114 (vercel.json cutover staged), #115 (live review in ReviewFlow). All squash-merged on main; main at `657b4fa`.
-**Next:** **Activate the cutover** — clear Vercel Root Directory (dashboard click OR Vercel MCP tool after Claude Code restart). Then verify with `curl`, smoke-test, record demo, submit Sun 8 PM EDT.
-**Last updated:** 2026-04-25 evening (web-wiring sprint — daily arc live in code, deploy gated on Vercel Root Directory step).
+**Phase:** Submission — `web/` daily arc live in code AND on the deployed URL. Demo recording + submission remaining.
+**Status:** 🟢 `intently-eta.vercel.app` serves the inherited prototype (verified via `curl` 2026-04-25 — `<title>Intently — Prototype</title>`). Voice (Web Speech), morning brief, evening review all call live ma-proxy.
+**Last:** 5 PRs landed in the web-wiring sprint — #111 (web/lib port), #112 (live voice in HeroListening), #113 (live brief in BriefFlow), #114 (vercel.json cutover staged), #115 (live review in ReviewFlow). Vercel Root Directory cleared after that. Main at `ea1ca4a`.
+**Next:** Manual smoke on the deployed URL → demo recording → submit Sun 8 PM EDT.
+**Last updated:** 2026-04-25 (Vercel cutover confirmed live; deploy no longer blocking).
 
 ### Go/No-Go (2026-04-24 EOD)
 
@@ -74,7 +74,7 @@ Project briefs at `.claude/handoffs/<slug>.md` — persist across sessions; neve
 ## Follow-ups (pending manual or flight-test)
 
 - Re-run smoke against `https://intently-eta.vercel.app` after merge to verify the fix on prod. ([PR #123](https://github.com/heymoosh/intently/pull/123))
-- The hook from #121 currently fires on every `Edit`/`Write` regardless of file path — including writes to `~/.bashrc` and `/tmp/`. Make it path-aware: only block when the target file is inside the repo root. Cheap fix, ~10 lines in `scripts/session-locks.sh`. ([PR #122](https://github.com/heymoosh/intently/pull/122))
+- **[Resolved 2026-04-25] Path-aware session-locks hook.** `block-if-sibling` now reads `tool_input.file_path` from the hook event JSON and only blocks when the target is inside `REPO_ROOT`. Edits to `~/.bashrc`, `/tmp/`, and other out-of-repo paths pass through. Bash smoke test in PR description; fails open on missing jq / unparseable path / no `file_path`.
 - **[Shipped 2026-04-25] Session Handoff Steward redesign.** Implemented in `chat/handoff-steward-redesign` — replaced per-session/nightly model with **per-project** handoffs at `.claude/handoffs/<slug>.md`, conversational kickoff trigger + manual `/handoff`, never auto-deleted. Old nightly launchd job + plist removed. Full decisions and divergence-from-original-spec rationale: `.claude/handoffs/steward-redesign.md`.
 - **[Resolved 2026-04-25] MA agents provisioned via `scripts/provision-ma-agents.ts`.** All four agents (daily-brief, daily-review, weekly-review, monthly-review) now exist in the daily-brief workspace; Supabase `MA_AGENT_ID_*` secrets refreshed (DAILY_REVIEW + WEEKLY_REVIEW digests changed — they were stale before); ma-proxy redeployed. Branch `feat/track-ma-provisioning` (PR #84) introduces the script.
 - **[Resolved 2026-04-25] Anthropic API key rotated twice + consolidated.** First rotation (last night) collapsed two keys into one. Second rotation (today) was forced when raw `bws secret list` echoed the value into a Claude transcript during BWS cleanup. Current consolidated key digest is `af4a5420…2b5a796e` (BWS + Supabase agree); ma-proxy redeployed. Memory `feedback-bws-never-list-raw.md` records the lesson: always pipe `bws secret list` through `jq` to strip `.value`.
@@ -86,10 +86,7 @@ Project briefs at `.claude/handoffs/<slug>.md` — persist across sessions; neve
 - **Stewards leave working-tree mods uncommitted.** Release-readiness + spec-conformance stewards edit tracked files overnight without committing. Design fix: auto-commit to `auto/steward/*` branches + draft PR.
 - **Post-first-live-run baseline floor.** Run daily-brief against `evals/datasets/daily-brief/cases.json` once, raise per-axis `minScores` in `evals/baselines/daily-brief.json` from 0 to observed floor, flip `axisStatus` from `unknown` to `baselined`.
 - **[Post-hackathon] Wire `decision-drift-check` to launchd.** Brief at `.claude/loops/decision-drift-check.md` now covers two passes: missed-decision drift + CLAUDE.md leanness audit (3-weeks test). Currently manual-only — no plist in `.claude/launchd/plists/`. Add `com.intently.decision-drift.plist` matching the existing pack, daily evening. Defer until after submission (2026-04-26 8 PM EDT) so we don't add a launchd job mid-crunch right after disabling two for safety.
-- **Vercel project Root Directory must be empty (repo root), not `app/`** for `vercel.json` (#114) to take effect on `intently-eta.vercel.app`. Two paths:
-  - **(a) Dashboard click** — vercel.com → intently project → Settings → General → Root Directory → clear (or set to `.`) → save → trigger redeploy.
-  - **(b) Vercel MCP** — installed end of 2026-04-25 evening session via `vercel mcp --clients "Claude Code"`. Requires Claude Code restart to pick up. After restart, the next session can call the Vercel MCP `update_project` tool with `rootDirectory: null` for the `intently` project; then push any commit (or trigger redeploy in dashboard) to apply.
-  - **Verify cutover:** `curl -s https://intently-eta.vercel.app | head -10` should show `<title>Intently — Prototype</title>` (the inherited prototype). If it shows `<title>Intently</title>` with `expo-reset` styles, the Root Directory is still pointing at `app/` and the cutover hasn't taken effect.
+- **[Resolved 2026-04-25] Vercel cutover live.** Project Root Directory cleared from `app/`; `intently-eta.vercel.app` now serves the inherited prototype (`vercel.json` from #114 active). Verified: `curl -s https://intently-eta.vercel.app | head` returns `<title>Intently — Prototype</title>`. Vercel MCP installed but unauthenticated — only `authenticate` / `complete_authentication` tools exposed; not needed since cutover already done.
 
 ## MA API schema — empirical corrections (captured for posterity)
 
@@ -104,19 +101,13 @@ Three bugs found during Friday's first live smoke tests. Fixes shipped in #68, #
 
 > Reflects the 2026-04-25 evening web-wiring sprint. The earlier "reconcile entries-architecture first" plan is deferred to post-hackathon (see banner above the Critical items section).
 
-1. **[BLOCKING demo URL] Activate Vercel cutover** — clear Vercel project Root Directory from `app/` to empty (repo root). Two paths in the Follow-ups bullet above:
-   - Dashboard click (~30s), OR
-   - Vercel MCP after Claude Code restart (`update_project` with `rootDirectory: null` on the `intently` project)
-
-2. **Trigger redeploy + verify** — push any commit (or use Vercel UI). Then `curl -s https://intently-eta.vercel.app | head -10`. Expect `<title>Intently — Prototype</title>` instead of the old Expo HTML. If it's still Expo, Root Directory wasn't actually changed — re-check.
-
-3. **Manual smoke on the deployed URL** — Chrome only:
+1. **Manual smoke on the deployed URL** — Chrome only:
    - Tap mic → grant permission → speak → real words appear (#112)
-   - Tap morning CTA → walk 3 conversational steps → real `daily-brief` agent response renders before the confirm card (#113)
+   - Tap morning CTA → walk 3 conversational steps → real `daily-brief` agent response renders before the confirm card (#113) — note: PR #123 (in flight) fixes BriefFlow step 0 unstick, needed for this beat to work end-to-end.
    - Tap evening CTA → walk 3 reflection steps → real `daily-review` agent response renders before the confirm card (#115)
    - DevTools Network tab: requests hit `cjlktjrossrzmswrayfz.supabase.co/functions/v1/ma-proxy`
 
-4. **Demo recording + submission** — script + practice takes + final recording. Submit by Sunday 2026-04-26, 8:00 PM EDT via `docs/hackathon/Submission Tracker.md`.
+2. **Demo recording + submission** — script + practice takes + final recording. Submit by Sunday 2026-04-26, 8:00 PM EDT via `docs/hackathon/Submission Tracker.md`.
 
 **Post-hackathon backlog:**
 - Entries-architecture formal reconciliation (the deferred Critical items 1–3 above)
