@@ -46,4 +46,53 @@ function labelForInputTrace(trace) {
   }
 }
 
-Object.assign(window, { kindMetaFor, formatGeneratedAt, labelForInputTrace });
+// Split prose into paragraphs. The agent prompt asks for "≤3 short paragraphs."
+// Most clients render \n\n as paragraph break; some emit single \n. Try both.
+function splitParagraphs(text) {
+  if (!text || typeof text !== 'string') return [];
+  const trimmed = text.trim();
+  if (!trimmed) return [];
+  const byDouble = trimmed.split(/\n\s*\n+/).map(s => s.trim()).filter(Boolean);
+  if (byDouble.length >= 2) return byDouble;
+  const bySingle = trimmed.split(/\n+/).map(s => s.trim()).filter(Boolean);
+  if (bySingle.length >= 2) return bySingle;
+  return [trimmed];
+}
+
+// Parse the daily-review prompt's deterministic 3-paragraph shape:
+//   para 1 → what got done (journal-worthy quote)
+//   para 2 → friction (a sentence of reflection)
+//   para 3 → seed for tomorrow
+// Returns null when the response is too short / shaped wrong to map cleanly,
+// so the consumer can fall back to the static demo copy.
+function parseReviewProse(text) {
+  const paras = splitParagraphs(text);
+  if (paras.length < 2) return null;
+  const journal  = paras[0];
+  const friction = paras[1];
+  const tomorrow = paras[2] || '';
+  return { journal, friction, tomorrow };
+}
+
+// Parse the daily-brief prompt's 3-paragraph shape into a pacing pair:
+//   pacing.title ← first sentence of paragraph 1 (felt-sense opener)
+//   pacing.body  ← remainder
+// Title length guarded so the italic quote slot doesn't overflow.
+function parseBriefProse(text, opts = {}) {
+  const titleMax = opts.titleMax || 90;
+  const paras = splitParagraphs(text);
+  if (!paras.length) return null;
+  const first = paras[0];
+  const sentenceMatch = first.match(/^[^.!?]+[.!?]/);
+  let title = sentenceMatch ? sentenceMatch[0].trim() : first;
+  if (title.length > titleMax) return null;
+  const restOfFirst = first.slice(title.length).trim();
+  const body = [restOfFirst, ...paras.slice(1)].filter(Boolean).join(' ').trim();
+  if (!body) return null;
+  return { pacing: { title, body } };
+}
+
+Object.assign(window, {
+  kindMetaFor, formatGeneratedAt, labelForInputTrace,
+  parseReviewProse, parseBriefProse,
+});

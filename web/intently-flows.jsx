@@ -885,7 +885,10 @@ function ReviewFlow({ onClose, onComplete }) {
           {showReviewThinking && <AgentTypingDark />}
           {liveReview && <ChatBubbleDark role="agent" text={liveReview} />}
           {reviewError && <ChatBubbleDark role="agent" text="(I couldn't reach the review generator just now — saving what you said anyway.)" />}
-          {showConfirm && <ReviewConfirmCard onAccept={() => onComplete && onComplete()} />}
+          {showConfirm && (() => {
+            const parsed = liveReview ? (window.parseReviewProse && window.parseReviewProse(liveReview)) : null;
+            return <ReviewConfirmCard parsed={parsed} onAccept={() => onComplete && onComplete(parsed)} />;
+          })()}
         </div>
       </div>
 
@@ -1023,7 +1026,10 @@ function AutoCheckList({ items, checkedIndex }) {
   );
 }
 
-function ReviewConfirmCard({ onAccept }) {
+function ReviewConfirmCard({ parsed, onAccept }) {
+  const journal  = (parsed && parsed.journal)  || 'The dry run actually went well. I walked in present.';
+  const friction = (parsed && parsed.friction) || 'Over-polishing the data slide — twice this week.';
+  const tomorrow = (parsed && parsed.tomorrow) || 'Write the job pitch before opening Slack.';
   return (
     <div style={{ marginTop: 4 }}>
       <div style={{
@@ -1037,13 +1043,13 @@ function ReviewConfirmCard({ onAccept }) {
           <div>
             <div style={{ fontFamily: T.font.UI, fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', color: 'rgba(251,246,234,0.55)', marginBottom: 2 }}>Journal · today</div>
             <div style={{ fontFamily: T.font.Display, fontSize: 17, lineHeight: '23px', fontStyle: 'italic', color: '#FBF6EA', letterSpacing: -0.2 }}>
-              "The dry run actually went well. I walked in present."
+              {parsed ? journal : `"${journal}"`}
             </div>
           </div>
           <div>
             <div style={{ fontFamily: T.font.UI, fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', color: 'rgba(251,246,234,0.55)', marginBottom: 2 }}>Friction</div>
             <div style={{ fontFamily: T.font.Reading, fontSize: 14, lineHeight: '20px', color: '#FBF6EA', opacity: 0.85 }}>
-              Over-polishing the data slide — twice this week.
+              {friction}
             </div>
           </div>
         </div>
@@ -1071,7 +1077,7 @@ function ReviewConfirmCard({ onAccept }) {
             fontStyle: 'italic', color: '#FBF6EA', letterSpacing: -0.2,
             marginBottom: 12,
           }}>
-            "Write the job pitch before opening Slack."
+            {parsed ? tomorrow : `"${tomorrow}"`}
           </div>
           <div style={{ height: 1, background: 'rgba(245,235,207,0.16)', marginBottom: 10 }} />
           <div style={{
@@ -1208,7 +1214,9 @@ function PresentEmpty({ onStartBrief }) {
 }
 
 // ─── END-OF-DAY (post-review) — simple closed-state ─────────────────
-function PresentClosed({ onReopenReview }) {
+function PresentClosed({ onReopenReview, review }) {
+  const oneLine  = (review && review.journal)  || 'The dry run actually went well. I walked in present.';
+  const tomorrow = (review && review.tomorrow) || 'Write the job pitch before opening Slack.';
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
       <div style={{ padding: '14px 24px 10px' }}>
