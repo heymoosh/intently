@@ -456,6 +456,9 @@ function BriefFlow({ onClose, onComplete }) {
   const [messages, setMessages] = React.useState([]);
   const [agentTyping, setAgentTyping] = React.useState(true);
   const [draft, setDraft] = React.useState('');
+  const [liveBrief, setLiveBrief] = React.useState(null);   // live ma-proxy daily-brief response
+  const [briefError, setBriefError] = React.useState(null); // set if the live call fails (demo still proceeds)
+  const [briefLoading, setBriefLoading] = React.useState(false);
   const scrollRef = React.useRef(null);
 
   // Drive the script — when step changes, post agent turn, reveal input/confirm
@@ -472,11 +475,47 @@ function BriefFlow({ onClose, onComplete }) {
 
   React.useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages, agentTyping]);
+  }, [messages, agentTyping, liveBrief, briefError, briefLoading]);
+
+  // When we reach the confirm step, fire the live daily-brief call in parallel
+  // with the agent's typing animation. Use the user's actual answers as input.
+  // Falls back gracefully if window.callMaProxy isn't loaded or the call fails —
+  // the demo still proceeds with the scripted confirm card.
+  React.useEffect(() => {
+    const s = BRIEF_SCRIPT[step];
+    if (!s || !s.confirm) return;
+    if (!window.callMaProxy) return;
+    if (liveBrief || briefError || briefLoading) return;
+
+    const userAnswers = messages
+      .filter(m => m.role === 'user')
+      .map(m => m.text);
+    const input = [
+      "It's morning. The user just had this conversation:",
+      ...userAnswers.map((a, i) => `Answer ${i + 1}: ${a}`),
+      '',
+      'Generate a personal daily brief in plain prose (no markdown headers, no bullets — just sentences). Open with a felt-sense observation about what they said. Name one thing that\'s actually at stake. End with a single grounding action they can take in the next hour. Keep it under 3 short paragraphs. Speak directly to them ("you"), not about them.',
+    ].join('\n');
+
+    setBriefLoading(true);
+    window.callMaProxy({ skill: 'daily-brief', input })
+      .then(r => {
+        setLiveBrief((r && r.finalText) || '');
+        setBriefLoading(false);
+      })
+      .catch(e => {
+        setBriefError((e && e.message) || 'brief call failed');
+        setBriefLoading(false);
+      });
+  }, [step, messages, liveBrief, briefError, briefLoading]);
 
   const s = BRIEF_SCRIPT[step];
   const showInput = s && s.input && !agentTyping;
-  const showConfirm = s && s.confirm && !agentTyping;
+  // Hold the confirm card until the live brief lands (or errors out) — the
+  // agent's actual response is the headline beat; the card summarizes it.
+  const liveBriefReady = liveBrief !== null || briefError !== null;
+  const showConfirm = s && s.confirm && !agentTyping && liveBriefReady;
+  const showBriefThinking = s && s.confirm && !agentTyping && briefLoading;
 
   const submit = (text) => {
     const t = (text && text.trim()) || (s.userDefault || '');
@@ -513,6 +552,10 @@ function BriefFlow({ onClose, onComplete }) {
             <ChatBubble key={i} role={m.role} text={m.text} sub={m.sub} />
           ))}
           {agentTyping && <AgentTyping />}
+          {/* Live daily-brief from ma-proxy — appears before the confirm card */}
+          {showBriefThinking && <AgentTyping />}
+          {liveBrief && <ChatBubble role="agent" text={liveBrief} />}
+          {briefError && <ChatBubble role="agent" text="(I couldn't reach the brief generator just now — here's your day shape anyway.)" />}
           {showConfirm && <BriefConfirmCard onAccept={() => onComplete && onComplete(MOCK_PLAN)} />}
         </div>
       </div>
