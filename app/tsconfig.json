@@ -6,6 +6,7 @@
   "include": [
     "**/*.ts",
     "**/*.tsx",
-    "../evals/runner/**/*.ts"
+    "../evals/runner/**/*.ts",
+    "../scripts/**/*.ts"
   ]
 }

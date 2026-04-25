@@ -8,7 +8,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "test:unit": "tsx --test $(find lib -name '*.test.ts') $(find ../evals/runner -name '*.test.ts')",
+    "test:unit": "tsx --test $(find lib -name '*.test.ts') $(find ../evals/runner -name '*.test.ts') $(find ../scripts -name '*.test.ts')",
     "eval:run": "tsx ../evals/runner/bin.ts"
   },
   "dependencies": {
