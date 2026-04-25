@@ -18,7 +18,7 @@
 intently-track daily-brief-impl "Wire the daily-brief agent to call the real Managed Agents SDK, replacing the stub executor."
 ```
 
-- Creates `~/worktrees/intently/daily-brief-impl`
+- Creates `~/wt/daily-brief-impl`
 - Branches `feat/track-daily-brief-impl` from fresh `origin/main`
 - cds in and launches Claude with the prompt
 
@@ -42,7 +42,7 @@ Every 15 min (during 07:30–22:30 local), the loop:
 - Resolves mechanical merge conflicts (whitespace, rename, reorder, additive non-overlap) and force-pushes with lease.
 - Flags semantic conflicts (intent divergence) by adding `needs-user-review` with a specific question in a comment.
 - Comments once on PRs whose CI keeps failing with the same error for >2h.
-- Removes worktrees at `~/worktrees/intently/<slug>` once the corresponding PR is merged and the worktree is clean.
+- Removes worktrees at `~/wt/<slug>` once the corresponding PR is merged and the worktree is clean.
 - Writes a report to `.claude/routine-output/babysit-prs-<date>-<time>.md` when it acts.
 
 ### Cleanup

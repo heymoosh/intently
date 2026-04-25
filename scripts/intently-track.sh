@@ -8,14 +8,14 @@
 #   intently-track --help
 #
 # What it does:
-#   1. Creates a git worktree at ~/worktrees/intently/<slug>
+#   1. Creates a git worktree at ~/wt/<slug>
 #   2. Branches feat/track-<slug> from origin/main (freshly fetched)
 #   3. cds into the worktree and launches `claude`
 #   4. On Claude exit, leaves the worktree intact so you can push/resume.
 #
 # Conventions the rest of the system relies on:
 #   - Branch prefix feat/track-*  → auto-merge-safe.yml picks it up alongside auto/*
-#   - Worktree path  ~/worktrees/intently/<slug>  → easy for other sessions to find
+#   - Worktree path  ~/wt/<slug>  → easy for other sessions to find
 #   - No worktree ever lives inside the main repo directory (avoids nested .git issues)
 #
 # This script does NOT:
@@ -27,7 +27,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-WORKTREE_BASE="$HOME/worktrees/intently"
+WORKTREE_BASE="$HOME/wt"
 
 # Color helpers — only if stdout is a tty.
 if [ -t 1 ]; then
@@ -41,7 +41,7 @@ usage() {
 ${C_BOLD}intently-track${C_RESET} — spawn a parallel-work track
 
   ${C_BOLD}intently-track${C_RESET} <slug> ["initial prompt"]
-      Create worktree ~/worktrees/intently/<slug>, branch feat/track-<slug>
+      Create worktree ~/wt/<slug>, branch feat/track-<slug>
       off origin/main, cd in, and launch Claude Code there. If an initial
       prompt is given, it is passed to Claude as the first turn.
 
@@ -53,7 +53,7 @@ ${C_BOLD}intently-track${C_RESET} — spawn a parallel-work track
       uncommitted changes or unpushed commits.
 
   ${C_BOLD}intently-track --clean-merged${C_RESET}
-      Iterate every worktree under ~/worktrees/intently/ and remove any
+      Iterate every worktree under ~/wt/ and remove any
       whose work is in main (regular-, rebase-, or squash-merged). Same
       per-worktree safety rules as --clean: refuses to remove anything
       with uncommitted changes or with unmerged+unpushed commits.
@@ -76,11 +76,11 @@ validate_slug() {
 }
 
 cmd_list() {
-  git -C "$REPO_ROOT" worktree list --porcelain | awk '
+  git -C "$REPO_ROOT" worktree list --porcelain | awk -v base="$WORKTREE_BASE/" '
     /^worktree / { wt=$2; next }
     /^branch refs\/heads\// {
       br=substr($2, length("refs/heads/")+1)
-      if (wt ~ /worktrees\/intently\//) {
+      if (index(wt, base) == 1) {
         printf "  %-40s  %s\n", br, wt
       }
       wt=""

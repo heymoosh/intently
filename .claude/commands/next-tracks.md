@@ -18,7 +18,7 @@ Be quick. Don't re-read a file if its content is already clear from TRACKER cont
 Each item from Next / Follow-ups / Critical-items gets exactly one label:
 
 - **READY** — unblocked, not in flight, not yet merged
-- **IN_FLIGHT** — matches an open PR title OR has an active worktree at `~/worktrees/intently/<slug>`
+- **IN_FLIGHT** — matches an open PR title OR has an active worktree at `~/wt/<slug>`
 - **MERGED** — file(s) the item would produce already exist on main OR a merged PR title indicates completion
 - **BLOCKED** — requires user-only action (OAuth registration, Bitwarden secrets, Michael Cohen session, spec decision, recording demo video) OR has a stated dependency not yet resolved
 
