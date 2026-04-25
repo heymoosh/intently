@@ -29,10 +29,20 @@ Until that port lands, the live deploy at `intently-eta.vercel.app` continues se
 
 ## Deploy
 
-Until vercel.json is added, this directory is not auto-deployed. Saturday's session decides between:
-- (a) replace `app/` deploy via `vercel.json` at repo root (`outputDirectory: "web"`),
-- (b) stand up a new Vercel project pointing at `web/` for preview-then-swap,
-- (c) some other path.
+Active. Repo-root `vercel.json` configures the existing `intently-eta.vercel.app` project to serve this directory as static — no build step, no install, framework: none.
+
+```jsonc
+// /vercel.json
+{
+  "buildCommand": null,
+  "installCommand": null,
+  "framework": null,
+  "outputDirectory": "web",
+  "cleanUrls": true
+}
+```
+
+Vercel auto-deploys on push to `main`. If the deploy stays stuck on the old Expo build, check the project settings dashboard — **Root Directory must be empty (repo root)**, not `app/`. Once Root Directory is correct, the repo `vercel.json` takes effect on the next push.
 
 ## House rules (inherited from design folder's CLAUDE.md)
 
