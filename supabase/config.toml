@@ -375,6 +375,16 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+[functions.ma-proxy]
+# Public proxy: the app posts anonymously and the proxy holds the Anthropic
+# key + per-skill agent IDs server-side. Pinned here so redeploys don't
+# default back to verify_jwt=true and break the unauthenticated client.
+verify_jwt = false
+
+[functions.reminders]
+# Same shape as ma-proxy: app calls without an auth header.
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327
