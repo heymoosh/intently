@@ -68,6 +68,8 @@ Implementation changes → `docs/architecture/`, `docs/decisions/` (ADRs for non
 
 ## Session handoff
 
-Convention: `docs/process/session-handoff.md`. The rolling file is `.claude/session-handoff.md` and is the first thing the next session reads. At session start, if `TRACKER.md` has a "Critical items awaiting review" section with items in it, walk through those with Muxin before substantive work.
+`TRACKER.md` is the canonical first-read on resume — hot queue, critical items, what's in flight. **At session start, if `TRACKER.md` has items under "Critical items awaiting review," walk through those with Muxin before substantive work.**
+
+`.claude/session-handoff.md` is the **Session Handoff Steward's** auto-generated daily audit trail (overwritten 22:45 nightly from git log + routine reports). Useful for "what happened yesterday" on a cold resume; not authoritative for "what's next" — TRACKER is. Convention reference: `docs/process/session-handoff.md`.
 
 **Drift check.** A `SessionStart` hook runs `scripts/session-precheck.sh` and may inject a `[session-precheck]` report into context. If present, surface it and offer to walk the fix playbook (`/precheck`) before substantive work.
