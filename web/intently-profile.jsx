@@ -110,17 +110,17 @@ function ProfileSheet({ connectedCount, onClose, onOpenConnections, onOpenAccoun
           letterSpacing: -0.4,
           boxShadow: '0 6px 16px rgba(31,27,21,0.16)',
           flexShrink: 0,
-        }}>M</div>
+        }}>S</div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{
             fontFamily: T.font.Display, fontSize: 22, lineHeight: '26px',
             fontStyle: 'italic', fontWeight: 500, color: T.color.PrimaryText,
             letterSpacing: -0.3,
-          }}>Maya Tanaka</div>
+          }}>Sam Tanaka</div>
           <div style={{
             fontFamily: T.font.UI, fontSize: 13, color: T.color.SupportingText,
             marginTop: 2,
-          }}>maya@intently.app</div>
+          }}>sam@intently.app</div>
         </div>
       </div>
 
@@ -274,8 +274,8 @@ function AccountPage({ onBack }) {
         border: `1px solid ${T.color.EdgeLine}`,
         borderRadius: 14, overflow: 'hidden', marginBottom: 18,
       }}>
-        <StaticRow label="Name" value="Maya Tanaka" />
-        <StaticRow label="Email" value="maya@intently.app" />
+        <StaticRow label="Name" value="Sam Tanaka" />
+        <StaticRow label="Email" value="sam@intently.app" />
         <StaticRow label="Password" value="Change" />
         <StaticRow label="Plan" value="Quiet · monthly" last />
       </div>

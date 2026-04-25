@@ -98,8 +98,8 @@
               width: 28, height: 28, borderRadius: 999, background: T.color.TintSage,
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
               color: '#FBF6EA', fontFamily: T.font.Display, fontWeight: 600, fontSize: 13,
-            }}>M</span>
-            Maya · {entry.dateLabel || 'Today'}
+            }}>S</span>
+            Sam · {entry.dateLabel || 'Today'}
           </div>
           {entry.body.map((block, i) => {
             if (block.kind === 'quote') {
