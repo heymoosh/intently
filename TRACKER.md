@@ -108,7 +108,7 @@ Three bugs found during Friday's first live smoke tests. Fixes shipped in #68, #
 
 > Reflects the 2026-04-25 evening web-wiring sprint. The earlier "reconcile entries-architecture first" plan is deferred to post-hackathon (see banner above the Critical items section).
 
-1. **Manual smoke on the deployed URL** — Chrome only:
+1. **Manual smoke on the deployed URL** (`intently-eta.vercel.app`) — Chrome only:
    - Tap mic → grant permission → speak → real words appear (#112)
    - Tap morning CTA → walk 3 conversational steps → real `daily-brief` agent response renders before the confirm card (#113) — note: PR #123 (in flight) fixes BriefFlow step 0 unstick, needed for this beat to work end-to-end.
    - Tap evening CTA → walk 3 reflection steps → real `daily-review` agent response renders before the confirm card (#115)
