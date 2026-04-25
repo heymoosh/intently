@@ -2,7 +2,7 @@
 
 Universal rules only — true at project start, end, and every session in between. Anything that's project-state (changes over time: stack, current docs, secret store, scope, routines) lives in `TRACKER.md § Current state pointers`. If guidance drifts from reality, the fix is **trim CLAUDE.md, update the TRACKER pointer, drop an ADR** — not edit CLAUDE.md to the new state.
 
-**House rule:** pointers > content. CLAUDE.md is capped at 100 lines (soft target 50); cap is enforced by a pre-commit hook and CI. If a rule belongs in another doc, link it — don't restate it. If something might be true today but not in 3 weeks, it doesn't belong here.
+**House rule:** pointers > content. CLAUDE.md is capped at 100 lines (soft target 50); cap is enforced by a pre-commit hook and CI. If a rule belongs in another doc, link it — don't restate it. **The 3-weeks test** — every line here must answer "why will this still be true in 3 weeks?" If the answer is "it won't" (project-state, dated incident, fresh decision, hardcoded path, scope/journey/URL specifics), it goes to TRACKER (state), CONTRIBUTING (how-to), or an ADR (decision) — not here.
 
 **Response style:** SPEAK PLAINLY, BE CONCISE - DO NOT TURN EVERYTHING INTO A LESSON, to the point, layman's terms. IF ASKED TO EXPLAIN technical details, lead with a 1-line primer of the concept.
 

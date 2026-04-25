@@ -73,6 +73,7 @@ Project briefs at `.claude/handoffs/<slug>.md` — persist across sessions; neve
 - **Fix `--clean` squash-merge false-positive** in `scripts/intently-track.sh`. Replace `git cherry` with `git diff --quiet main HEAD`. ~2-line fix.
 - **Stewards leave working-tree mods uncommitted.** Release-readiness + spec-conformance stewards edit tracked files overnight without committing. Design fix: auto-commit to `auto/steward/*` branches + draft PR.
 - **Post-first-live-run baseline floor.** Run daily-brief against `evals/datasets/daily-brief/cases.json` once, raise per-axis `minScores` in `evals/baselines/daily-brief.json` from 0 to observed floor, flip `axisStatus` from `unknown` to `baselined`.
+- **[Post-hackathon] Wire `decision-drift-check` to launchd.** Brief at `.claude/loops/decision-drift-check.md` now covers two passes: missed-decision drift + CLAUDE.md leanness audit (3-weeks test). Currently manual-only — no plist in `.claude/launchd/plists/`. Add `com.intently.decision-drift.plist` matching the existing pack, daily evening. Defer until after submission (2026-04-26 8 PM EDT) so we don't add a launchd job mid-crunch right after disabling two for safety.
 
 ## MA API schema — empirical corrections (captured for posterity)
 
