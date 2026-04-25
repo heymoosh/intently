@@ -140,7 +140,7 @@ TRACKER stays the hot queue (what to do today, what's blocked, what just merged)
 
 All of these have been decided. Don't redebate in-scope during the next 3 days.
 
-- 6 deferred skills (daily-triage, monthly-review, project-continue, session-digest, vault-drift-check, notes-action-sync) — per ADR and `docs/backlog/deferred-features.md`
+- 5 deferred skills (daily-triage, project-continue, session-digest, vault-drift-check, notes-action-sync) — per ADR and `docs/backlog/deferred-features.md`. **monthly-review is back in scope** (un-deferred 2026-04-25): MA agent provisioned, demo arc now covers it alongside daily/weekly review.
 - Hindsight self-hosted on Fly — no bandwidth; skip entirely
 - Multi-user isolation — single-user dogfood per ADR 0002
 - Full preferences conversation in setup — defaults-only per SKILL.md V1 cut (5 items annotated)
