@@ -235,11 +235,14 @@ function AddZone({ addLabel, placeholder, onCommit, helper, compact, tint, right
 // matching window.entities.* helper as fire-and-forget so rows persist to
 // Supabase. Errors log to console — UI never blocks on the network.
 //
-// Toggles (adminReminder.done, projectTodo.done) currently stay in-memory:
-// the optimistic local IDs (`r-...`, `pt-...`) don't map to DB UUIDs in this
-// session. Real toggle-persistence needs (a) the insert helper to return the
-// row id and (b) read-on-mount to hydrate from Supabase so the local id maps
-// to a real one. Flagged as a follow-up after the read-on-mount lands.
+// On mount, hydrates from Supabase: pulls active goals, projects (+ JSONB todos),
+// today's plan items + journal entries, and pending admin reminders. Items added
+// optimistically during the load (temp ids prefixed `g-` `pr-` `j-` `p-` `r-`)
+// are preserved alongside hydrated rows, so a fast typer doesn't lose work.
+//
+// Toggles (adminReminder.done, projectTodo.done) still stay in-memory in this
+// pass — flagging that work for a follow-up since the in-memory state now has
+// the real UUIDs needed to wire it.
 function useManualAdds() {
   const [state, setState] = React.useState({
     // Present-plan additions, keyed by band name ('Morning' | 'Afternoon' | 'Evening')
@@ -265,6 +268,98 @@ function useManualAdds() {
       .catch((e) => console.warn(`[entities] ${label} failed:`, e && e.message ? e.message : e));
   };
   const _today = () => new Date().toISOString().slice(0, 10);
+
+  // Optimistic-id detector: items added in the current session that are pending
+  // persistence have these prefixes. Hydrated rows use real UUIDs.
+  const _isOptimistic = (id) => typeof id === 'string' && /^(g|pr|j|p|r|pt)-\d/.test(id);
+
+  // Hydrate from Supabase once on mount. Each list fires in parallel; failures
+  // fall back to an empty array so a single dead helper doesn't break the rest.
+  const hydratedRef = React.useRef(false);
+  React.useEffect(() => {
+    if (hydratedRef.current) return;
+    if (!window.listGoals) return; // entities helpers not loaded — skip
+    let cancelled = false;
+
+    (async () => {
+      const today = _today();
+      const [goals, projects, journalEntries, planItems, reminders] = await Promise.all([
+        window.listGoals().catch((e) => { console.warn('[entities] listGoals:', e.message); return []; }),
+        window.listProjects().catch((e) => { console.warn('[entities] listProjects:', e.message); return []; }),
+        window.listJournalEntries({ limit: 50 }).catch((e) => { console.warn('[entities] listJournalEntries:', e.message); return []; }),
+        window.listPlanItems(today).catch((e) => { console.warn('[entities] listPlanItems:', e.message); return []; }),
+        window.listAdminReminders().catch((e) => { console.warn('[entities] listAdminReminders:', e.message); return []; }),
+      ]);
+
+      if (cancelled) return;
+
+      // Journal rows come back newest-first; flip to oldest-first so the JSX's
+      // .slice().reverse() shows newest at the top of the inline list. Filter
+      // to today only — the prototype's inline journal scope.
+      const todayJournal = journalEntries
+        .filter((e) => {
+          try { return new Date(e.at).toISOString().slice(0, 10) === today; }
+          catch { return false; }
+        })
+        .slice()
+        .reverse();
+
+      // projects.todos is JSONB — extract per-project. Hydrated todos already
+      // have real UUIDs; preserve them.
+      const hydratedProjectTodos = {};
+      for (const p of projects) {
+        if (Array.isArray(p.todos) && p.todos.length > 0) {
+          hydratedProjectTodos[p.id] = p.todos.map((t) => ({
+            text: t.text || '',
+            id: t.id || `pt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            done: !!t.done,
+          }));
+        }
+      }
+
+      setState((s) => ({
+        ...s,
+        goals: [
+          ...goals.map((g) => ({ text: g.title, id: g.id })),
+          ...s.goals.filter((g) => _isOptimistic(g.id)),
+        ],
+        projects: [
+          ...projects.map((p) => ({ text: p.title, id: p.id })),
+          ...s.projects.filter((p) => _isOptimistic(p.id)),
+        ],
+        journal: {
+          ...s.journal,
+          today: [
+            ...todayJournal.map((e) => ({ text: e.body_markdown, id: e.id, at: new Date(e.at) })),
+            ...s.journal.today.filter((j) => _isOptimistic(j.id)),
+          ],
+        },
+        plan: {
+          Morning: [
+            ...planItems.filter((p) => p.band === 'morning').map((p) => ({ text: p.text, id: p.id })),
+            ...s.plan.Morning.filter((p) => _isOptimistic(p.id)),
+          ],
+          Afternoon: [
+            ...planItems.filter((p) => p.band === 'afternoon').map((p) => ({ text: p.text, id: p.id })),
+            ...s.plan.Afternoon.filter((p) => _isOptimistic(p.id)),
+          ],
+          Evening: [
+            ...planItems.filter((p) => p.band === 'evening').map((p) => ({ text: p.text, id: p.id })),
+            ...s.plan.Evening.filter((p) => _isOptimistic(p.id)),
+          ],
+        },
+        adminReminders: [
+          ...reminders.map((r) => ({ text: r.text, id: r.id, done: false })),
+          ...s.adminReminders.filter((r) => _isOptimistic(r.id)),
+        ],
+        projectTodos: { ...hydratedProjectTodos, ...s.projectTodos },
+      }));
+
+      hydratedRef.current = true;
+    })();
+
+    return () => { cancelled = true; };
+  }, []);
 
   return {
     state,
