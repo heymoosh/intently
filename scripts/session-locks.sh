@@ -8,19 +8,25 @@
 # liveness signal so we can warn when siblings are present in the same cwd.
 #
 # Subcommands (all read the hook event JSON from stdin):
-#   ensure    — create or touch this session's lockfile (idempotent heartbeat)
-#   remove    — delete this session's lockfile
-#   check     — emit a [session-locks] warning to stdout+stderr if sibling
-#               sessions exist in the SAME working directory; silent otherwise
+#   ensure            — create or touch this session's lockfile (heartbeat)
+#   remove            — delete this session's lockfile
+#   check             — emit a [session-locks] warning if a sibling session
+#                       exists in the SAME working directory; silent otherwise
+#   block-if-sibling  — same detection as `check` but exits 2 with a stderr
+#                       message so a PreToolUse hook can hard-block Edit/Write
+#                       in the primary checkout when a sibling is active.
+#                       Polite warnings get ignored; the block doesn't.
 #
 # Lockfile path:     <repo>/.claude/sessions/<session_id>.lock
 # Lockfile contents: JSON { session_id, pid, cwd, started_at }
-# Stale threshold:   4 hours (UserPromptSubmit hook touches keep alive)
+# Stale threshold:   45 min (UserPromptSubmit hook touches keep alive)
 # Same-cwd filter:   siblings only count if their cwd matches this session's,
 #                    so primary-vs-worktree pairs don't false-positive (those
 #                    are already surfaced by session-precheck's worktree check).
 #
-# Fail-open: never blocks. Missing jq, missing stdin, etc. exit 0.
+# Fail-open for inspection commands (ensure/remove/check). The block command
+# also fails open on missing jq / missing stdin so a broken hook doesn't lock
+# the user out of editing entirely.
 
 set +e
 
@@ -51,6 +57,29 @@ cwd_of_lock() {
 }
 
 now() { date +%s; }
+
+# Populate the global `siblings` array with "<short-sid> (last seen Ns ago)"
+# entries for every other live lockfile in the same cwd. Skips self by SID
+# and stale locks by mtime. Shared by `check` and `block-if-sibling`.
+find_siblings() {
+  siblings=()
+  [ -d "$LOCK_DIR" ] || return 0
+  local cutoff f sid m lock_cwd age short_sid
+  cutoff=$(( $(now) - STALE_SECS ))
+  for f in "$LOCK_DIR"/*.lock; do
+    [ -e "$f" ] || continue
+    sid="$(basename "$f" .lock)"
+    [ -n "$SELF_SID" ] && [ "$sid" = "$SELF_SID" ] && continue
+    m="$(mtime_of "$f")"
+    [ -z "$m" ] && continue
+    [ "$m" -le "$cutoff" ] && continue
+    lock_cwd="$(cwd_of_lock "$f")"
+    [ "$lock_cwd" = "$SELF_CWD" ] || continue
+    age=$(( $(now) - m ))
+    short_sid="$(echo "$sid" | cut -c1-8)"
+    siblings+=("$short_sid (last seen ${age}s ago)")
+  done
+}
 
 # Read stdin once up-front (Claude Code hook event JSON).
 HOOK_INPUT=""
@@ -90,24 +119,7 @@ case "$cmd" in
     ;;
 
   check)
-    # Count siblings in the SAME cwd. Skip self by SID. Skip stale by mtime.
-    cutoff=$(( $(now) - STALE_SECS ))
-    siblings=()
-    [ -d "$LOCK_DIR" ] || exit 0
-    for f in "$LOCK_DIR"/*.lock; do
-      [ -e "$f" ] || continue
-      sid="$(basename "$f" .lock)"
-      [ -n "$SELF_SID" ] && [ "$sid" = "$SELF_SID" ] && continue
-      m="$(mtime_of "$f")"
-      [ -z "$m" ] && continue
-      [ "$m" -le "$cutoff" ] && continue
-      lock_cwd="$(cwd_of_lock "$f")"
-      # Only count siblings sharing this cwd.
-      [ "$lock_cwd" = "$SELF_CWD" ] || continue
-      age=$(( $(now) - m ))
-      short_sid="$(echo "$sid" | cut -c1-8)"
-      siblings+=("$short_sid (last seen ${age}s ago)")
-    done
+    find_siblings
     [ ${#siblings[@]} -eq 0 ] && exit 0
     {
       echo "[session-locks]"
@@ -119,8 +131,27 @@ case "$cmd" in
     } | tee /dev/stderr
     ;;
 
+  block-if-sibling)
+    # Wired as a PreToolUse hook for Edit/Write tools. Exit 2 → Claude Code
+    # blocks the tool call and feeds stderr back to the model so it adapts.
+    find_siblings
+    [ ${#siblings[@]} -eq 0 ] && exit 0
+    {
+      echo "[session-locks] BLOCKED — ${#siblings[@]} other Claude session(s) active in this checkout ($SELF_CWD):"
+      for s in "${siblings[@]}"; do echo "  $s"; done
+      echo ""
+      echo "Edits in the primary checkout while a sibling is active can be silently overwritten"
+      echo "if the other session switches branches. Spawn a worktree before retrying:"
+      echo ""
+      echo "  git worktree add ~/wt/<slug> -b chat/<slug> && cd ~/wt/<slug>"
+      echo ""
+      echo "Then resume work there. (See CONTRIBUTING.md § Editing workflow.)"
+    } >&2
+    exit 2
+    ;;
+
   *)
-    echo "Usage: $(basename "$0") {ensure|remove|check}" >&2
+    echo "Usage: $(basename "$0") {ensure|remove|check|block-if-sibling}" >&2
     exit 2
     ;;
 esac
