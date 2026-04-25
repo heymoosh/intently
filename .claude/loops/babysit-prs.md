@@ -33,7 +33,7 @@ Close the gap between what `auto-merge-safe.yml` can do deterministically and wh
    - **Genuinely ambiguous:** both branches encode parallel decisions where neither obviously supersedes the other, OR the change is to behavior-bearing code where "newer" doesn't imply "better." Add `needs-user-review` label with a specific question in a PR comment.
 3. **Stalled PRs.** No commits on the branch for >2h AND `security.yml`/`ci.yml` haven't been run (or keep failing with the same error). Comment once with what's blocking.
 4. **Missing checks.** Branch pushed but a workflow never triggered. Re-trigger via `workflow_dispatch`.
-5. **Cleanup.** After a `feat/track-*` PR is merged and its branch deleted remotely, remove the local worktree at `~/worktrees/intently/<slug>` if it's clean (no uncommitted changes, no unpushed commits).
+5. **Cleanup.** After a `feat/track-*` PR is merged and its branch deleted remotely, remove the local worktree at `~/wt/<slug>` if it's clean (no uncommitted changes, no unpushed commits).
 
 ## What this loop MUST NOT do
 
@@ -82,8 +82,8 @@ Each iteration:
         re-trigger via workflow_dispatch
 
 3. CLEANUP: any feat/track-* branch that's merged remotely:
-     if worktree exists at ~/worktrees/intently/<slug> and is clean:
-         git worktree remove ~/worktrees/intently/<slug>
+     if worktree exists at ~/wt/<slug> and is clean:
+         git worktree remove ~/wt/<slug>
 
 4. REPORT: write routine-output/babysit-prs-<YYYY-MM-DD>-<HHMM>.md with:
      - PRs acted on (PR# + action taken)
