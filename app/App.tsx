@@ -17,6 +17,7 @@ import Markdown from '@ronradtke/react-native-markdown-display';
 import AgentOutputCard from './components/AgentOutputCard';
 import BriefFlow, { BriefAnswers } from './components/BriefFlow';
 import JournalEditor from './components/JournalEditor';
+import ReviewFlow, { ReviewAnswers } from './components/ReviewFlow';
 import VoiceModal from './components/VoiceModal';
 import { AgentOutput } from './lib/agent-output';
 import { callMaProxy, MaProxyError, MaSkill, toAgentOutput } from './lib/ma-client';
@@ -254,6 +255,15 @@ export default function App() {
   // Opens from the morning sunrise CTA — replaces the prior direct-agent-call pattern
   // so the demo lands "the agent IS the interface" instead of "tap pill, see brief."
   const [briefFlowOpen, setBriefFlowOpen] = useState(false);
+  // ReviewFlow is the conversational evening daily-review overlay — same pattern as
+  // BriefFlow, opens from the evening midnight CTA. Replaces the prior direct
+  // handleGenerateLiveReview call so the agent walks the user through 3 questions
+  // (highlight / friction / tomorrow seed) before the MA runs.
+  const [reviewFlowOpen, setReviewFlowOpen] = useState(false);
+  // Tracks whether we've auto-fired the weekly review yet this session. Without
+  // this guard the effect would re-fire every time the user swiped back to a
+  // Past slot. liveWeekly.kind !== 'idle' is also a guard but adds idempotency.
+  const weeklyAutoFired = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -399,12 +409,35 @@ export default function App() {
     setPhase('planned');
   };
 
-  const handleGenerateLiveReview = () =>
-    runAgent('daily-review', DAILY_REVIEW_DEMO_INPUT, {
-      kind: 'review',
-      title: 'Today, in review',
-      inputTraces: ['calendar', 'journal'],
-    }, setLiveReview);
+  // ReviewFlow surfaces 3 user answers (highlight / friction / tomorrow seed). When
+  // present, append them as a "Today (in your words)" block so the agent's daily
+  // review reflects what the user just said in the conversation. Without answers
+  // we fall back to seed-only — keeps the regenerate path working without
+  // re-opening the flow.
+  const handleGenerateLiveReview = (answers?: ReviewAnswers) => {
+    const userBlock = answers
+      ? `\n\n## Today (in your words)\n- Highlight: ${answers.highlight}\n- Friction: ${answers.friction}\n- Tomorrow seed: ${answers.tomorrow}\n`
+      : '';
+    return runAgent(
+      'daily-review',
+      DAILY_REVIEW_DEMO_INPUT + userBlock,
+      {
+        kind: 'review',
+        title: 'Today, in review',
+        inputTraces: ['calendar', 'journal'],
+      },
+      setLiveReview,
+    );
+  };
+
+  // ReviewFlow accept → fire the daily-review MA call with the user's answers,
+  // then close the overlay. Mirrors the brief accept pattern — wait for the
+  // agent before closing so the in-flow "Closing the day…" state is the
+  // user-facing loading signal, not a blank evening-phase card.
+  const handleReviewAccept = async (answers: ReviewAnswers) => {
+    await handleGenerateLiveReview(answers);
+    setReviewFlowOpen(false);
+  };
 
   const handleGenerateLiveWeekly = () =>
     runAgent('weekly-review', WEEKLY_REVIEW_DEMO_INPUT, {
@@ -474,7 +507,7 @@ export default function App() {
                 <PhaseCta
                   label="Start your daily review"
                   loading={liveReview.kind === 'loading'}
-                  onPress={handleGenerateLiveReview}
+                  onPress={() => setReviewFlowOpen(true)}
                   variant="evening"
                 />
               ) : null}
@@ -544,6 +577,22 @@ export default function App() {
         showsHorizontalScrollIndicator={false}
         style={styles.pager}
         onContentSizeChange={onPagerContentSized}
+        // Auto-fire the weekly-review MA call the first time the user reaches
+        // any Past slot in this session. Past = slot % 3 === 0 (see CYCLES /
+        // SCREENS_PER_CYCLE comment above). Guards: a useRef latch so we don't
+        // re-fire on every swipe, plus the idle-state check so a manual rerun
+        // doesn't get clobbered. Fires onMomentumScrollEnd so we trigger after
+        // the user actually lands on Past, not while they're mid-drag.
+        onMomentumScrollEnd={(e) => {
+          if (weeklyAutoFired.current) return;
+          if (liveWeekly.kind !== 'idle') return;
+          if (!pageWidth) return;
+          const slot = Math.round(e.nativeEvent.contentOffset.x / pageWidth);
+          if (slot % SCREENS_PER_CYCLE === 0) {
+            weeklyAutoFired.current = true;
+            handleGenerateLiveWeekly();
+          }
+        }}
       >
         {Array.from({ length: TOTAL_SLOTS }, (_, i) => {
           const kind = i % SCREENS_PER_CYCLE; // 0 Past, 1 Present, 2 Future
@@ -576,6 +625,17 @@ export default function App() {
           onAccept={handleBriefAccept}
           agentRunning={liveBrief.kind === 'loading'}
           agentError={liveBrief.kind === 'error' ? liveBrief.message : null}
+        />
+      ) : null}
+      {/* Same defensive conditional-mount pattern as BriefFlow — keeps the
+          evening overlay's portal off the tree until the user opens it. */}
+      {reviewFlowOpen ? (
+        <ReviewFlow
+          visible={reviewFlowOpen}
+          onClose={() => setReviewFlowOpen(false)}
+          onAccept={handleReviewAccept}
+          agentRunning={liveReview.kind === 'loading'}
+          agentError={liveReview.kind === 'error' ? liveReview.message : null}
         />
       ) : null}
       <StatusBar style="auto" />
