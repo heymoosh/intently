@@ -122,7 +122,12 @@ function HeroAffordance({ state = 'idle', onChange, onPick, seedTranscript = '',
   };
 
   if (isListening) {
-    return <HeroListening onDone={(transcript) => onChange && onChange('chat', { transcript })} />;
+    return <HeroListening onDone={(transcript) => {
+      // Empty transcript = X-close (no routing); non-empty = Stop (route to chat with seed).
+      if (!onChange) return;
+      if (transcript && transcript.trim()) onChange('chat', { transcript });
+      else onChange('idle');
+    }} />;
   }
   if (isChat) {
     return <HeroChat
