@@ -1,0 +1,135 @@
+name: append-pr-followups
+
+# Scrape merged PRs for a "## Manual follow-ups" section in the PR body and
+# append each bullet to TRACKER.md's "## Follow-ups (pending manual or
+# flight-test)" section, with a back-link to the PR.
+#
+# Solves the gap where in-session capture of manual follow-ups misses items
+# the active session forgot. PR authors include a `## Manual follow-ups`
+# section in the PR body; this workflow makes sure those land in TRACKER
+# even if no one runs `update-tracker` after merge.
+#
+# Convention for PR bodies:
+#
+#     ## Manual follow-ups
+#     - User needs to grant Linear OAuth scope
+#     - [ ] Provision X in Supabase console
+#
+# Both "- " and "* " markers work. Checkbox markers (`[ ]`, `[x]`) are
+# preserved so the bullet renders as a checklist item in TRACKER.
+#
+# Absent or empty section → no-op. Heading match is exact and
+# case-sensitive.
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  append:
+    if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Append manual follow-ups to TRACKER.md
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PYEOF'
+          import os, re, sys
+
+          body = os.environ.get("PR_BODY") or ""
+          pr_num = os.environ["PR_NUMBER"]
+          pr_url = os.environ["PR_URL"]
+
+          # Extract the "## Manual follow-ups" section (until next ## or EOF)
+          m = re.search(
+              r"^##\s+Manual follow-ups\s*$(.*?)(?=^##\s|\Z)",
+              body,
+              re.MULTILINE | re.DOTALL,
+          )
+          if not m:
+              print("No '## Manual follow-ups' section in PR body; nothing to do.")
+              sys.exit(0)
+
+          # Collect top-level bullets only (no nested indentation)
+          bullets = [
+              line.rstrip()
+              for line in m.group(1).splitlines()
+              if re.match(r"^[-*]\s+\S", line)
+          ]
+          if not bullets:
+              print("Empty '## Manual follow-ups' section; nothing to do.")
+              sys.exit(0)
+
+          # Strip the leading bullet marker, normalize to "- ", append PR backlink
+          tagged = []
+          for b in bullets:
+              text = re.sub(r"^[-*]\s+", "", b)
+              tagged.append(f"- {text} ([PR #{pr_num}]({pr_url}))")
+
+          path = "TRACKER.md"
+          with open(path) as f:
+              content = f.read()
+
+          heading = "## Follow-ups (pending manual or flight-test)"
+          if heading not in content:
+              print(f"Heading '{heading}' not found in {path}; aborting.", file=sys.stderr)
+              sys.exit(1)
+
+          # Insert just below the heading (and the blank line after it)
+          before, after = content.split(heading, 1)
+          new_content = (
+              before
+              + heading
+              + "\n\n"
+              + "\n".join(tagged)
+              + "\n"
+              + after.lstrip("\n")
+          )
+
+          with open(path, "w") as f:
+              f.write(new_content)
+
+          print(f"Appended {len(tagged)} follow-up(s) under '{heading}'.")
+          PYEOF
+
+          if git diff --quiet TRACKER.md; then
+            echo "TRACKER.md unchanged; nothing to commit."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add TRACKER.md
+          git commit -m "Append PR #${PR_NUMBER} manual follow-ups to TRACKER"
+
+          # Race guard: if another PR merged between checkout and now and
+          # already pushed to main, rebase and retry.
+          for attempt in 1 2 3; do
+            if git push origin main; then
+              echo "Pushed on attempt $attempt."
+              exit 0
+            fi
+            echo "Push rejected; rebasing on origin/main and retrying (attempt $attempt)."
+            git fetch origin main
+            git rebase origin/main || {
+              echo "Rebase failed — manual TRACKER conflict needs human resolution."
+              exit 1
+            }
+          done
+
+          echo "Push failed after 3 attempts."
+          exit 1

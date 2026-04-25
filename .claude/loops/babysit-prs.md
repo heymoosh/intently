@@ -27,7 +27,10 @@ Close the gap between what `auto-merge-safe.yml` can do deterministically and wh
 ## What this loop handles
 
 1. **Merge conflicts on stacked track branches.** When branch A merges to main, branch B (stacked on A) now conflicts with origin/main. The loop rebases B onto origin/main; if the rebase is clean, force-push (with-lease) to the branch; if it conflicts, inspect.
-2. **Semantic vs mechanical conflict resolution.** Both files touched same lines → read both sides → if one version clearly subsumes the other (e.g. branch A added a test, branch B renamed a variable that happens to appear in the same hunk), resolve automatically. If intents diverge (both changed behavior in the same function differently), add `needs-user-review` label with a specific question in a PR comment.
+2. **Conflict resolution by intent.** Both branches touched same lines → read both sides → resolve in this order:
+   - **Mechanical (no intent overlap):** rename, reorder, whitespace, additive-non-overlap (e.g. branch A added a test, branch B renamed a variable that appears in the same hunk). Resolve automatically.
+   - **Intent supersession (newer decision wins):** both branches edited the same idea and one is clearly fresher (e.g. two updates to the same TRACKER row, two edits to the same CLAUDE.md rule, two competing decisions in a handoff). Take the version on the newer commit and auto-resolve. Note the supersession in the resolution comment.
+   - **Genuinely ambiguous:** both branches encode parallel decisions where neither obviously supersedes the other, OR the change is to behavior-bearing code where "newer" doesn't imply "better." Add `needs-user-review` label with a specific question in a PR comment.
 3. **Stalled PRs.** No commits on the branch for >2h AND `security.yml`/`ci.yml` haven't been run (or keep failing with the same error). Comment once with what's blocking.
 4. **Missing checks.** Branch pushed but a workflow never triggered. Re-trigger via `workflow_dispatch`.
 5. **Cleanup.** After a `feat/track-*` PR is merged and its branch deleted remotely, remove the local worktree at `~/worktrees/intently/<slug>` if it's clean (no uncommitted changes, no unpushed commits).
@@ -38,7 +41,7 @@ Close the gap between what `auto-merge-safe.yml` can do deterministically and wh
 - Push to `main` or any non-`auto/*` / non-`feat/track-*` branch.
 - Remove `needs-user-review` label once added. Only the user takes that off.
 - Rebase a PR whose author is the user (i.e. not `auto/*` or `feat/track-*`). Their feat branches are theirs to manage.
-- Write to `TRACKER.md`, `CLAUDE.md`, or any file under `.claude/handoffs/` — those are owned by other routines or interactive Claude sessions.
+- **Originate** edits to `TRACKER.md`, `CLAUDE.md`, or `.claude/handoffs/*` — those are owned by other routines or interactive Claude sessions. Resolving a merge conflict in those files during a rebase is allowed and follows the conflict-resolution rules above (mechanical → auto, newer-supersedes → auto, ambiguous → `needs-user-review`).
 - Force-push without `--force-with-lease` — never overwrite unseen upstream commits.
 
 ## Model + effort
@@ -70,7 +73,8 @@ Each iteration:
         if clean: force-push-with-lease, comment "rebased onto $base"
         if conflict: analyze hunks
           MECHANICAL (rename/reorder/whitespace/additive-non-overlap): resolve, force-push, comment
-          SEMANTIC (intent divergence): add needs-user-review label + comment with specific question
+          NEWER-SUPERSEDES (same idea, one is clearly fresher): take newer, force-push, comment notes the supersession
+          AMBIGUOUS (parallel decisions OR behavior-bearing code): add needs-user-review label + comment with specific question
    c. If CHECKS_FAILING with same error as last run:
         check last commit SHA equals last iteration's recorded SHA for this PR
         if yes, and commit is >2h old: add needs-user-review label + comment

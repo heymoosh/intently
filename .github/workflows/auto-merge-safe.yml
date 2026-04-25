@@ -2,12 +2,12 @@ name: auto-merge-safe
 
 # Classifies auto/* and feat/track-* PRs and auto-merges when safe.
 #
-#   Mechanical paths (routine-output / TRACKER.md)
+#   Mechanical paths (routine-output, TRACKER.md, CLAUDE.md, .claude/handoffs/)
 #     → auto-merge once security.yml passes. No human review.
-#     Note: .claude/handoffs/*.md is intentionally NOT mechanical — handoffs
-#     are substantive project artifacts written by interactive Claude
-#     sessions, so they fall through to the docs/config classifier.
-#   Docs/config paths (docs/**, CLAUDE.md, .gitignore, etc.)
+#     Trust model: these files only get edited via interactive sessions that
+#     already got Muxin's approval before opening the PR; the PR existing IS
+#     the approval, so a second click-to-merge step is redundant friction.
+#   Docs/config paths (docs/**, .gitignore, etc.)
 #     → flip ready-for-review, label, comment. User reads these.
 #   Code paths (agents/**, app/**, supabase/**, tests/**, evals/**, scripts/**)
 #     → auto-merge once security.yml AND ci.yml both pass. Gated on tests green.
@@ -127,7 +127,7 @@ jobs:
           echo "Changed files:"
           echo "$FILES"
 
-          MECHANICAL_RE='^(routine-output/|TRACKER\.md$)'
+          MECHANICAL_RE='^(routine-output/|TRACKER\.md$|CLAUDE\.md$|\.claude/handoffs/)'
           CODE_RE='^(agents/|app/|supabase/|tests/|evals/(datasets|rubrics|baselines|runner)/|scripts/|\.githooks/|\.github/workflows/)'
 
           ALL_MECHANICAL=true
