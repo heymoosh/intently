@@ -194,7 +194,7 @@ function PresentMorning() {
         <div style={{
           fontFamily: T.font.Display, fontSize: 32, fontWeight: 500, lineHeight: '38px',
           color: T.color.PrimaryText, letterSpacing: -0.6, fontStyle: 'italic',
-        }}>Good morning, Maya.</div>
+        }}>Good morning, Sam.</div>
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px 240px', display: 'flex', flexDirection: 'column', gap: 22 }}>

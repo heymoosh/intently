@@ -428,7 +428,7 @@ function ProjectDetailV2({ p, adds, onBack, onAddProjectTodo, onToggleProjectTod
 // the plan populating band-by-band.
 const BRIEF_SCRIPT = [
   {
-    agent: "Morning, Maya.",
+    agent: "Morning, Sam.",
     agentSub: "Yesterday you shipped the slide and walked after dinner. Today is Thursday, week 17 — three things on your weekly board still.",
     typing: 1800,
   },
@@ -1172,7 +1172,7 @@ function PresentEmpty({ onStartBrief }) {
         <div style={{
           fontFamily: T.font.Display, fontSize: 32, fontWeight: 500, lineHeight: '38px',
           color: T.color.PrimaryText, letterSpacing: -0.6, fontStyle: 'italic',
-        }}>Good morning, Maya.</div>
+        }}>Good morning, Sam.</div>
       </div>
 
       <div style={{ position: 'relative', zIndex: 1, flex: 1, overflowY: 'auto', padding: '20px 24px 240px', display: 'flex', flexDirection: 'column', gap: 28 }}>
