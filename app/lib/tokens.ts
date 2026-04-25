@@ -62,6 +62,30 @@ export const light = {
     InputTraceHealth:     palette.ink[400],
   },
 
+  // Painterly CTA gradients — sunrise (morning) + midnight (evening). String
+  // form because react-native-web passes `backgroundImage` through to the DOM
+  // directly; native target uses the matching solid fallback colors below.
+  // Source: docs/design/Intently - App/intently-screens.jsx PresentMorning +
+  // PresentPlan(evening) buttons.
+  gradients: {
+    MorningCta:        'linear-gradient(135deg, #C66B3F 0%, #E8A25E 55%, #F1DE8A 100%)',
+    MorningCtaFallback:'#D9874D',
+    EveningCta:        'linear-gradient(135deg, #2A2348 0%, #3D3565 55%, #5A4E7E 100%)',
+    EveningCtaFallback:'#3D3565',
+  },
+
+  // Painterly palettes — 4-stop accents matched to design canvas. Goal cards
+  // and the Daily Brief hero panel pull from this set. Order is always
+  // [base, accent1, accent2, highlight] per PainterlyBlock contract.
+  // Source: docs/design/Intently - App/intently-screens.jsx FutureScreen +
+  // PresentMorning yesterday block.
+  painterly: {
+    GoalJapan:    ['#F5EBCF', '#CFC9EB', '#F0B98C', '#E6DFF5'] as [string, string, string, string],
+    GoalSideHustle:['#E8EDE3', '#B8D0BE', '#F1DE8A', '#E8A25E'] as [string, string, string, string],
+    GoalRelational:['#F5EBCF', '#F0B98C', '#E6DFF5', '#F1DE8A'] as [string, string, string, string],
+    BriefHero:    ['#CFC9EB', '#8E8FC6', '#F0B98C', '#2B2118'] as [string, string, string, string],
+  },
+
   typography: {
     fonts: {
       // Google Fonts loaded via @expo-google-fonts; strings are the package constants.

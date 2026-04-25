@@ -14,9 +14,11 @@ import {
   View,
 } from 'react-native';
 import Markdown from '@ronradtke/react-native-markdown-display';
+import { Handshake, Leaf, Plane } from 'lucide-react-native';
 import AgentOutputCard from './components/AgentOutputCard';
 import BriefFlow, { BriefAnswers } from './components/BriefFlow';
 import JournalEditor from './components/JournalEditor';
+import PainterlyBlock, { PainterlyPalette } from './components/painterly/PainterlyBlock';
 import VoiceModal from './components/VoiceModal';
 import { AgentOutput } from './lib/agent-output';
 import { callMaProxy, MaProxyError, MaSkill, toAgentOutput } from './lib/ma-client';
@@ -46,24 +48,37 @@ type LiveState =
 type PresentPhase = 'morning' | 'planned' | 'evening';
 
 // Three goals at a time per MVP spec (§2.1). Each has a monthly slice that
-// refreshes on month boundary. Painterly palettes deferred to post-V1; flat
-// card-surface tokens carry the visual load for now, varied so the three
-// cards read as distinct.
-const GOALS = [
+// refreshes on month boundary. Painterly palette + corner glyph per design
+// canvas FutureScreen (intently-screens.jsx) — each card reads as a distinct
+// painted panel keyed to the goal's mood. Glyph is an oversize lucide icon
+// rendered behind the type at low opacity (atmospheric, not decorative).
+const GOALS: Array<{
+  title: string;
+  monthly: string;
+  palette: PainterlyPalette;
+  Glyph: typeof Plane;
+  seed: number;
+}> = [
   {
     title: 'Move to Japan.',
     monthly: 'April: finish the visa checklist and book the scouting trip for June.',
-    tint: 'ConfirmationCardSurface' as const,
+    palette: theme.light.painterly.GoalJapan,
+    Glyph: Plane,
+    seed: 3,
   },
   {
     title: 'Start a side hustle that pays my rent.',
     monthly: 'April: ship the landing page and get 10 waitlist signups from real conversations.',
-    tint: 'QuestCardSurface' as const,
+    palette: theme.light.painterly.GoalSideHustle,
+    Glyph: Leaf,
+    seed: 4,
   },
   {
     title: 'Be someone I would want to work with.',
     monthly: 'April: one 1:1 a week, and say the hard thing out loud when it matters.',
-    tint: 'UncertainCardSurface' as const,
+    palette: theme.light.painterly.GoalRelational,
+    Glyph: Handshake,
+    seed: 5,
   },
 ];
 
@@ -188,8 +203,11 @@ function derivePhase(now: Date = new Date()): PresentPhase {
 }
 
 // Morning/evening phase CTA — larger, visually weighted as the focal
-// affordance on the screen. Sunrise for morning, midnight for evening.
-// Gradient is deferred per "functionality first"; solid tint carries intent.
+// affordance on the screen. Sunrise for morning (warm peach → terracotta),
+// midnight for evening (deep indigo → slate violet). Gradient applies via
+// react-native-web's `backgroundImage` passthrough on web; native falls back
+// to a solid mid-stop. Soft glow shadow per design canvas.
+// Source: intently-screens.jsx PresentMorning + PresentPlan(evening) buttons.
 function PhaseCta({
   label,
   onPress,
@@ -201,12 +219,22 @@ function PhaseCta({
   loading?: boolean;
   variant?: 'morning' | 'evening';
 }) {
-  const bg =
-    variant === 'evening' ? t.colors.PrimaryText : t.colors.UndoAffordance;
-  const fg = t.colors.InverseText;
+  const isEvening = variant === 'evening';
+  const fg = '#FBF6EA'; // matches design canvas — warm cream, not the cooler InverseText
+  const fallback = isEvening
+    ? t.gradients.EveningCtaFallback
+    : t.gradients.MorningCtaFallback;
+  const gradient = isEvening ? t.gradients.EveningCta : t.gradients.MorningCta;
   return (
     <Pressable
-      style={[styles.phaseCta, { backgroundColor: bg }]}
+      style={[
+        styles.phaseCta,
+        isEvening ? styles.phaseCtaEvening : styles.phaseCtaMorning,
+        { backgroundColor: fallback },
+        // Web-only: react-native-web passes `backgroundImage` through to the
+        // DOM; the cast is required because RN's ViewStyle typing rejects it.
+        { backgroundImage: gradient } as any,
+      ]}
       onPress={loading ? undefined : onPress}
     >
       {loading ? (
@@ -506,19 +534,38 @@ export default function App() {
             Three long-term visions. Each one gets a monthly slice — the agent cascades
             it into weekly and daily moves on Present.
           </Text>
-          {GOALS.map((g, i) => (
-            <View
-              key={i}
-              style={[styles.goalCard, { backgroundColor: t.colors[g.tint] }]}
-            >
-              <Text style={styles.goalTitle}>{g.title}</Text>
-              <View style={styles.goalDivider} />
-              <Text style={styles.goalMonthlyEyebrow}>APRIL</Text>
-              <Text style={styles.goalMonthly}>
-                {g.monthly.replace(/^April:\s*/, '')}
-              </Text>
-            </View>
-          ))}
+          {GOALS.map((g, i) => {
+            const Glyph = g.Glyph;
+            return (
+              <View key={i} style={styles.goalCardShell}>
+                <PainterlyBlock
+                  palette={g.palette}
+                  seed={g.seed}
+                  style={styles.goalCardPainterly}
+                >
+                  {/* Oversize atmospheric glyph in the bottom-right corner —
+                      reads as background texture, not iconography. */}
+                  <View pointerEvents="none" style={styles.goalCornerGlyph}>
+                    <Glyph
+                      size={150}
+                      color={t.colors.PrimaryText}
+                      strokeWidth={1.4}
+                    />
+                  </View>
+                  <View style={styles.goalCardInner}>
+                    <Text style={styles.goalTitle}>{g.title}</Text>
+                    <View style={styles.goalDivider} />
+                    <View style={styles.goalMonthlyRow}>
+                      <Text style={styles.goalMonthlyEyebrow}>APRIL</Text>
+                      <Text style={styles.goalMonthly}>
+                        {g.monthly.replace(/^April:\s*/, '')}
+                      </Text>
+                    </View>
+                  </View>
+                </PainterlyBlock>
+              </View>
+            );
+          })}
         </View>
       }
     />
@@ -738,7 +785,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 56,
-    ...t.elevation.Raised,
+  },
+  // Morning glow — warm terracotta drop + subtle inner highlight. Native
+  // shadowColor approximates the multi-layer glow on web; RN doesn't compose
+  // multiple shadows the way CSS does.
+  phaseCtaMorning: {
+    shadowColor: '#C66B3F',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.42,
+    shadowRadius: 28,
+    elevation: 6,
+  },
+  phaseCtaEvening: {
+    shadowColor: '#1C1638',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.38,
+    shadowRadius: 26,
+    elevation: 6,
   },
   phaseCtaLabel: {
     fontFamily: t.typography.fonts.UISemi,
@@ -760,37 +823,67 @@ const styles = StyleSheet.create({
     color: t.colors.SupportingText,
     fontStyle: 'italic',
   },
-  goalCard: {
-    padding: t.spacing['5'],
+  // Goal card shell — outer wrapper holds the shadow and rounded mask. The
+  // PainterlyBlock inside provides the painted background; we keep the shell
+  // separate so SVG/blob clipping works (overflow: hidden + radius on the
+  // PainterlyBlock would stamp on the children's z-index on web).
+  goalCardShell: {
     borderRadius: t.radius.Card,
     marginBottom: t.spacing['4'],
+    overflow: 'hidden',
     ...t.elevation.Raised,
+  },
+  goalCardPainterly: {
+    minHeight: 210,
+    borderRadius: t.radius.Card,
+  },
+  goalCardInner: {
+    padding: t.spacing['5'],
+    paddingTop: t.spacing['5'],
+    paddingBottom: t.spacing['5'],
+    position: 'relative',
+    zIndex: 2,
+  },
+  // Bottom-right faded glyph — atmospheric texture, not iconography. Matches
+  // the design canvas placement (negative offset so the icon partially
+  // bleeds off the corner). opacity 0.20 reads as a watermark.
+  goalCornerGlyph: {
+    position: 'absolute',
+    right: -18,
+    bottom: -24,
+    opacity: 0.2,
+    zIndex: 1,
   },
   goalTitle: {
     fontFamily: t.typography.fonts.Display,
-    fontSize: 24,
-    lineHeight: 28,
+    fontSize: 28,
+    lineHeight: 32,
     color: t.colors.PrimaryText,
-    letterSpacing: -0.3,
+    letterSpacing: -0.5,
+    fontStyle: 'italic',
+    maxWidth: '88%',
   },
   goalDivider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: t.colors.EdgeLine,
-    marginVertical: t.spacing['3'],
-    opacity: 0.5,
+    height: 1,
+    backgroundColor: 'rgba(31,27,21,0.22)',
+    marginTop: t.spacing['4'],
+    marginBottom: t.spacing['3'],
+  },
+  goalMonthlyRow: {
+    maxWidth: '88%',
   },
   goalMonthlyEyebrow: {
     fontFamily: t.typography.fonts.UISemi,
     fontSize: 10,
     letterSpacing: 1.2,
     color: t.colors.PrimaryText,
-    opacity: 0.55,
+    opacity: 0.6,
     marginBottom: t.spacing['1'],
   },
   goalMonthly: {
     fontFamily: t.typography.fonts.Reading,
     fontSize: 15,
-    lineHeight: 22,
+    lineHeight: 23,
     color: t.colors.PrimaryText,
     opacity: 0.86,
   },
