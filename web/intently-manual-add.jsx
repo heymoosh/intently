@@ -275,6 +275,7 @@ function useManualAdds() {
 
   // Hydrate from Supabase once on mount. Each list fires in parallel; failures
   // fall back to an empty array so a single dead helper doesn't break the rest.
+  // Before hydration, seed Sam's data if the user has no goals (idempotent).
   const hydratedRef = React.useRef(false);
   React.useEffect(() => {
     if (hydratedRef.current) return;
@@ -282,6 +283,18 @@ function useManualAdds() {
     let cancelled = false;
 
     (async () => {
+      // Seed Sam's life on first ever load. No-op if user has goals already.
+      if (window.seedSamIfEmpty) {
+        try {
+          const result = await window.seedSamIfEmpty();
+          if (result && !result.skipped) {
+            console.log('[seed-sam] seeded fresh user:', result.inserted);
+          }
+        } catch (e) {
+          console.warn('[seed-sam] failed:', e && e.message ? e.message : e);
+        }
+      }
+
       const today = _today();
       const [goals, projects, journalEntries, planItems, reminders] = await Promise.all([
         window.listGoals().catch((e) => { console.warn('[entities] listGoals:', e.message); return []; }),
