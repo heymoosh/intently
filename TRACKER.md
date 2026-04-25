@@ -48,6 +48,7 @@ This section is the spine. Every topic with a "current truth" lives here as a po
 Project briefs at `.claude/handoffs/<slug>.md` — persist across sessions; never auto-deleted. Convention: `docs/process/session-handoff.md`. Slash command: `/handoff`.
 
 - **`steward-redesign`** → `.claude/handoffs/steward-redesign.md` — per-project handoff system. **Shipped 2026-04-25** in PR [#79](https://github.com/heymoosh/intently/pull/79) (commit `ce7d0c4`). Doc preserved for pattern review. Status: shipped.
+- **`ma-agents-complete`** → `.claude/handoffs/ma-agents-complete.md` — all 6 MA agents provisioned + situation-aware editing-workflow rule + Anthropic key consolidated/rotated twice. **Shipped 2026-04-25** in PR [#109](https://github.com/heymoosh/intently/pull/109) (banner + rule) and direct-to-main commits `e5ee672`/`e0a1e60`/`28ac025`. Doc preserved for pattern review (workflow-rule arc + bws-list leak lesson). Status: shipped.
 - **`entries-architecture`** → `.claude/handoffs/entries-architecture.md` — reconcile new design folder against current code, produce v2 session prompt, spawn parallel implementation tracks. Currently pre-Phase-1 (about to spawn Explore agents for design read + code survey). Status: active.
 - **`overnight-build-loops`** → `.claude/handoffs/overnight-build-loops.md` — robustness rewrite for the overnight build loop: no iter cap, safe-task gate, hourly inline `/babysit-prs`, terminal-only summary, launchd-not-caffeinate. Driven by 2026-04-25 night failure (1 of 3 iters silently failed; 9-hour Mac-sleep gap). Status: active.
 - **`critical-flow-check`** → `.claude/handoffs/critical-flow-check.md` — Critical Flow Check routine **disabled on launchd 2026-04-25** after it silently auto-edited `agents/daily-review/SKILL.md` on `main`. Upstream issue: AC files are being authored by automated stewards without Muxin sign-off; routine then enforces those AC against implementation source-of-truth. Re-enablement gated on real verification infra (E2E + AI eval rubric) and a rewritten report-only brief. Status: active (routine disabled).
@@ -104,7 +105,6 @@ Three bugs found during Friday's first live smoke tests. Fixes shipped in #68, #
 
 ## Stretch (skip if time-pressed)
 
-- update-tracker + setup MA agents created in console.
 - Visual polish pass beyond tokens (PainterlyBlock, LandscapePanel, painterly palettes).
 - Google OAuth + real calendar/email wiring (seed data covers demo).
 
@@ -137,6 +137,14 @@ Three bugs found during Friday's first live smoke tests. Fixes shipped in #68, #
 Read in order: `launch-plan.md`, this file, `CLAUDE.md`. If Critical items has entries, walk through with user first. Update Status + prepend dated Log entry at end of any non-trivial session.
 
 ## Log
+
+### 2026-04-25 (MA agents complete + editing-workflow revision)
+
+PR [#109](https://github.com/heymoosh/intently/pull/109) merged + 3 direct-to-main commits. Full pattern detail: `.claude/handoffs/ma-agents-complete.md`. Headlines:
+- **All 6 MA agents now live.** `intently-setup` and `intently-update-tracker` provisioned via `scripts/provision-ma-agents.ts --skill setup --skill update-tracker --write-secrets`; Supabase `MA_AGENT_ID_*` written for both; ma-proxy redeployed.
+- **Supersedes banner across all 6 `agents/<skill>/SKILL.md` files.** Live prompt comes from `ma-agent-config.json`, not SKILL.md — banner makes the precedence explicit so future SKILL.md edits don't silently fail to ship.
+- **Editing workflow rule revised.** Replaced "branch-first" with situation-aware: single-session live-approved → commit on `main`; parallel/background/stacked → worktree; never `git checkout` in primary. Full text moved to `CONTRIBUTING.md` § Editing workflow; CLAUDE.md is now a 1-line pointer.
+- **Anthropic API key rotated twice + consolidated.** First rotation = collapse two keys (daily-brief / review-agents) into one. Second rotation = forced when raw `bws secret list` echoed the value into a transcript mid-session. Current digest `af4a5420…2b5a796e`; BWS + Supabase agree. Memory `feedback-bws-never-list-raw.md` saved as the durable lesson.
 
 ### 2026-04-24 (web pivot + live MA end-to-end)
 12 PRs merged. Went from "seed-data mobile app" to "live Opus 4.7 on a public URL running real daily-brief synthesis against seed context" in one session. Key arcs:
