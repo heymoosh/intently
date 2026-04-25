@@ -500,15 +500,22 @@ function BriefFlow({ onClose, onComplete }) {
     const userAnswers = messages
       .filter(m => m.role === 'user')
       .map(m => m.text);
-    const input = [
-      "It's morning. The user just had this conversation:",
-      ...userAnswers.map((a, i) => `Answer ${i + 1}: ${a}`),
-      '',
-      'Generate a personal daily brief in plain prose (no markdown headers, no bullets — just sentences). Open with a felt-sense observation about what they said. Name one thing that\'s actually at stake. End with a single grounding action they can take in the next hour. Keep it under 3 short paragraphs. Speak directly to them ("you"), not about them.',
-    ].join('\n');
 
     setBriefLoading(true);
-    window.callMaProxy({ skill: 'daily-brief', input })
+    // Context assembler reads goals/projects/yesterday's review/recent journals/
+    // today's plan/calendar/emails/due reminders from Supabase and formats them
+    // as the agent's input. Falls back to user-answers-only if assembler missing.
+    const inputPromise = window.assembleBriefContext
+      ? window.assembleBriefContext(userAnswers)
+      : Promise.resolve([
+          "It's morning. The user just had this conversation:",
+          ...userAnswers.map((a, i) => `Answer ${i + 1}: ${a}`),
+          '',
+          'Generate a personal daily brief in plain prose. Speak directly to them ("you").',
+        ].join('\n'));
+
+    inputPromise
+      .then((input) => window.callMaProxy({ skill: 'daily-brief', input }))
       .then(r => {
         setLiveBrief((r && r.finalText) || '');
         setBriefLoading(false);
@@ -900,18 +907,22 @@ function ReviewFlow({ onClose, onComplete }) {
     const userAnswers = messages
       .filter(m => m.role === 'user')
       .map(m => m.text);
-    const input = [
-      "It's evening. The user just had this end-of-day reflection:",
-      ...userAnswers.map((a, i) => `Answer ${i + 1}: ${a}`),
-      '',
-      "Auto-checked items the agent inferred done from today's logs:",
-      ...AUTO_CHECK_ITEMS.map(it => `- ${it}`),
-      '',
-      'Generate a short evening review in plain prose (no markdown headers, no bullets — just sentences). Acknowledge what they got right today, reflect briefly on the friction without lecturing, and plant a single seed for tomorrow that connects to what they said. Keep it under 3 short paragraphs. Speak directly to them ("you"), not about them. Tone: warm, plainspoken, end-of-day.',
-    ].join('\n');
 
     setReviewLoading(true);
-    window.callMaProxy({ skill: 'daily-review', input })
+    // Context assembler reads goals/projects/today's plan/recent journal/due
+    // reminders from Supabase. Auto-checked items still come from the JSX
+    // (Task #14 will replace them with inferred-from-real-entries).
+    const inputPromise = window.assembleReviewContext
+      ? window.assembleReviewContext(userAnswers, AUTO_CHECK_ITEMS)
+      : Promise.resolve([
+          "It's evening. The user just had this end-of-day reflection:",
+          ...userAnswers.map((a, i) => `Answer ${i + 1}: ${a}`),
+          '',
+          'Generate a short evening review in plain prose. Speak directly to them ("you"). Tone: warm, plainspoken, end-of-day.',
+        ].join('\n'));
+
+    inputPromise
+      .then((input) => window.callMaProxy({ skill: 'daily-review', input }))
       .then(r => {
         setLiveReview((r && r.finalText) || '');
         setReviewLoading(false);
