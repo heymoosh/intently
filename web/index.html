@@ -132,15 +132,16 @@
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<!-- Runtime config. Supabase URL + anon key are intentionally safe to commit
-     (RLS gates reads; service-role key lives in BWS only). See app/.env.example. -->
+<!-- Runtime config. Supabase URL + publishable key are intentionally safe to
+     commit (RLS gates reads; secret key lives in BWS only). See app/.env.example. -->
 <script>
   window.INTENTLY_CONFIG = {
     supabaseUrl: 'https://cjlktjrossrzmswrayfz.supabase.co',
-    // TODO: paste anon key from Supabase dashboard (project cjlktjrossrzmswrayfz).
-    // Anon key is RLS-gated and safe to commit; flagged as a manual follow-up
-    // because the agent that wrote this lib didn't have access to the dashboard.
-    supabaseAnonKey: 'TODO: paste anon key from Supabase dashboard',
+    // Publishable key (sb_publishable_*) — Supabase's newer RLS-gated client key.
+    // Anonymous sign-in is enabled on the project; web/lib/supabase.js calls
+    // signInAnonymously() on first use so writes get a real auth.uid() that
+    // satisfies the owner-only RLS policies.
+    supabasePublishableKey: 'sb_publishable_uvMby6govO8qKuxYVRXb7A_nBZvMzII', // gitleaks:allow — publishable key is RLS-gated, public-by-design per Supabase docs
   };
 </script>
 
