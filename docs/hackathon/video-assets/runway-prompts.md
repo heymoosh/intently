@@ -8,6 +8,20 @@ Each prompt below is a single self-contained copy-paste. Style descriptor and ba
 
 ---
 
+## Aspect ratio plan
+
+Master everything at **16:9** for web / YouTube / DevPost / desktop full-screen, then re-cut to **9:16** for mobile vertical (Reels, Shorts, Stories). Cropping 16:9 → 9:16 loses side information you can spare; the reverse direction can't be done at all.
+
+- **Default in Runway: 16:9** for every scene's first generation.
+- **Re-generate at 9:16** for the scenes whose composition doesn't survive a center-crop:
+  - **Scene 4** — the path's curve is a horizontal motion; on vertical crop the bend disappears. Re-gen with the bend going diagonal / into depth instead of sideways.
+  - **Scene 16** — wide environment shot; re-gen with @AppHero centered and foliage above/below rather than left/right.
+  - **Scene 17** — wide group composition; re-gen with @AppHero and @AppHero2 centered tighter, background figures stacked toward the middle distance instead of spread laterally.
+- Every other scene (centered character, close crops, single-subject framing) center-crops cleanly from 16:9 to 9:16.
+- Skip 1:1 unless you're actively planning to post to IG/X feed.
+
+---
+
 ## Scene 1 — Neutral starting state
 
 ```
