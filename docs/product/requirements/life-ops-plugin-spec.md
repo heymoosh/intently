@@ -1,3 +1,7 @@
+> **⚠ ORIGINAL INTENT — not current ground truth.** Captures pre-2026-04-25 framing. Current product behavior derives from `TRACKER.md § Current state pointers` (UX = `docs/design/Intently - App/HANDOFF.md`; agent behavior = `agents/<skill>/SKILL.md`; stack/scope/secrets = `docs/decisions/`). Treat this doc as historical reference for original intent — **do not derive current product behavior from it**.
+
+---
+
 # Life Ops Plugin — Design Spec
 
 **Purpose:** A packageable Cowork plugin that gives any user a daily/weekly/monthly rhythm for staying on top of their life and projects — without requiring a full project management tool.

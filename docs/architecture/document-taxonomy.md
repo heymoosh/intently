@@ -1,3 +1,7 @@
+> **⚠ ORIGINAL INTENT — not current ground truth.** Captures pre-2026-04-25 framing. Current information-routing lives in `TRACKER.md § Current state pointers` (which itself is the new spine). Treat this doc as historical reference for original intent — **do not derive current doc-routing from it**.
+
+---
+
 # Document Taxonomy
 
 **Type:** Strategy doc — the rules for where information lives.

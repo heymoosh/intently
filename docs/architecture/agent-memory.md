@@ -1,3 +1,7 @@
+> **⚠ ORIGINAL INTENT — not current ground truth.** Captures pre-2026-04-25 framing. Current architecture derives from `TRACKER.md § Current state pointers` (stack = ADR 0004 web-only pivot; agent behavior = `agents/<skill>/SKILL.md`; data model = forthcoming ADR per design folder). Treat this doc as historical reference for original intent — **do not derive current architecture from it**.
+
+---
+
 # Agent Memory — Intently (hackathon scope)
 
 **Type:** Architecture doc — the memory and state model the V1 agents read and write.
