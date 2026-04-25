@@ -461,16 +461,26 @@ function BriefFlow({ onClose, onComplete }) {
   const [briefLoading, setBriefLoading] = React.useState(false);
   const scrollRef = React.useRef(null);
 
-  // Drive the script — when step changes, post agent turn, reveal input/confirm
+  // Drive the script — when step changes, post agent turn, reveal input/confirm.
+  // Steps that have neither `input` nor `confirm` are passive bubbles (e.g. the
+  // opening greeting) and auto-advance after a short reading pause so the user
+  // is never stuck without an affordance.
   React.useEffect(() => {
     const s = BRIEF_SCRIPT[step];
     if (!s) return;
     setAgentTyping(true);
-    const t = setTimeout(() => {
+    const typingTimer = setTimeout(() => {
       setMessages(m => [...m, { role: 'agent', text: s.agent, sub: s.agentSub }]);
       setAgentTyping(false);
     }, s.typing);
-    return () => clearTimeout(t);
+    let advanceTimer;
+    if (!s.input && !s.confirm) {
+      advanceTimer = setTimeout(() => setStep(step + 1), s.typing + 1400);
+    }
+    return () => {
+      clearTimeout(typingTimer);
+      if (advanceTimer) clearTimeout(advanceTimer);
+    };
   }, [step]);
 
   React.useEffect(() => {
