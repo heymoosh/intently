@@ -2,6 +2,16 @@ The user invoked `/start-work` to resume working on Intently. Pick up cleanly fr
 
 ## Steps
 
+0. **Check for parallel work before touching shared files.** Two surfaces silently clobber TRACKER / `.claude/handoffs/` / CLAUDE if ignored:
+   - **Parallel worktrees** — run `git worktree list`. If any entry is outside the primary checkout, name them in your Critical-items walkthrough.
+   - **Sibling sessions in the same checkout** — the SessionStart `[session-locks]` report (if any) lists other live Claude sessions in this same cwd.
+
+   If either signal is non-empty, ask Muxin one question before any edits to TRACKER/handoffs/CLAUDE: *"is this session its own track, or piggybacking on main?"* If piggybacking and he plans to touch shared files, propose spawning a worktree per `CONTRIBUTING.md` § Editing workflow:
+   ```
+   git worktree add ~/wt/<slug> -b chat/<slug>
+   ```
+   Then `cd` into it and resume there. Do not auto-spawn — Muxin decides per-session.
+
 1. **CLAUDE.md is already auto-loaded** — do not re-fetch it. You already see it in the system prompt.
 
 2. **Read once, in this order:**

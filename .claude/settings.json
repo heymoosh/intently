@@ -53,6 +53,34 @@
           {
             "type": "command",
             "command": "bash scripts/session-precheck.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash scripts/session-locks.sh ensure"
+          },
+          {
+            "type": "command",
+            "command": "bash scripts/session-locks.sh check"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash scripts/session-locks.sh ensure"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash scripts/session-locks.sh remove"
           }
         ]
       }
