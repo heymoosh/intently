@@ -278,6 +278,21 @@ export default function App() {
     return () => sub?.remove();
   }, []);
 
+  // Enforce scroll-snap on the pager's underlying DOM node. react-native-web's
+  // StyleSheet.create silently drops unknown CSS props in some 0.21+ builds, so
+  // `scrollSnapType` on the stylesheet doesn't reliably reach the DOM. Slot-level
+  // `scrollSnapAlign` is inline and survives the passthrough; this keeps the
+  // pager-level rule alongside it. Without this, the pager drags like a whiteboard
+  // on Chrome/Safari/Edge.
+  useEffect(() => {
+    const ref = pager.current as unknown as { getScrollableNode?: () => HTMLElement } | null;
+    if (!ref) return;
+    const node = ref.getScrollableNode ? ref.getScrollableNode() : (ref as unknown as HTMLElement);
+    if (node && node.style) {
+      node.style.scrollSnapType = 'x mandatory';
+    }
+  }, [screenWidth]);
+
   if (!fontsLoaded) return null;
 
   const pageWidth = screenWidth;
@@ -524,13 +539,19 @@ export default function App() {
         visible={journalOpen}
         onClose={() => setJournalOpen(false)}
       />
-      <BriefFlow
-        visible={briefFlowOpen}
-        onClose={() => setBriefFlowOpen(false)}
-        onAccept={handleBriefAccept}
-        agentRunning={liveBrief.kind === 'loading'}
-        agentError={liveBrief.kind === 'error' ? liveBrief.message : null}
-      />
+      {/* Conditional-mount: react-native-web's Modal portals append a div to
+          document.body on mount regardless of `visible`. Keeping BriefFlow off
+          the tree until the user opens it avoids any extra portal chrome
+          interfering with the pager's scroll-snap behavior. */}
+      {briefFlowOpen ? (
+        <BriefFlow
+          visible={briefFlowOpen}
+          onClose={() => setBriefFlowOpen(false)}
+          onAccept={handleBriefAccept}
+          agentRunning={liveBrief.kind === 'loading'}
+          agentError={liveBrief.kind === 'error' ? liveBrief.message : null}
+        />
+      ) : null}
       <StatusBar style="auto" />
     </View>
   );
