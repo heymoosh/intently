@@ -36,13 +36,17 @@ function makeConfigRoot(
 interface FakeCall {
   list: number;
   create: CreateAgentParams[];
+  update: Array<{ agentId: string; params: CreateAgentParams }>;
 }
 
-function makeClient(existing: AgentSummary[]): {
+function makeClient(
+  existing: AgentSummary[],
+  opts: { withUpdate?: boolean; updateThrows?: Error } = {}
+): {
   client: AgentsClient;
   calls: FakeCall;
 } {
-  const calls: FakeCall = { list: 0, create: [] };
+  const calls: FakeCall = { list: 0, create: [], update: [] };
   const client: AgentsClient = {
     async list() {
       calls.list++;
@@ -59,6 +63,13 @@ function makeClient(existing: AgentSummary[]): {
       };
     },
   };
+  if (opts.withUpdate) {
+    client.update = async (agentId, params) => {
+      calls.update.push({ agentId, params });
+      if (opts.updateThrows) throw opts.updateThrows;
+      return { id: agentId, name: params.name, version: 2 };
+    };
+  }
   return { client, calls };
 }
 
@@ -361,6 +372,178 @@ test('provision: --write-secrets calls setSecret for created and existing agents
       ['MA_AGENT_ID_DAILY_BRIEF', 'agent_existing_db'],
       ['MA_AGENT_ID_DAILY_REVIEW', 'agent_test_intently-daily-review'],
     ]);
+  } finally {
+    cleanup();
+  }
+});
+
+// ---------- provision: --update-existing ----------
+
+test('parseArgs: --update-existing flag', () => {
+  const flags = parseArgs(['--update-existing', '--skill', 'daily-brief']);
+  assert.equal(flags.updateExisting, true);
+  assert.deepEqual(flags.skills, ['daily-brief']);
+});
+
+test('parseArgs: updateExisting defaults to false', () => {
+  const flags = parseArgs(['--all']);
+  assert.equal(flags.updateExisting, false);
+});
+
+test('provision: --update-existing pushes new config to existing agents', async () => {
+  const { root, cleanup } = makeConfigRoot({
+    'daily-brief': mkConfig('intently-daily-brief', { system: 'NEW system prompt' }),
+    'daily-review': mkConfig('intently-daily-review', { system: 'fresh review prompt' }),
+  });
+  try {
+    const { client, calls } = makeClient(
+      [
+        { id: 'agent_existing_db', name: 'intently-daily-brief' },
+        { id: 'agent_existing_dr', name: 'intently-daily-review' },
+      ],
+      { withUpdate: true }
+    );
+    const cap = captureLog();
+    const results = await provision({
+      skills: ['daily-brief', 'daily-review'],
+      configRoot: root,
+      dryRun: false,
+      writeSecrets: false,
+      updateExisting: true,
+      client,
+      log: cap.log,
+      warn: cap.warn,
+    });
+    assert.equal(calls.create.length, 0, 'never creates when both exist');
+    assert.equal(calls.update.length, 2, 'updates both existing agents');
+    assert.equal(calls.update[0]?.agentId, 'agent_existing_db');
+    assert.equal(calls.update[0]?.params.system, 'NEW system prompt');
+    assert.equal(calls.update[1]?.agentId, 'agent_existing_dr');
+    assert.equal(calls.update[1]?.params.system, 'fresh review prompt');
+    for (const r of results) {
+      assert.equal(r.status, 'updated');
+    }
+  } finally {
+    cleanup();
+  }
+});
+
+test('provision: --update-existing + --dry-run never calls update', async () => {
+  const { root, cleanup } = makeConfigRoot({
+    'daily-brief': mkConfig('intently-daily-brief'),
+  });
+  try {
+    const { client, calls } = makeClient(
+      [{ id: 'agent_existing_db', name: 'intently-daily-brief' }],
+      { withUpdate: true }
+    );
+    const cap = captureLog();
+    const results = await provision({
+      skills: ['daily-brief'],
+      configRoot: root,
+      dryRun: true,
+      writeSecrets: false,
+      updateExisting: true,
+      client,
+      log: cap.log,
+      warn: cap.warn,
+    });
+    assert.equal(calls.update.length, 0);
+    assert.equal(results[0]?.status, 'would-update');
+    assert.equal(results[0]?.agentId, 'agent_existing_db');
+  } finally {
+    cleanup();
+  }
+});
+
+test('provision: --update-existing falls back to console URL when SDK lacks update', async () => {
+  const { root, cleanup } = makeConfigRoot({
+    'daily-brief': mkConfig('intently-daily-brief'),
+  });
+  try {
+    // withUpdate omitted → client.update is undefined.
+    const { client, calls } = makeClient([
+      { id: 'agent_existing_db', name: 'intently-daily-brief' },
+    ]);
+    const cap = captureLog();
+    const results = await provision({
+      skills: ['daily-brief'],
+      configRoot: root,
+      dryRun: false,
+      writeSecrets: false,
+      updateExisting: true,
+      client,
+      log: cap.log,
+      warn: cap.warn,
+    });
+    assert.equal(calls.create.length, 0);
+    assert.equal(results[0]?.status, 'error');
+    assert.match(results[0]?.message ?? '', /update unsupported/);
+    assert.equal(
+      cap.warnings.some((w) => w.includes('console.anthropic.com/agents/agent_existing_db')),
+      true,
+      `expected fallback URL warning, got: ${cap.warnings.join('|')}`
+    );
+  } finally {
+    cleanup();
+  }
+});
+
+test('provision: --update-existing surfaces SDK update errors with console URL', async () => {
+  const { root, cleanup } = makeConfigRoot({
+    'daily-brief': mkConfig('intently-daily-brief'),
+  });
+  try {
+    const { client } = makeClient(
+      [{ id: 'agent_existing_db', name: 'intently-daily-brief' }],
+      { withUpdate: true, updateThrows: new Error('agent locked') }
+    );
+    const cap = captureLog();
+    const results = await provision({
+      skills: ['daily-brief'],
+      configRoot: root,
+      dryRun: false,
+      writeSecrets: false,
+      updateExisting: true,
+      client,
+      log: cap.log,
+      warn: cap.warn,
+    });
+    assert.equal(results[0]?.status, 'error');
+    assert.match(results[0]?.message ?? '', /update failed: agent locked/);
+    assert.equal(
+      cap.warnings.some((w) => w.includes('agent locked') && w.includes('console.anthropic.com')),
+      true
+    );
+  } finally {
+    cleanup();
+  }
+});
+
+test('provision: without --update-existing, existing agents stay untouched even when client.update exists', async () => {
+  const { root, cleanup } = makeConfigRoot({
+    'daily-brief': mkConfig('intently-daily-brief'),
+  });
+  try {
+    const { client, calls } = makeClient(
+      [{ id: 'agent_existing_db', name: 'intently-daily-brief' }],
+      { withUpdate: true }
+    );
+    const cap = captureLog();
+    const results = await provision({
+      skills: ['daily-brief'],
+      configRoot: root,
+      dryRun: false,
+      writeSecrets: false,
+      updateExisting: false,
+      client,
+      log: cap.log,
+      warn: cap.warn,
+    });
+    assert.equal(calls.update.length, 0, 'no updates without the flag');
+    assert.equal(calls.create.length, 0, 'no creates either — agent already exists');
+    assert.equal(results[0]?.status, 'exists');
+    assert.equal(results[0]?.agentId, 'agent_existing_db');
   } finally {
     cleanup();
   }

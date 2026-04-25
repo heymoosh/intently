@@ -130,3 +130,27 @@ Use the tag from the category above that fits. If the user shares something that
 ## First-run handling
 
 If `first_run_complete: false`: skip step 2 (no chat history yet) and skip step 3 (no past entries). Keep the narrative and reflection prompt — those work from day one.
+
+## Output contract (V1 demo)
+
+The web prototype parses your output to populate the closing review view. Every response must end with a single fenced JSON block that mirrors the narrative you just wrote. Conversational prose comes first; the JSON block is always the last thing in the message and is the only fenced JSON in the response.
+
+Shape:
+
+```json
+{
+  "journal_text": "string (the reflective summary)",
+  "friction": [{ "text": "string", "tag": "string" }],
+  "tomorrow": [{ "text": "string", "tier": "P1" | "P2" | "P3" }],
+  "calendar": [{ "text": "string" }]
+}
+```
+
+Field rules:
+
+- `journal_text` — the narrative reflection from step 5, condensed to the part worth keeping in the journal. Use the user's own words where they spoke. Lightest edits only.
+- `friction` — open threads, blockers, or things the user named as hard. `tag` is optional and uses the same tags as the reflection prompts (`#grow`, `#self`, `#brag`, `#ant`, `#ideas`).
+- `tomorrow` — the shape-tomorrow suggestion from step 5b, plus any explicit "I want to do X tomorrow" the user named. `tier` mirrors P1/P2/P3.
+- `calendar` — known events on tomorrow's calendar that should surface in the morning brief. Empty array when nothing is known.
+
+Emit empty arrays rather than omitting fields. If the user did not engage with the reflection prompt, still emit the JSON block with whatever `journal_text` you wrote and empty arrays for the rest.

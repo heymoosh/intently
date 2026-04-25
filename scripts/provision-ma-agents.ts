@@ -56,11 +56,21 @@ export interface AgentSummary {
 export interface AgentsClient {
   list(): Promise<AsyncIterable<AgentSummary>> | AsyncIterable<AgentSummary>;
   create(params: CreateAgentParams): Promise<AgentSummary>;
+  // Optional: not all SDK versions expose update. The script falls back to
+  // logging a console URL when this method is missing or throws.
+  update?(agentId: string, params: CreateAgentParams): Promise<AgentSummary>;
 }
 
 export interface ProvisionRunResult {
   skill: string;
-  status: 'created' | 'exists' | 'would-create' | 'would-skip' | 'error';
+  status:
+    | 'created'
+    | 'exists'
+    | 'updated'
+    | 'would-create'
+    | 'would-skip'
+    | 'would-update'
+    | 'error';
   agentId?: string;
   message?: string;
 }
@@ -70,6 +80,9 @@ export interface ProvisionOpts {
   configRoot: string;
   dryRun: boolean;
   writeSecrets: boolean;
+  // Default: false. When true, an agent that already exists by name has its
+  // local config pushed to the live workspace via client.update.
+  updateExisting?: boolean;
   client: AgentsClient;
   setSecret?: (name: string, value: string) => void;
   log?: (line: string) => void;
@@ -205,6 +218,62 @@ export async function provision(opts: ProvisionOpts): Promise<ProvisionRunResult
     const existing = existingByName.get(config.name);
 
     if (existing) {
+      if (opts.updateExisting) {
+        if (opts.dryRun) {
+          log(`→ ${skill}: would update agent '${config.name}' (${existing.id})`);
+          results.push({ skill, status: 'would-update', agentId: existing.id });
+          continue;
+        }
+
+        let params: CreateAgentParams;
+        try {
+          params = buildCreateParams(config, warn);
+        } catch (err) {
+          const msg = (err as Error).message;
+          warn(`✗ ${skill}: ${msg}`);
+          results.push({ skill, status: 'error', message: msg });
+          continue;
+        }
+
+        log(`→ ${skill}: updating agent '${params.name}' (${existing.id})…`);
+        const result: ProvisionRunResult = {
+          skill,
+          status: 'updated',
+          agentId: existing.id,
+        };
+
+        if (typeof opts.client.update !== 'function') {
+          const url = consoleUrlForAgent(existing.id);
+          warn(
+            `✗ ${skill}: SDK does not expose agents.update — open the console to push the new prompt by hand: ${url}`
+          );
+          result.status = 'error';
+          result.message = `update unsupported by this SDK; edit manually at ${url}`;
+        } else {
+          try {
+            const updated = await opts.client.update(existing.id, params);
+            log(`✓ ${skill}: updated → ${updated.id}`);
+          } catch (err) {
+            const msg = (err as Error).message;
+            const url = consoleUrlForAgent(existing.id);
+            warn(`✗ ${skill}: update failed — ${msg}. Edit manually at ${url}`);
+            result.status = 'error';
+            result.message = `update failed: ${msg}`;
+          }
+        }
+
+        if (result.status === 'updated' && opts.writeSecrets) {
+          const ok = writeSecret(skill, existing.id, opts, warn, log);
+          if (!ok) {
+            result.status = 'error';
+            result.message = 'failed to write supabase secret';
+          }
+        }
+
+        results.push(result);
+        continue;
+      }
+
       log(`✓ ${skill}: exists as ${config.name} → ${existing.id}`);
       const result: ProvisionRunResult = {
         skill,
@@ -265,6 +334,10 @@ export async function provision(opts: ProvisionOpts): Promise<ProvisionRunResult
   return results;
 }
 
+export function consoleUrlForAgent(agentId: string): string {
+  return `https://console.anthropic.com/agents/${agentId}`;
+}
+
 function writeSecret(
   skill: string,
   agentId: string,
@@ -305,6 +378,7 @@ interface CliFlags {
   skills: readonly string[];
   dryRun: boolean;
   writeSecrets: boolean;
+  updateExisting: boolean;
   envFile?: string;
   help: boolean;
 }
@@ -316,7 +390,10 @@ Flags:
   --all                Provision all MVP skills (default if --skill omitted).
   --skill <name>       Provision only one skill (e.g. daily-review). Repeatable.
   --write-secrets      Write each agent ID to Supabase secrets after creation.
-  --dry-run            List existing agents but never call create or write secrets.
+  --update-existing    For agents that already exist by name, push the local
+                       config to overwrite the live system prompt. Without this
+                       flag, existing agents are left alone.
+  --dry-run            List existing agents but never call create, update, or write secrets.
   --env-file <path>    Load ANTHROPIC_API_KEY from a .env file (default: .env.local if present).
   --help, -h           Show this help.
 `;
@@ -326,6 +403,7 @@ export function parseArgs(argv: readonly string[]): CliFlags {
     skills: [],
     dryRun: false,
     writeSecrets: false,
+    updateExisting: false,
     help: false,
   };
   const skills: string[] = [];
@@ -345,6 +423,9 @@ export function parseArgs(argv: readonly string[]): CliFlags {
       }
       case '--write-secrets':
         flags.writeSecrets = true;
+        break;
+      case '--update-existing':
+        flags.updateExisting = true;
         break;
       case '--dry-run':
         flags.dryRun = true;
@@ -466,6 +547,7 @@ async function main(argv: readonly string[]): Promise<number> {
     configRoot,
     dryRun: flags.dryRun,
     writeSecrets: flags.writeSecrets,
+    updateExisting: flags.updateExisting,
     client,
     setSecret: defaultSetSecret,
   });
