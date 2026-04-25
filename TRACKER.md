@@ -102,6 +102,8 @@ End-to-end Playwright smoke against `intently-eta.vercel.app/?dev=1`. ma-proxy f
 
 ## Follow-ups (pending manual or flight-test)
 
+- **AddZones + read-on-mount wiring** is deferred — depends on PR #137 (entities lib + 0005 plan_items migration) merging first, plus `supabase db push` to apply migrations 0003/0004/0005, plus anonymous Supabase auth on app load OR RLS relaxation (current owner-only policies will reject anon writes from the browser). ([PR #139](https://github.com/heymoosh/intently/pull/139))
+- **Update live MA agents to emit the structured JSON tail**: see PR #138 Manual follow-ups (run `npx tsx scripts/provision-ma-agents.ts --skill daily-brief --skill daily-review --update-existing`). Until that runs, `parseAgentPlan` / `parseAgentReview` use prose-only fallback paths — populated view still reshapes from agent prose, just less structurally. ([PR #139](https://github.com/heymoosh/intently/pull/139))
 - Run `supabase db push` to apply migrations 0003, 0004, 0005 (currently NOT applied; persistence will 500 until done). ([PR #137](https://github.com/heymoosh/intently/pull/137))
 - If `supabaseAnonKey` was left as a TODO, paste the project's anon key into `web/index.html`. ([PR #137](https://github.com/heymoosh/intently/pull/137))
 - After db push: re-deploy `web/` to Vercel so the new supabase + entities script tags ship. ([PR #137](https://github.com/heymoosh/intently/pull/137))
