@@ -74,6 +74,8 @@ Project briefs at `.claude/handoffs/<slug>.md` — persist across sessions; neve
 
 ## Follow-ups (pending manual or flight-test)
 
+- This workflow does not apply to its own merge. The OLD workflow runs on the merge that introduces the new behavior; effects start with the next PR. ([PR #129](https://github.com/heymoosh/intently/pull/129))
+- Future enhancement: invoke the `intently-update-tracker` MA agent on PR merge to auto-generate the TRACKER updates blocks from the PR diff, so authors do not have to write them by hand. ([PR #129](https://github.com/heymoosh/intently/pull/129))
 - Watch for false-positive blocks in genuine pure-read sessions where Claude needs to edit one file (rare; the fix is to write the intent file first per the prompt). ([PR #131](https://github.com/heymoosh/intently/pull/131))
 - Consider extending to `Bash` for git commits later, but the existing pre-commit hook is the better catch point — this hook is for "first substantive write," not commit time. ([PR #131](https://github.com/heymoosh/intently/pull/131))
 - Wire `onReviewComplete` to also call ma-proxy `daily-review` if not already (out of scope for this PR — already shipped in #115). ([PR #125](https://github.com/heymoosh/intently/pull/125))
