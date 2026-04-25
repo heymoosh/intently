@@ -4,6 +4,8 @@ description: "Scheduled morning briefing. Orients the user on goals, active proj
 status: hackathon-mvp
 ---
 
+> **⚠️ Superseded by `ma-agent-config.json` (deployed 2026-04-25).** The live agent in the Managed Agents console (`intently-daily-brief`) runs the `system` prompt embedded in `ma-agent-config.json`, not this file. This SKILL.md is the human-authored source-of-truth for behavior intent; edits here do **not** propagate until re-provisioned via `scripts/provision-ma-agents.ts`.
+
 # Daily Brief
 
 Work through the steps in order. Conventions from `agents/_shared/life-ops-conventions.md` apply.

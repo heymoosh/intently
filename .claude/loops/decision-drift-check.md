@@ -46,6 +46,27 @@
 
 6. **Does NOT auto-edit** TRACKER or write ADRs. Output is advisory. User reviews on next morning routine; `/start-work` should surface this report alongside Critical items.
 
+## Pass 2 — CLAUDE.md leanness audit
+
+**Why:** the session-end discipline catches missed *decisions*; this pass catches CLAUDE.md *bloat*. Same trigger, same report.
+
+**Inputs:** current `CLAUDE.md` + `TRACKER.md § Current state` rows + `CONTRIBUTING.md` section list.
+
+**The test:** apply the 3-weeks test (CLAUDE.md house rule) to every line/rule in `CLAUDE.md`. Flag a line as a trim candidate if **any** of the following hits:
+
+1. **Dated incident citation** — references a specific date (`YYYY-MM-DD`) or a one-time event ("the X misread", "the Y incident") as justification for a rule. Rule should stand on its own; the incident lives in memory + Log.
+2. **Hardcoded user-specific path** — `/Users/<name>/`, `~/<dir>` for tooling layout, machine-specific paths. These break the moment another contributor clones or the user moves machines.
+3. **Concrete file path used as a non-pointer** — a path mentioned inline (e.g. `.githooks/pre-commit`, `scripts/foo.sh`) that names *what enforces a rule* rather than *what to read*. These belong in the TRACKER "Enforcement + drift-check tooling" row; CLAUDE.md keeps the concept ("enforced by a pre-commit hook"), not the path.
+4. **Project-state framed as durable** — anything in "Product intent — durable" or similar that names: a stack choice, a deploy URL, a list of journeys/skills/screens, an in/out-of-scope item, a deferred-feature claim. These belong in TRACKER `§ Current state` rows; CLAUDE.md only gets the *invariant* product framing.
+5. **Operational how-to** — multi-step recipes, command syntax, decision trees about *how* to do a thing (commit, branch, deploy, migrate, recover). These belong in `CONTRIBUTING.md` or a runbook; CLAUDE.md gets a one-line pointer.
+6. **Duplicates content already owned elsewhere** — restates something `TRACKER.md`, `CONTRIBUTING.md`, an ADR, or a memory file already owns. Per the "pointers > content" rule, link the owner instead.
+
+**For each flagged line:** propose a destination — `TRACKER.md § <row>`, `CONTRIBUTING.md § <section>`, `docs/decisions/<n>-<slug>.md`, or memory — and the one-line replacement that should live in `CLAUDE.md` (or "drop entirely; no replacement needed").
+
+**Append findings** to the same `routine-output/decision-drift-<YYYY-MM-DD>.md` under a `## CLAUDE.md leanness — trim candidates` heading. Include current line count vs. soft target (50) so growth pressure is visible.
+
+**Does NOT auto-edit `CLAUDE.md`.** Trim is a decision; this pass is advisory.
+
 ## What this loop does NOT do
 
 - Does not block sessions or hooks.

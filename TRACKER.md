@@ -22,6 +22,8 @@ This section is the spine. Every topic with a "current truth" lives here as a po
 | **Acceptance criteria process** | `docs/process/acceptance-criteria.md` | Immutable during build; only Status + Last checked may change. |
 | **Release gates** | `docs/process/release-gates.md` | `release-gate.yml` enforces in CI. |
 | **Test scope** | Unit + E2E only for hackathon (skip integration). Post-hackathon to be re-decided. | Cap exists so coverage doesn't grow into time we don't have. |
+| **Editing + branching workflow** | `CONTRIBUTING.md` § Editing workflow | When to commit on `main` vs. spin up a worktree, never-`git-checkout`-in-primary rule, stash-to-worktree migration recipe. `<wt-root>` is per-developer. |
+| **Enforcement + drift-check tooling** | `.githooks/pre-commit`, `.github/workflows/docs-check.yml`, `scripts/session-precheck.sh`, `.claude/loops/decision-drift-check.md` | CLAUDE.md cap + secrets check (pre-commit + CI), session-start drift report, decision-drift safety-net loop. Update this row if any get renamed. |
 
 **Original-intent docs (archived, not current ground truth — bannered in-file):** `docs/product/vision.md`, `docs/product/requirements/life-ops-plugin-spec.md`, `docs/design/app-experience.md`, `docs/architecture/agent-memory.md`, `docs/architecture/data-model.md`, `docs/architecture/document-taxonomy.md`. Treat as historical reference for original intent; current product behavior derives from the rows above.
 
@@ -54,6 +56,7 @@ This section is the spine. Every topic with a "current truth" lives here as a po
 Project briefs at `.claude/handoffs/<slug>.md` — persist across sessions; never auto-deleted. Convention: `docs/process/session-handoff.md`. Slash command: `/handoff`.
 
 - **`steward-redesign`** → `.claude/handoffs/steward-redesign.md` — per-project handoff system. **Shipped 2026-04-25** in PR [#79](https://github.com/heymoosh/intently/pull/79) (commit `ce7d0c4`). Doc preserved for pattern review. Status: shipped.
+- **`ma-agents-complete`** → `.claude/handoffs/ma-agents-complete.md` — all 6 MA agents provisioned + situation-aware editing-workflow rule + Anthropic key consolidated/rotated twice. **Shipped 2026-04-25** in PR [#109](https://github.com/heymoosh/intently/pull/109) (banner + rule) and direct-to-main commits `e5ee672`/`e0a1e60`/`28ac025`. Doc preserved for pattern review (workflow-rule arc + bws-list leak lesson). Status: shipped.
 - **`entries-architecture`** → `.claude/handoffs/entries-architecture.md` — reconcile new design folder against current code, produce v2 session prompt, spawn parallel implementation tracks. Currently pre-Phase-1 (about to spawn Explore agents for design read + code survey). Status: active.
 - **`overnight-build-loops`** → `.claude/handoffs/overnight-build-loops.md` — robustness rewrite for the overnight build loop: no iter cap, safe-task gate, hourly inline `/babysit-prs`, terminal-only summary, launchd-not-caffeinate. Driven by 2026-04-25 night failure (1 of 3 iters silently failed; 9-hour Mac-sleep gap). Status: active.
 - **`critical-flow-check`** → `.claude/handoffs/critical-flow-check.md` — Critical Flow Check routine **disabled on launchd 2026-04-25** after it silently auto-edited `agents/daily-review/SKILL.md` on `main`. Upstream issue: AC files are being authored by automated stewards without Muxin sign-off; routine then enforces those AC against implementation source-of-truth. Re-enablement gated on real verification infra (E2E + AI eval rubric) and a rewritten report-only brief. Status: active (routine disabled).
@@ -70,14 +73,15 @@ Project briefs at `.claude/handoffs/<slug>.md` — persist across sessions; neve
 
 - **[Shipped 2026-04-25] Session Handoff Steward redesign.** Implemented in `chat/handoff-steward-redesign` — replaced per-session/nightly model with **per-project** handoffs at `.claude/handoffs/<slug>.md`, conversational kickoff trigger + manual `/handoff`, never auto-deleted. Old nightly launchd job + plist removed. Full decisions and divergence-from-original-spec rationale: `.claude/handoffs/steward-redesign.md`.
 - **[Resolved 2026-04-25] MA agents provisioned via `scripts/provision-ma-agents.ts`.** All four agents (daily-brief, daily-review, weekly-review, monthly-review) now exist in the daily-brief workspace; Supabase `MA_AGENT_ID_*` secrets refreshed (DAILY_REVIEW + WEEKLY_REVIEW digests changed — they were stale before); ma-proxy redeployed. Branch `feat/track-ma-provisioning` (PR #84) introduces the script.
-- **Rotate both Anthropic API keys.** Both BWS `ANTHROPIC_API_KEY` values (the "daily brief" and "review agents" keys) were echoed into a Claude transcript on 2026-04-25 during provisioning. Rotate in Anthropic console, update BWS, then `supabase secrets set ANTHROPIC_API_KEY=<new-daily-brief-key>` and redeploy ma-proxy. User-only.
-- **Clean up bunk BWS entries.** BWS has three malformed agent-ID secrets (`daily-review`, `weekly-review`, `monthly-review`) created earlier today with raw key names + whitespace contamination + IDs from a *different* workspace than the proxy uses. Source of truth for these is now Supabase secrets (`MA_AGENT_ID_*`); delete the bunk BWS entries, or rename + repoint to the correct IDs. The "Review agents for intently" `ANTHROPIC_API_KEY` entry can also be deleted once you confirm nothing else references it. User-only.
-- **update-tracker + setup MA agents** — deferred. update-tracker = small confirmation-card surface only, setup = seed-data-covered for demo. Create if time permits.
+- **[Resolved 2026-04-25] Anthropic API key rotated twice + consolidated.** First rotation (last night) collapsed two keys into one. Second rotation (today) was forced when raw `bws secret list` echoed the value into a Claude transcript during BWS cleanup. Current consolidated key digest is `af4a5420…2b5a796e` (BWS + Supabase agree); ma-proxy redeployed. Memory `feedback-bws-never-list-raw.md` records the lesson: always pipe `bws secret list` through `jq` to strip `.value`.
+- **[Resolved 2026-04-25] Bunk BWS entries deleted.** Three stale agent-ID secrets (`daily-review`, `weekly-review`, `monthly-review`) removed via vault.bitwarden.com. Surviving `ANTHROPIC_API_KEY` entry renamed off "daily brief" to "Anthropic API Key" same day. BWS now contains only live entries: `ANTHROPIC_API_KEY`, `MA_AGENT_ID_DAILY_BRIEF`, `MA_ENVIRONMENT_ID`.
+- **[Resolved 2026-04-25] update-tracker + setup MA agents provisioned.** `intently-setup` (`agent_011CaQoLWQ5FeWdv6aKtfLLA`, sonnet-4-6) and `intently-update-tracker` (`agent_011CaQoLk4MMuPvqh8RGRS11`, sonnet-4-6) created via `scripts/provision-ma-agents.ts --skill setup --skill update-tracker --write-secrets`; `MA_AGENT_ID_SETUP` + `MA_AGENT_ID_UPDATE_TRACKER` written to Supabase; ma-proxy redeployed. All 6 agents now live in the daily-brief workspace.
 - **Accidental direct-to-main commit `5b95d51`** (swipe fix). Branch-first rule violated because `gh pr merge --delete-branch` dropped me back to main and next commit went there. Change is correct + deployed, left in place. Consider adding a post-merge hook that refuses commits on main to prevent recurrence.
 - **Apply pg_cron migration** (`supabase/migrations/0002_schedules.sql`). Needs `supabase db push` — user-only.
 - **Fix `--clean` squash-merge false-positive** in `scripts/intently-track.sh`. Replace `git cherry` with `git diff --quiet main HEAD`. ~2-line fix.
 - **Stewards leave working-tree mods uncommitted.** Release-readiness + spec-conformance stewards edit tracked files overnight without committing. Design fix: auto-commit to `auto/steward/*` branches + draft PR.
 - **Post-first-live-run baseline floor.** Run daily-brief against `evals/datasets/daily-brief/cases.json` once, raise per-axis `minScores` in `evals/baselines/daily-brief.json` from 0 to observed floor, flip `axisStatus` from `unknown` to `baselined`.
+- **[Post-hackathon] Wire `decision-drift-check` to launchd.** Brief at `.claude/loops/decision-drift-check.md` now covers two passes: missed-decision drift + CLAUDE.md leanness audit (3-weeks test). Currently manual-only — no plist in `.claude/launchd/plists/`. Add `com.intently.decision-drift.plist` matching the existing pack, daily evening. Defer until after submission (2026-04-26 8 PM EDT) so we don't add a launchd job mid-crunch right after disabling two for safety.
 
 ## MA API schema — empirical corrections (captured for posterity)
 
@@ -110,7 +114,6 @@ Three bugs found during Friday's first live smoke tests. Fixes shipped in #68, #
 
 ## Stretch (skip if time-pressed)
 
-- update-tracker + setup MA agents created in console.
 - Visual polish pass beyond tokens (PainterlyBlock, LandscapePanel, painterly palettes).
 - Google OAuth + real calendar/email wiring (seed data covers demo).
 
@@ -143,6 +146,14 @@ Three bugs found during Friday's first live smoke tests. Fixes shipped in #68, #
 Read in order: `launch-plan.md`, this file, `CLAUDE.md`. If Critical items has entries, walk through with user first. Update Status + prepend dated Log entry at end of any non-trivial session.
 
 ## Log
+
+### 2026-04-25 (MA agents complete + editing-workflow revision)
+
+PR [#109](https://github.com/heymoosh/intently/pull/109) merged + 3 direct-to-main commits. Full pattern detail: `.claude/handoffs/ma-agents-complete.md`. Headlines:
+- **All 6 MA agents now live.** `intently-setup` and `intently-update-tracker` provisioned via `scripts/provision-ma-agents.ts --skill setup --skill update-tracker --write-secrets`; Supabase `MA_AGENT_ID_*` written for both; ma-proxy redeployed.
+- **Supersedes banner across all 6 `agents/<skill>/SKILL.md` files.** Live prompt comes from `ma-agent-config.json`, not SKILL.md — banner makes the precedence explicit so future SKILL.md edits don't silently fail to ship.
+- **Editing workflow rule revised.** Replaced "branch-first" with situation-aware: single-session live-approved → commit on `main`; parallel/background/stacked → worktree; never `git checkout` in primary. Full text moved to `CONTRIBUTING.md` § Editing workflow; CLAUDE.md is now a 1-line pointer.
+- **Anthropic API key rotated twice + consolidated.** First rotation = collapse two keys (daily-brief / review-agents) into one. Second rotation = forced when raw `bws secret list` echoed the value into a transcript mid-session. Current digest `af4a5420…2b5a796e`; BWS + Supabase agree. Memory `feedback-bws-never-list-raw.md` saved as the durable lesson.
 
 ### 2026-04-24 (web pivot + live MA end-to-end)
 12 PRs merged. Went from "seed-data mobile app" to "live Opus 4.7 on a public URL running real daily-brief synthesis against seed context" in one session. Key arcs:

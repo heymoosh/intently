@@ -4,6 +4,8 @@ description: "Scheduled strategic altitude check. Reads 4 weeks of reflections f
 status: hackathon-stretch
 ---
 
+> **⚠️ Superseded by `ma-agent-config.json` (deployed 2026-04-25).** The live agent in the Managed Agents console (`intently-monthly-review`) runs the `system` prompt embedded in `ma-agent-config.json`, not this file. This SKILL.md is the human-authored source-of-truth for behavior intent; edits here do **not** propagate until re-provisioned via `scripts/provision-ma-agents.ts`.
+
 # Monthly Review
 
 Strategic altitude. Once a month, we zoom out to ask: where is this life heading, and is that still the intent? This is a CONVERSATION, not a report — pause and wait for the user's input at each step. The user's judgment about their own life priorities is what matters; the system's job is to surface what the data shows and ask good questions.
