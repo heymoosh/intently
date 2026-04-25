@@ -1,12 +1,27 @@
-What I liked about each one - I love the blue bottle. It's literal and it's hand-drawn.
-You can tell Monarch is really clever. It's literally a butterfly, but it's also hand-drawn. You got that quality there.
-The third one that looks like a heart, I think I just like the feel of it.
-You know, no sharp angles, that sort of thing. On the cool logo that I mentioned, I think it's called Rewrite or something.
-It looks more like a journal. Again, I love that kind of hand-drawn, squigglyness to it.
-What I'm actually leaning towards is something that is just literally a clever eye with a hand-drawn feeling to it, maybe not saying something boring.
-I don't want it to look boring. I don't want it to look professional. I want it to look personal.
-I want it to look hand-draw style. I want it to inherit the design colors that we built, but not in a rainbow sort of style, in like a find one or two primary brand colors and use it for the logo kind of thing.
-My vision for this is that when you load the app, it starts with the main logo icon in the middle that's this eye.
-It animates to the left, and then the rest of the app is written in, so it almost reads like I intend it.
-I kind of wonder if I stole this from Instagram.
-Actually, I'm pretty sure this is a pretty standard logo animation for a home screen, but yeah, that's what I'm leaning towards right now.
+Here is the clean, formatted version of the color scheme from your original prompt:
+
+### **Brand Tints**
+
+| Name | Hex Code |
+| :--- | :--- |
+| **Tint Sage** | #8CB39A |
+| **Tint Sage Deep** | #5F8A72 |
+| **Tint Lilac** | #CFC9EB |
+| **Tint Butter** | #F1DE8A |
+| **Tint Peach** | #F0B98C |
+| **Tint Clay** | #C66B3F |
+| **Tint Moss** | #3A4E3A |
+| **Tint Dusk** | #8E8FC6 |
+| **Tint Mint** | #B8D9C0 |
+
+---
+
+### **Semantic Colors**
+
+| Name | Value |
+| :--- | :--- |
+| **Primary text** | #2B2118 |
+| **Supporting text** | #6E604D |
+| **Subtle text** | #9A8A72 |
+| **Edge/separator** | #E2DBCB |
+| **Overlay scrim** | rgba(31,27,21,0.45) |
