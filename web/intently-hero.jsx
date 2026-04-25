@@ -26,7 +26,7 @@ function VoiceWaveform({ color = '#FBF8F2', amplitude = 1 }) {
 // Tap = voice; press-and-hold = menu. Always bottom-right.
 // Press-hold behaviour: hold to open menu, drag up to a button, RELEASE over it to activate.
 // If you release still over the mic → plain tap → listening.
-function HeroAffordance({ state = 'idle', onChange, onPick }) {
+function HeroAffordance({ state = 'idle', onChange, onPick, seedTranscript = '', onTranscriptConsumed }) {
   // state: 'idle' | 'listening' | 'processing' | 'expanded'
   const holdTimer = React.useRef(null);
   const openedByHold = React.useRef(false);
@@ -71,7 +71,9 @@ function HeroAffordance({ state = 'idle', onChange, onPick }) {
 
   const onMicPointerDown = (e) => {
     if (isProcessing) return;
-    e.currentTarget.setPointerCapture && e.currentTarget.setPointerCapture(e.pointerId);
+    if (e.pointerId != null && e.currentTarget.setPointerCapture) {
+      try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* assistive-tech / synthesized event — no active pointer to capture */ }
+    }
     openedByHold.current = false;
     activeKey.current = null;
     setActiveHover(null);
@@ -120,10 +122,15 @@ function HeroAffordance({ state = 'idle', onChange, onPick }) {
   };
 
   if (isListening) {
-    return <HeroListening onDone={() => onChange && onChange('chat')} />;
+    return <HeroListening onDone={(transcript) => onChange && onChange('chat', { transcript })} />;
   }
   if (isChat) {
-    return <HeroChat onDone={() => onChange && onChange('idle')} onMic={() => onChange && onChange('listening')} />;
+    return <HeroChat
+      seedTranscript={seedTranscript}
+      onTranscriptConsumed={onTranscriptConsumed}
+      onDone={() => onChange && onChange('idle')}
+      onMic={() => onChange && onChange('listening')}
+    />;
   }
 
   return (
@@ -226,6 +233,8 @@ function ProcessingArc() {
 // Wired to the live Web Speech API via window.useVoiceInput (web/lib/voice.js).
 function HeroListening({ onDone }) {
   const { state, start, stop } = useVoiceInput();
+  const stopRequested = React.useRef(false);
+  const closeRequested = React.useRef(false);
 
   // Auto-start the mic when the listening surface mounts.
   React.useEffect(() => { start(); }, [start]);
@@ -240,11 +249,30 @@ function HeroListening({ onDone }) {
     : "I'm listening.";
   const isListening = state.kind === 'listening';
 
-  // Stop the recognizer, then exit. Brief delay lets the final result flush.
+  // Stop button — wait for the recognizer to flush the final transcript
+  // (state.kind transitions to 'stopped' or 'idle'), then route it onward.
   const handleStop = React.useCallback(() => {
+    stopRequested.current = true;
     stop();
-    setTimeout(() => { if (onDone) onDone(); }, 150);
+  }, [stop]);
+
+  // Close (X) button — abort and exit without routing the transcript.
+  const handleClose = React.useCallback(() => {
+    closeRequested.current = true;
+    stop();
+    if (onDone) onDone('');
   }, [stop, onDone]);
+
+  // Watch for the recognizer reaching a terminal state after Stop was pressed,
+  // then forward the captured transcript to the parent (which decides routing).
+  React.useEffect(() => {
+    if (!stopRequested.current || closeRequested.current) return;
+    if (state.kind === 'stopped' || state.kind === 'idle') {
+      const transcript = state.kind === 'stopped' ? state.transcript : '';
+      stopRequested.current = false;
+      if (onDone) onDone(transcript);
+    }
+  }, [state, onDone]);
 
   return (
     <div style={{
@@ -252,7 +280,7 @@ function HeroListening({ onDone }) {
       zIndex: 50, display: 'flex', flexDirection: 'column',
       }}>
       <div style={{ flex: '0 0 auto', paddingTop: 60, paddingInline: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <button onClick={handleStop} aria-label="Close voice" style={{
+        <button onClick={handleClose} aria-label="Close voice" style={{
           width: 44, height: 44, borderRadius: 999, background: 'transparent',
           border: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
           cursor: 'pointer', color: T.color.SupportingText, margin: -8,
@@ -327,22 +355,64 @@ function HeroListening({ onDone }) {
 // ─── HERO CHAT ─── full-screen chat surface.
 // Mixed text/voice input; inline confirmation cards with Undo for agent actions;
 // quiet back-and-forth with the agent after a brief or a voice capture.
-function HeroChat({ onDone, onMic }) {
+function HeroChat({ onDone, onMic, seedTranscript = '', onTranscriptConsumed }) {
   const [draft, setDraft] = React.useState('');
+  const [thread, setThread] = React.useState([]);
+  const [pending, setPending] = React.useState(false);
   const scrollRef = React.useRef(null);
-  // Thread seeded from the voice capture the user just finished.
-  const thread = [
-    { kind: 'user', t: "I'm moving the Thursday pitch review to Friday morning — Anya's out Thursday afternoon and I want a clear head for it." },
-    { kind: 'agent', t: 'Done. I moved it to Friday 9:30, kept the 45-min block, and sent the update to Anya and Raf.' },
-    { kind: 'action', icon: 'calendar', title: 'Pitch review → Fri Apr 25, 9:30 AM', meta: 'Work Calendar · 2 guests notified' },
-    { kind: 'agent', t: "Raf's reply came back: he can't do Friday morning. Want me to ask him for a Friday-afternoon slot, or keep the meeting with just Anya?" },
-    { kind: 'user', t: 'Just Anya is fine. Send Raf the deck and ask for async notes.' },
-    { kind: 'agent', t: 'Drafted this for Raf — say the word and I send it.' },
-    { kind: 'action', icon: 'mail', title: 'Draft: "Deck for async review"', meta: 'To: Raf · Subject + 2-paragraph body ready', draft: true },
-  ];
+  const seededRef = React.useRef(false);
+
+  // Render an agent reply based on the classify-and-store response shape.
+  const replyForClassify = React.useCallback((res) => {
+    if (!res) return "Got it — I'll keep that in mind.";
+    if (res.classified === true && res.reminder) {
+      const when = res.reminder.remind_on || 'soon';
+      return `Got it. I'll surface "${res.reminder.text}" on ${when}.`;
+    }
+    if (res.classified === false) {
+      return "Noted — I didn't pin it to a date, but I'll keep it in context for the next brief.";
+    }
+    return "Got it — I'll keep that in mind.";
+  }, []);
+
+  // Send a user utterance through classify-and-store, append both turns.
+  const sendUtterance = React.useCallback(async (text) => {
+    const trimmed = (text || '').trim();
+    if (!trimmed) return;
+    setThread((prev) => [...prev, { kind: 'user', t: trimmed }]);
+    setPending(true);
+    try {
+      const res = window.classifyTranscript ? await window.classifyTranscript(trimmed) : null;
+      setThread((prev) => [...prev, { kind: 'agent', t: replyForClassify(res) }]);
+    } catch {
+      setThread((prev) => [...prev, { kind: 'agent', t: "Got it — I'll keep that in mind." }]);
+    } finally {
+      setPending(false);
+    }
+  }, [replyForClassify]);
+
+  // Seed the thread from a voice capture the user just finished, exactly once.
+  React.useEffect(() => {
+    if (seededRef.current) return;
+    if (!seedTranscript || !seedTranscript.trim()) return;
+    seededRef.current = true;
+    sendUtterance(seedTranscript);
+    if (onTranscriptConsumed) onTranscriptConsumed();
+  }, [seedTranscript, sendUtterance, onTranscriptConsumed]);
+
   React.useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, []);
+  }, [thread, pending]);
+
+  const submitDraft = () => {
+    const text = draft.trim();
+    if (!text) return;
+    setDraft('');
+    sendUtterance(text);
+  };
+  const onComposerKey = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitDraft(); }
+  };
   return (
     <div style={{
       position: 'absolute', inset: 0, background: T.color.PrimarySurface,
@@ -461,19 +531,33 @@ function HeroChat({ onDone, onMic }) {
         }}>
           <input
             value={draft} onChange={e => setDraft(e.target.value)}
-            placeholder="Say more, or ask a question…"
+            onKeyDown={onComposerKey}
+            placeholder={pending ? "Thinking…" : "Say more, or ask a question…"}
+            disabled={pending}
             style={{
               flex: 1, border: 'none', background: 'transparent', outline: 'none',
               fontFamily: T.font.Reading, fontSize: 15, color: T.color.PrimaryText,
+              opacity: pending ? 0.6 : 1,
             }}
           />
-          <button onClick={onMic} aria-label="Voice" style={{
-            width: 36, height: 36, borderRadius: 999, border: 'none',
-            background: T.color.PrimaryText, color: T.color.InverseText,
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-          }}>
-            <Icon.Mic size={16} color={T.color.InverseText} />
-          </button>
+          {draft.trim() ? (
+            <button onClick={submitDraft} disabled={pending} aria-label="Send" style={{
+              width: 36, height: 36, borderRadius: 999, border: 'none',
+              background: T.color.PrimaryText, color: T.color.InverseText,
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              cursor: pending ? 'default' : 'pointer', opacity: pending ? 0.5 : 1,
+            }}>
+              <Icon.Check size={16} color={T.color.InverseText} stroke={2.4} />
+            </button>
+          ) : (
+            <button onClick={onMic} aria-label="Voice" style={{
+              width: 36, height: 36, borderRadius: 999, border: 'none',
+              background: T.color.PrimaryText, color: T.color.InverseText,
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+            }}>
+              <Icon.Mic size={16} color={T.color.InverseText} />
+            </button>
+          )}
         </div>
       </div>
     </div>

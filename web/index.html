@@ -219,19 +219,21 @@ function PastJournalProto({ adds, onAddJournal, onPickEntry }) {
 }
 
 // Planned-phase Present, with optional populate-animation and optional evening CTA.
-function PresentPlanProtoAnimated({ phase, adds, onAddPlan, onAddJournal, animate, onStartReview }) {
-  const populated = window.usePopulate(PLAN_DATA.bands);
-  const total = PLAN_DATA.bands.reduce((a, b) => a + b.items.length, 0);
+// `plan` (optional) is the agent-driven plan from BriefFlow; falls back to PLAN_DATA seed.
+function PresentPlanProtoAnimated({ phase, adds, onAddPlan, onAddJournal, animate, onStartReview, plan }) {
+  const activePlan = plan || PLAN_DATA;
+  const populated = window.usePopulate(activePlan.bands);
+  const total = activePlan.bands.reduce((a, b) => a + b.items.length, 0);
   // When animating, we splice in the fade by replacing bands with a visibility-count per band.
   const visibleBands = React.useMemo(() => {
-    if (!animate) return PLAN_DATA.bands.map(b => ({ ...b, items: b.items }));
+    if (!animate) return activePlan.bands.map(b => ({ ...b, items: b.items }));
     let remaining = populated;
-    return PLAN_DATA.bands.map(b => {
+    return activePlan.bands.map(b => {
       const take = Math.max(0, Math.min(b.items.length, remaining));
       remaining -= b.items.length;
       return { ...b, items: b.items.slice(0, take) };
     });
-  }, [animate, populated]);
+  }, [animate, populated, activePlan]);
   const animationDone = !animate || populated >= total;
 
   return (
@@ -244,13 +246,14 @@ function PresentPlanProtoAnimated({ phase, adds, onAddPlan, onAddJournal, animat
       hideFlags={animate && populated < 2}
       onStartReview={onStartReview}
       addZonesReady={animationDone}
+      plan={activePlan}
     />
   );
 }
 
 // Shell copy of PresentPlanProto but accepts a bands override. Keeps add-zones
 // hidden until animation completes.
-function PresentPlanShell({ phase, adds, onAddPlan, onAddJournal, bands, hideFlags, onStartReview, addZonesReady }) {
+function PresentPlanShell({ phase, adds, onAddPlan, onAddJournal, bands, hideFlags, onStartReview, addZonesReady, plan = PLAN_DATA }) {
   const isEvening = phase === 'evening';
   const done = {
     'Hackathon build — light touch. One trial run for the demo.': true,
@@ -276,19 +279,19 @@ function PresentPlanShell({ phase, adds, onAddPlan, onAddJournal, bands, hideFla
           fontFamily: T.font.Display, fontSize: 28, fontWeight: 500, lineHeight: '32px',
           color: T.color.PrimaryText, letterSpacing: -0.5, fontStyle: 'italic',
           marginTop: 2,
-        }}>{isEvening ? 'How the day landed.' : PLAN_DATA.pacing.title}</div>
+        }}>{isEvening ? 'How the day landed.' : plan.pacing.title}</div>
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '10px 20px 160px', display: 'flex', flexDirection: 'column', gap: 18 }}>
         {!isEvening && (
-          <div style={{ fontFamily: T.font.Reading, fontSize: 15, lineHeight: '23px', color: T.color.SupportingText, fontStyle: 'italic' }}>{PLAN_DATA.pacing.body}</div>
+          <div style={{ fontFamily: T.font.Reading, fontSize: 15, lineHeight: '23px', color: T.color.SupportingText, fontStyle: 'italic' }}>{plan.pacing.body}</div>
         )}
 
         {!isEvening && !hideFlags && (
           <div style={{ }}>
             <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: T.color.SupportingText, marginBottom: 8 }}>Flags</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {PLAN_DATA.flags.map((f, i) => {
+              {plan.flags.map((f, i) => {
                 const m = FLAG_META[f.k];
                 return (
                   <div key={i} style={{
@@ -395,7 +398,7 @@ function PresentPlanShell({ phase, adds, onAddPlan, onAddJournal, bands, hideFla
           <div>
             <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: T.color.SupportingText, marginBottom: 10 }}>Consciously parked today</div>
             <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {PLAN_DATA.parked.map((p, i) => (
+              {plan.parked.map((p, i) => (
                 <li key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, fontFamily: T.font.Reading, fontSize: 14, lineHeight: '20px', color: T.color.SubtleText, fontStyle: 'italic' }}>
                   <span style={{ width: 16, height: 1, background: T.color.EdgeLine, flexShrink: 0 }} />
                   {p}
@@ -590,9 +593,20 @@ const DAY_STATES = [
 function PrototypePhone({ dayState, setDayState }) {
   const [idx, setIdx] = React.useState(1);
   const [heroState, setHeroState] = React.useState('idle');
+  const [capturedTranscript, setCapturedTranscript] = React.useState('');
+  // Hero state-machine wrapper: extracts a transcript payload from voice→chat
+  // transitions so HeroChat can seed its thread with the user's words.
+  const onHeroChange = React.useCallback((next, payload) => {
+    if (payload && typeof payload.transcript === 'string') {
+      setCapturedTranscript(payload.transcript);
+    }
+    setHeroState(next);
+  }, []);
   const [openProject, setOpenProject] = React.useState(null);
   const [openGoal, setOpenGoal] = React.useState(null);
   const [briefJustAccepted, setBriefJustAccepted] = React.useState(false);
+  const [livePlan, setLivePlan] = React.useState(null);   // agent-driven plan from latest BriefFlow accept
+  const [liveReview, setLiveReview] = React.useState(null); // agent-driven review summary from latest ReviewFlow accept
   const [showJournal, setShowJournal] = React.useState(false);
   const [showConnections, setShowConnections] = React.useState(false);
   const [profileView, setProfileView] = React.useState(null); // null | 'sheet' | 'account' | 'preferences' | 'help'
@@ -625,12 +639,14 @@ function PrototypePhone({ dayState, setDayState }) {
 
   // When Brief completes, advance to planned with the populate flag.
   // Persist completion so refresh keeps the user in the right state until midnight.
-  const onBriefComplete = () => {
+  const onBriefComplete = (plan) => {
+    if (plan) setLivePlan(plan);
     setBriefJustAccepted(true);
     markCompletedToday('brief');
     setDayState('planned');
   };
-  const onReviewComplete = () => {
+  const onReviewComplete = (review) => {
+    if (review) setLiveReview(review);
     markCompletedToday('review');
     setDayState('closed');
   };
@@ -643,7 +659,7 @@ function PrototypePhone({ dayState, setDayState }) {
       return <PresentEmpty onStartBrief={() => setDayState('brief')} />;
     }
     if (dayState === 'closed') {
-      return <PresentClosed />;
+      return <PresentClosed review={liveReview} />;
     }
     if (dayState === 'evening') {
       return (
@@ -654,6 +670,7 @@ function PrototypePhone({ dayState, setDayState }) {
           onAddJournal={m.addJournal}
           animate={false}
           onStartReview={() => setDayState('review')}
+          plan={livePlan}
         />
       );
     }
@@ -665,6 +682,7 @@ function PrototypePhone({ dayState, setDayState }) {
         onAddPlan={m.addPlanItem}
         onAddJournal={m.addJournal}
         animate={briefJustAccepted}
+        plan={livePlan}
       />
     );
   })();
@@ -848,7 +866,9 @@ function PrototypePhone({ dayState, setDayState }) {
           <TenseNav index={idx} onIndex={setIdx} dim={micDim} />
           <HeroAffordance
             state={heroState}
-            onChange={setHeroState}
+            onChange={onHeroChange}
+            seedTranscript={capturedTranscript}
+            onTranscriptConsumed={() => setCapturedTranscript('')}
             onPick={(key) => {
               if (key === 'journal') {
                 setHeroState('idle');
@@ -863,7 +883,9 @@ function PrototypePhone({ dayState, setDayState }) {
       {(openGoal || openProject) && dayState !== 'brief' && dayState !== 'review' && !showJournal && !showConnections && !profileView && (
         <HeroAffordance
           state={heroState}
-          onChange={setHeroState}
+          onChange={onHeroChange}
+          seedTranscript={capturedTranscript}
+          onTranscriptConsumed={() => setCapturedTranscript('')}
           onPick={(key) => {
             if (key === 'journal') {
               setHeroState('idle');
