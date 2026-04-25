@@ -26,7 +26,7 @@ Daily morning run (not Saturday-only) is deliberate: a silent blocker on Wednesd
   - Loop reports from yesterday evening if present (`critical-flow-check-*.md`, `eval-spot-check-*.md`, `build-watchdog-*.md`, `criteria-sync-*.md`)
 - Overnight auto-fix PRs (`gh pr list --search 'auto/ in:title created:>yesterday'` or similar)
 - `TRACKER.md` current state
-- `.claude/session-handoff.md` (context from last session)
+- `.claude/handoffs/*.md` (active project handoffs for context, if any)
 
 ## Output
 

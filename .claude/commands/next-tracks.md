@@ -102,7 +102,7 @@ I'll draft prompts only after you approve. Generated prompts stay local (uncommi
 
 - Do NOT write any files. Output only. The user reviews, then directs.
 - Do NOT launch any `intently-track` command. The user runs those manually after approving.
-- Do NOT edit TRACKER.md, CLAUDE.md, session-handoff.md.
+- Do NOT edit TRACKER.md, CLAUDE.md, or any file under .claude/handoffs/.
 - If the classification is ambiguous, default to BLOCKED and note the ambiguity — better to under-propose than to generate work for items that shouldn't run.
 - If no items are READY, say so plainly and suggest what to look at next (Critical items, spec decisions, etc.).
 

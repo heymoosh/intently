@@ -16,7 +16,7 @@ Stable context for every Claude session in this repo. If guidance drifts from re
 
 Intently is a mobile app that turns recurring life operations (daily triage, morning briefing, weekly review, meal planning, monthly review) into an agent-native experience. Scheduled managed agents do the work; the mobile UI reflects state, triggers runs, and renders output.
 
-Primary journeys (also the demo flows and Spec Conformance Steward targets): **daily brief**, **daily review**, **weekly review**. Full behavior lives in `docs/product/requirements/life-ops-plugin-spec.md`; MVP cut in `.claude/session-handoff.md`.
+Primary journeys (also the demo flows and Spec Conformance Steward targets): **daily brief**, **daily review**, **weekly review**. Full behavior lives in `docs/product/requirements/life-ops-plugin-spec.md`; MVP cut in `TRACKER.md` § Locked decisions.
 
 ## Architecture source of truth
 
@@ -60,7 +60,7 @@ Unit (agent memory + deterministic logic) + E2E (three demo flows). **Skip integ
 
 ## Doc upkeep
 
-Implementation changes → `docs/architecture/`, `docs/decisions/` (ADRs for non-obvious calls), `evals/reports/`, `.claude/session-handoff.md`. CLAUDE.md updates only when guidance drifts from reality — any routine that spots drift proposes the fix.
+Implementation changes → `docs/architecture/`, `docs/decisions/` (ADRs for non-obvious calls), `evals/reports/`, `.claude/handoffs/<slug>.md` for the active project. CLAUDE.md updates only when guidance drifts from reality — any routine that spots drift proposes the fix.
 
 ## Routine and loop pack
 
@@ -70,6 +70,8 @@ Implementation changes → `docs/architecture/`, `docs/decisions/` (ADRs for non
 
 `TRACKER.md` is the canonical first-read on resume — hot queue, critical items, what's in flight. **At session start, if `TRACKER.md` has items under "Critical items awaiting review," walk through those with Muxin before substantive work.**
 
-`.claude/session-handoff.md` is the **Session Handoff Steward's** auto-generated daily audit trail (overwritten 22:45 nightly from git log + routine reports). Useful for "what happened yesterday" on a cold resume; not authoritative for "what's next" — TRACKER is. Convention reference: `docs/process/session-handoff.md`.
+**Project depth lives in `.claude/handoffs/<slug>.md`** — one file per project (not per session), persistent across sessions, never auto-deleted. Triad: `launch-plan.md` (slow strategy) → `TRACKER.md` (hot queue) → `.claude/handoffs/<slug>.md` (project depth). Convention: `docs/process/session-handoff.md`. Slash command: `/handoff`.
+
+**Propose `/handoff` at kickoff** — when conversation has produced (a) a stated goal, (b) at least one non-trivial decision with rationale, AND (c) work that's plausibly multi-session or multi-file. Skip for quick fixes, single-PR work, exploratory chats. **Update inline** as decisions land mid-session; **re-distill** via `/handoff` at session-end (the "clean happy-path" pass that strips exploratory noise). **Continue, don't duplicate** — if a slug already exists in `.claude/handoffs/`, update it.
 
 **Drift check.** A `SessionStart` hook runs `scripts/session-precheck.sh` and may inject a `[session-precheck]` report into context. If present, surface it and offer to walk the fix playbook (`/precheck`) before substantive work.

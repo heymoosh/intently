@@ -7,7 +7,7 @@ The user invoked `/start-work` to resume working on Intently. Pick up cleanly fr
 2. **Read once, in this order:**
    - `TRACKER.md` — the hot queue + Critical items awaiting review.
    - `launch-plan.md` — durable strategy + milestones (skim if you've recently read it; full read if it's been a while).
-   - Any files referenced in TRACKER's "Active session docs" or `.claude/session-handoffs/` directory — these hold the depth for in-flight work post-steward-redesign. Skip if neither exists yet.
+   - Any files referenced in TRACKER's "Active handoffs" section or `.claude/handoffs/` directory — these hold project depth for in-flight work. Skip if neither has entries yet.
 
 3. **Don't re-fetch files you already have in context.** If something looks familiar from earlier in this session, recall and confirm instead of running another `Read`. State "I already pulled X this session — gist is Y" rather than re-reading.
 

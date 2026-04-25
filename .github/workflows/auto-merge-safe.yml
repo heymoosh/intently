@@ -2,8 +2,11 @@ name: auto-merge-safe
 
 # Classifies auto/* and feat/track-* PRs and auto-merges when safe.
 #
-#   Mechanical paths (routine-output / TRACKER.md / session-handoff.md)
+#   Mechanical paths (routine-output / TRACKER.md)
 #     → auto-merge once security.yml passes. No human review.
+#     Note: .claude/handoffs/*.md is intentionally NOT mechanical — handoffs
+#     are substantive project artifacts written by interactive Claude
+#     sessions, so they fall through to the docs/config classifier.
 #   Docs/config paths (docs/**, CLAUDE.md, .gitignore, etc.)
 #     → flip ready-for-review, label, comment. User reads these.
 #   Code paths (agents/**, app/**, supabase/**, tests/**, evals/**, scripts/**)
@@ -124,7 +127,7 @@ jobs:
           echo "Changed files:"
           echo "$FILES"
 
-          MECHANICAL_RE='^(routine-output/|\.claude/session-handoff\.md$|TRACKER\.md$)'
+          MECHANICAL_RE='^(routine-output/|TRACKER\.md$)'
           CODE_RE='^(agents/|app/|supabase/|tests/|evals/(datasets|rubrics|baselines|runner)/|scripts/|\.githooks/|\.github/workflows/)'
 
           ALL_MECHANICAL=true

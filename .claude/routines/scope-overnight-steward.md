@@ -107,7 +107,7 @@ Write to `routine-output/scope-overnight-<YYYY-MM-DD>.md` (today's date, since t
 ## Definition of done
 
 - `routine-output/scope-overnight-<YYYY-MM-DD>.md` written
-- One-line entry appended to `.claude/session-handoff.md` under "Recent routine runs"
+- (Routine output is the deliverable; no separate session-handoff append — that file was retired in `chat/handoff-steward-redesign`. Active project handoffs now live at `.claude/handoffs/<slug>.md` and are not auto-appended to by routines.)
 - If fewer than 3 READY items identified, flag this at the top so Muxin can reconsider whether to run the loop at all tonight (low-yield nights aren't worth the token spend)
 
 ## Hard stops for the routine itself

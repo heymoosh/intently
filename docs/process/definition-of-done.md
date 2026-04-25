@@ -58,7 +58,7 @@ Before I declare this done, check:
 If any answer is NO or UNKNOWN, do not call it done. Fix it or surface the blocker.
 ```
 
-If the answer to any of these is no, **do not pass go**. Fix the gap or explicitly flag it as a blocker for the next session with a written note in `.claude/session-handoff.md`.
+If the answer to any of these is no, **do not pass go**. Fix the gap or explicitly flag it as a blocker — add a bullet to `TRACKER.md` § Follow-ups and, if the work is part of an active project, append the blocker to that project's `.claude/handoffs/<slug>.md` § Open questions.
 
 ---
 

@@ -41,4 +41,4 @@ At minimum:
 - `CLAUDE.md` — product/build context anchor.
 - `docs/process/release-gates.md` — what must be true before a feature ships.
 - `docs/process/acceptance-criteria.md` — how criteria are authored and edited.
-- `docs/process/session-handoff.md` — how sessions hand off to each other.
+- `docs/process/session-handoff.md` — per-project handoff convention; slash command `/handoff`; files at `.claude/handoffs/<slug>.md`.
