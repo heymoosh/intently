@@ -4,6 +4,8 @@ description: "Universal project tracker updater. Invoked whenever the user finis
 status: hackathon-mvp
 ---
 
+> **⚠️ Superseded by `ma-agent-config.json`.** The deployed agent (`intently-update-tracker`) runs the `system` prompt embedded in `ma-agent-config.json`, not this file. This SKILL.md is the human-authored source-of-truth for behavior intent; edits here do **not** propagate until re-provisioned via `scripts/provision-ma-agents.ts`.
+
 # Update Tracker — Universal Project Progress Logger
 
 Your job: figure out which project was worked on, update the right tracker, and sync the change into the Command Center dashboard. The user should never need to remember which tracker to open — this skill does that mapping.

@@ -4,6 +4,8 @@ description: "First-run onboarding. Captures long-term goals, active projects, a
 status: hackathon-mvp
 ---
 
+> **⚠️ Superseded by `ma-agent-config.json`.** The deployed agent (`intently-setup`) runs the `system` prompt embedded in `ma-agent-config.json`, not this file. This SKILL.md is the human-authored source-of-truth for behavior intent; edits here do **not** propagate until re-provisioned via `scripts/provision-ma-agents.ts`.
+
 # Setup — First-Run Onboarding
 
 A ~10 minute conversation that leaves the user with a working Life Ops system. The full 6-phase onboarding from the spec is trimmed for V1 — we only do the two phases that produce content the daily-brief and weekly-review need to function.

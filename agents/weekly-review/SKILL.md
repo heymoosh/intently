@@ -4,6 +4,8 @@ description: "Scheduled weekly review. Reads the past week's journal and logs, s
 status: hackathon-mvp
 ---
 
+> **⚠️ Superseded by `ma-agent-config.json` (deployed 2026-04-25).** The live agent in the Managed Agents console (`intently-weekly-review`) runs the `system` prompt embedded in `ma-agent-config.json`, not this file. This SKILL.md is the human-authored source-of-truth for behavior intent; edits here do **not** propagate until re-provisioned via `scripts/provision-ma-agents.ts`.
+
 # Weekly Review
 
 The compounding engine. This is a conversation, not a report — pause and wait for the user's input at each step.

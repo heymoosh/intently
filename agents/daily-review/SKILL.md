@@ -4,6 +4,8 @@ description: "Scheduled end-of-day review. Wraps today's log, reconciles with ch
 status: hackathon-mvp
 ---
 
+> **⚠️ Superseded by `ma-agent-config.json` (deployed 2026-04-25).** The live agent in the Managed Agents console (`intently-daily-review`) runs the `system` prompt embedded in `ma-agent-config.json`, not this file. This SKILL.md is the human-authored source-of-truth for behavior intent; edits here do **not** propagate until re-provisioned via `scripts/provision-ma-agents.ts`.
+
 # Daily Review
 
 End-of-day review. The administrative steps below need to run, but **the output to the user must lead with the day, not the checklist.** See "How to present this" before writing any final response.
