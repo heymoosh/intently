@@ -16,13 +16,24 @@ import {
 import Markdown from '@ronradtke/react-native-markdown-display';
 import AgentOutputCard from './components/AgentOutputCard';
 import BriefFlow, { BriefAnswers } from './components/BriefFlow';
+import GoalDetail from './components/GoalDetail';
 import JournalEditor from './components/JournalEditor';
+import ProjectCard from './components/ProjectCard';
+import ProjectDetail from './components/ProjectDetail';
 import VoiceModal from './components/VoiceModal';
 import { AgentOutput } from './lib/agent-output';
 import { callMaProxy, MaProxyError, MaSkill, toAgentOutput } from './lib/ma-client';
 import { DAILY_BRIEF_DEMO_INPUT, dailyBriefSeed } from './fixtures/daily-brief-seed';
 import { DAILY_REVIEW_DEMO_INPUT, dailyReviewSeed } from './fixtures/daily-review-seed';
 import { WEEKLY_REVIEW_DEMO_INPUT, weeklyReviewSeed } from './fixtures/weekly-review-seed';
+import {
+  Goal,
+  GOAL_DATA,
+  getGoalById,
+  getProjectById,
+  Project,
+  PROJECT_DATA,
+} from './fixtures/goals-projects';
 import { fetchDueReminders, formatRemindersForInput } from './lib/reminders';
 import { supabase } from './lib/supabase';
 import { theme } from './lib/tokens';
@@ -45,27 +56,25 @@ type LiveState =
 // clock-driven; for demo we expose a dev toggle so we can record each beat.
 type PresentPhase = 'morning' | 'planned' | 'evening';
 
-// Three goals at a time per MVP spec (§2.1). Each has a monthly slice that
-// refreshes on month boundary. Painterly palettes deferred to post-V1; flat
-// card-surface tokens carry the visual load for now, varied so the three
-// cards read as distinct.
-const GOALS = [
-  {
-    title: 'Move to Japan.',
-    monthly: 'April: finish the visa checklist and book the scouting trip for June.',
-    tint: 'ConfirmationCardSurface' as const,
-  },
-  {
-    title: 'Start a side hustle that pays my rent.',
-    monthly: 'April: ship the landing page and get 10 waitlist signups from real conversations.',
-    tint: 'QuestCardSurface' as const,
-  },
-  {
-    title: 'Be someone I would want to work with.',
-    monthly: 'April: one 1:1 a week, and say the hard thing out loud when it matters.',
-    tint: 'UncertainCardSurface' as const,
-  },
-];
+// Three goals at a time per MVP spec (§2.1). Sourced from fixtures so the
+// Future band, GoalDetail drill-down, and ProjectDetail all read from one
+// place — keeps the Sam persona consistent across the demo (no Maya drift).
+//
+// Tints are the painterly-tint families translated to flat card surfaces;
+// each goal still varies enough that the three cards read distinct.
+const GOAL_TINTS = [
+  'ConfirmationCardSurface',
+  'QuestCardSurface',
+  'UncertainCardSurface',
+] as const;
+
+// Detail-view navigation state. Both detail screens are rendered as full-bleed
+// overlays above the swipe shell when set (BriefFlow Modal pattern). Mutually
+// exclusive with each other; null means the swipe shell is unobstructed.
+type DetailView =
+  | { kind: 'goal'; id: string }
+  | { kind: 'project'; id: string }
+  | null;
 
 // Dev-only Supabase status pill. Hidden in normal state so the demo surface
 // isn't cluttered; we only surface an error (user-meaningful).
@@ -254,6 +263,14 @@ export default function App() {
   // Opens from the morning sunrise CTA — replaces the prior direct-agent-call pattern
   // so the demo lands "the agent IS the interface" instead of "tap pill, see brief."
   const [briefFlowOpen, setBriefFlowOpen] = useState(false);
+  // Goal/Project drill-down navigation state. Tapping a goal or project card
+  // anywhere (Future band, inside GoalDetail) sets this; back / close clears.
+  // Detail screens render as full-bleed overlays above the swipe shell.
+  const [detailView, setDetailView] = useState<DetailView>(null);
+  const openGoal = (goal: Goal) => setDetailView({ kind: 'goal', id: goal.id });
+  const openProject = (project: Project) =>
+    setDetailView({ kind: 'project', id: project.id });
+  const closeDetail = () => setDetailView(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -495,8 +512,15 @@ export default function App() {
     />
   );
 
-  // Future — three goal cards + monthly slice per design §3.3. Projects band
-  // deferred; goals are the primary content here.
+  // Future — three goal cards + Projects band per design §3.3. Each goal card
+  // is a Pressable that opens GoalDetail; the Projects band shows non-Admin
+  // projects in a 2-col grid that opens ProjectDetail.
+  //
+  // Projects band sits below the goals in the same scroll container, matching
+  // intently-screens.jsx → ProjectsBand. Admin project intentionally excluded
+  // from this band (HANDOFF §1.4 — Admin lives in its own band post-MVP; for
+  // now we just hide it here).
+  const visibleProjects = PROJECT_DATA.filter((p) => p.id !== 'admin');
   const futureScreen = (
     <Screen
       content={
@@ -506,19 +530,44 @@ export default function App() {
             Three long-term visions. Each one gets a monthly slice — the agent cascades
             it into weekly and daily moves on Present.
           </Text>
-          {GOALS.map((g, i) => (
-            <View
-              key={i}
-              style={[styles.goalCard, { backgroundColor: t.colors[g.tint] }]}
-            >
-              <Text style={styles.goalTitle}>{g.title}</Text>
-              <View style={styles.goalDivider} />
-              <Text style={styles.goalMonthlyEyebrow}>APRIL</Text>
-              <Text style={styles.goalMonthly}>
-                {g.monthly.replace(/^April:\s*/, '')}
+          {GOAL_DATA.map((g, i) => {
+            const tintToken = GOAL_TINTS[i % GOAL_TINTS.length];
+            return (
+              <Pressable
+                key={g.id}
+                onPress={() => openGoal(g)}
+                accessibilityLabel={`Open goal ${g.title}`}
+                style={[
+                  styles.goalCard,
+                  { backgroundColor: t.colors[tintToken] },
+                ]}
+              >
+                <Text style={styles.goalTitle}>{g.title}</Text>
+                <View style={styles.goalDivider} />
+                <Text style={styles.goalMonthlyEyebrow}>APRIL</Text>
+                <Text style={styles.goalMonthly}>
+                  {g.month.replace(/^April:\s*/, '')}
+                </Text>
+              </Pressable>
+            );
+          })}
+
+          {/* Projects band */}
+          <View style={styles.projectsBand}>
+            <View style={styles.projectsBandHeader}>
+              <Text style={styles.projectsBandLabel}>PROJECTS</Text>
+              <Text style={styles.projectsBandCount}>
+                {visibleProjects.length} active
               </Text>
             </View>
-          ))}
+            <View style={styles.projectsGrid}>
+              {visibleProjects.map((p) => (
+                <View key={p.id} style={styles.projectsGridCell}>
+                  <ProjectCard project={p} onPress={() => openProject(p)} />
+                </View>
+              ))}
+            </View>
+          </View>
         </View>
       }
     />
@@ -578,7 +627,63 @@ export default function App() {
           agentError={liveBrief.kind === 'error' ? liveBrief.message : null}
         />
       ) : null}
+      {/* Goal/Project drill-down — full-bleed overlay above the swipe shell.
+          Same conditional-mount posture as BriefFlow so a closed detail
+          doesn't leave a portal mounted. Detail screens are stack-style
+          replacements (state machine, not nav stack), so opening a project
+          from inside a goal simply mutates `detailView`. */}
+      {detailView ? <DetailOverlay
+        view={detailView}
+        onBack={closeDetail}
+        onOpenGoal={openGoal}
+        onOpenProject={openProject}
+      /> : null}
       <StatusBar style="auto" />
+    </View>
+  );
+}
+
+// Renders whichever detail screen the navigation state points at. Defensive on
+// missing IDs so a stale state can't crash the shell — closes itself instead.
+function DetailOverlay({
+  view,
+  onBack,
+  onOpenGoal,
+  onOpenProject,
+}: {
+  view: NonNullable<DetailView>;
+  onBack: () => void;
+  onOpenGoal: (goal: Goal) => void;
+  onOpenProject: (project: Project) => void;
+}) {
+  if (view.kind === 'goal') {
+    const goal = getGoalById(view.id);
+    if (!goal) {
+      onBack();
+      return null;
+    }
+    return (
+      <View style={styles.detailOverlay}>
+        <GoalDetail
+          goal={goal}
+          onBack={onBack}
+          onOpenProject={onOpenProject}
+        />
+      </View>
+    );
+  }
+  const project = getProjectById(view.id);
+  if (!project) {
+    onBack();
+    return null;
+  }
+  return (
+    <View style={styles.detailOverlay}>
+      <ProjectDetail
+        project={project}
+        onBack={onBack}
+        onOpenGoal={onOpenGoal}
+      />
     </View>
   );
 }
@@ -793,5 +898,49 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     color: t.colors.PrimaryText,
     opacity: 0.86,
+  },
+  // Future Projects band — sits below the goal cards in the same scroll
+  // container per design §3.3 + intently-screens.jsx → ProjectsBand.
+  projectsBand: {
+    marginTop: t.spacing['5'],
+  },
+  projectsBandHeader: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    marginBottom: t.spacing['3'],
+  },
+  projectsBandLabel: {
+    fontFamily: t.typography.fonts.UISemi,
+    fontSize: 10,
+    letterSpacing: 1.4,
+    color: t.colors.SupportingText,
+  },
+  projectsBandCount: {
+    fontFamily: t.typography.fonts.UI,
+    fontSize: 11,
+    color: t.colors.SubtleText,
+  },
+  projectsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -5,
+  },
+  projectsGridCell: {
+    width: '50%',
+    paddingHorizontal: 5,
+    marginBottom: 10,
+  },
+  // Detail overlay — full-bleed surface above the swipe shell. Absolute
+  // position with high zIndex so it sits over the pager + hero button. Pager
+  // keeps its swipe-snap; the overlay just paints over it while open.
+  detailOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 100,
+    backgroundColor: t.colors.PrimarySurface,
   },
 });
