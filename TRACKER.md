@@ -30,11 +30,11 @@ This section is the spine. Every topic with a "current truth" lives here as a po
 
 ## Status
 
-**Phase:** Submission — `web/` daily arc live in code AND on the deployed URL. Demo recording + submission remaining.
-**Status:** 🟢 `intently-eta.vercel.app` serves the inherited prototype (verified via `curl` 2026-04-25 — `<title>Intently — Prototype</title>`). Voice (Web Speech), morning brief, evening review all call live ma-proxy.
-**Last:** 5 PRs landed in the web-wiring sprint — #111 (web/lib port), #112 (live voice in HeroListening), #113 (live brief in BriefFlow), #114 (vercel.json cutover staged), #115 (live review in ReviewFlow). Vercel Root Directory cleared after that. Main at `ea1ca4a`.
-**Next:** Manual smoke on the deployed URL → demo recording → submit Sun 8 PM EDT.
-**Last updated:** 2026-04-25 (Vercel cutover confirmed live; deploy no longer blocking).
+**Phase:** Submission — `web/` daily arc live in code AND on the deployed URL. Smoke complete; **3 P0 wiring gaps surfaced** (see Smoke gaps below). Demo recording + submission remaining.
+**Status:** 🟡 `intently-eta.vercel.app` serves the inherited prototype. ma-proxy `daily-brief` + `daily-review` calls verified live (200, real Opus 4.7 prose synthesizing user inputs). **But:** voice transcript drops on stop, brief/review chat steps 1–2 are scripted not live, populated plan post-confirm is static MOCK_PLAN not agent-driven.
+**Last:** End-to-end Playwright smoke 2026-04-25 — 9 gaps captured (3 P0, 3 P1, 3 P2). 5 web-wiring PRs landed before that (#111–#115). Main at `487d65a`.
+**Next:** Decide on the 3 P0 smoke gaps → demo recording → submit Sun 8 PM EDT.
+**Last updated:** 2026-04-25 (post-smoke; status downgraded 🟢→🟡 reflecting wiring gaps).
 
 ### Go/No-Go (2026-04-24 EOD)
 
@@ -71,6 +71,34 @@ Project briefs at `.claude/handoffs/<slug>.md` — persist across sessions; neve
 2. **Reminders intent reconciliation.** Muxin's stated intent (in his own words, captured in the entries-architecture session prompt): "*reminders was more like, 'keep track of this and surface it in daily briefing' not specifically 'you asked me to remind you to...' so that if i say, dropped in a 'hey add this somewhere' and leave a voice memo the agent's like 'cool got it' and it stashes it somewhere where it will pull it up again during our daily briefing... it tracks time sensitivity.*" Current shipped reminders flow is still narrow date-anchored (classify prompt rejects anything without a clear date). The reconciliation pass needs to confirm whether the new design folder has a different/better model for this — and whether "Entry as canonical, reminders as projection" still holds.
 
 3. **Worktree at `~/worktrees/intently/entries-architecture` is parked.** It was created via `intently-track entries-architecture` but no Claude session has done work in it. After reconciliation, decide: continue in that worktree, destroy + recreate fresh, or skip the worktree pattern entirely if the new plan doesn't fit it. Don't run `claude` in it until the reconciliation is done; otherwise that session starts building from a stale plan.
+
+## Smoke gaps (2026-04-25 — pre-submission)
+
+End-to-end Playwright smoke against `intently-eta.vercel.app/?dev=1`. ma-proxy fired live and returned 200 for both `daily-brief` and `daily-review` (verified via network tab — request bodies contained the actual user inputs typed in the chat). Live Opus 4.7 prose rendered in the brief + review confirm-step bubbles. UI navigation and overlays all work. **Gaps below are wiring shortfalls behind the visual fidelity** — order is "what hurts the demo most."
+
+### P0 — fix or decide before submission
+
+1. **Voice transcript drops on stop.** Confirmed live by Muxin's mic test: Web Speech captures audio, transcript appears live during speaking, then **disappears** when the stop button is pressed. Per `web/WIRING-POINTS.md` line 38, this is the unwired beat flagged "P0 — DECISION REQUIRED": HeroListening's stop button calls `onDone` which flips state to `'chat'` with no transcript handling. The chat view then renders the seeded mock thread, not the user's words. **Decision needed (WIRING-POINTS.md OPEN Q1):** route to `classifyTranscript()` (capture-as-reminder), or to `callMaProxy({skill:'chat', input})` (start a chat turn), or both. For a 3-minute demo where voice is the headline, "speak → text vanishes" is the worst possible beat.
+
+2. **Brief + review chat scripts are partly canned.** Steps 1–2 of each flow are driven by hardcoded `BRIEF_SCRIPT` / `REVIEW_SCRIPT` arrays in `web/intently-flows.jsx`. The agent's "Morning, Maya" / "What's alive for you today?" / "Anything you're carrying that you want to park?" are literal strings in the JSX, not from the agent. **Only the final user input** before the confirm card actually fires `callMaProxy`. If a judge interrupts the demo mid-conversation or types something unexpected at step 1, it advances the script regardless of input semantics. Decision: live for the demo path (sufficient for a recorded video), or wire per-turn.
+
+3. **Populated plan after BriefConfirmCard accept is static seed.** The mid-day plan view (Demo day / Hackathon first / WIP commitment / morning / afternoon / evening / parked items) renders from the `MOCK_PLAN` constant in `web/intently-flows.jsx`, not from the agent's response. The live agent prose lands in the chat bubble before the confirm card, then is discarded. Anything the user said that should reshape the day (e.g., "I'm sick today, no work") is ignored. Same pattern for the closed-state "TODAY, IN ONE LINE" + "FOR TOMORROW" — both static. Tracked in TRACKER post-hackathon backlog already, but elevating priority: the demo's "Opus 4.7 reshaped my day from my answers" beat does not land because the day doesn't actually reshape.
+
+### P1 — visible bugs
+
+4. **Integration logos 404 on Connections page.** `/assets/integrations/notion.png`, `slack.webp`, `gcal.png`, `outlook.svg`, `gmail.png`, `github.png` all return 404. The Connections page renders integration rows with broken images (small "Goog…" text fallback visible in OAuth modal too). 6 missing files; needs the assets folder populated under `web/assets/integrations/`.
+
+5. **`setPointerCapture` NotFoundError on hero mic** under any non-pointer event source (assistive tech, keyboard activation, voice control). `intently-hero.jsx:106` calls `setPointerCapture(e.pointerId)` unconditionally inside `onMicPointerDown`; throws when `pointerId` doesn't refer to an active pointer. Needs a try/catch or a `e.pointerId != null` guard.
+
+6. **`textDecoration` shorthand vs `textDecorationColor` warning** from `AutoCheckList` in ReviewFlow (4 React console errors per review run). Cosmetic; mixing shorthand and longhand `text-decoration` properties on the same `<span>`. `intently-flows.jsx` AutoCheckList — split shorthand or set both as separate longhand.
+
+### P2 — known design choices, deferred
+
+7. **AddZones (goals, projects, plan items, journal entries, admin reminders, project todos) all save to in-memory React state via `useManualAdds`.** Verified: added a project todo + admin reminder + journal entry, all rendered correctly across screens (Past↔Present journal share confirmed). All vanish on refresh. WIRING-POINTS.md OPEN Q2 left these unwired for the demo. Acceptable for a recorded demo; needs Supabase persistence for real usage.
+
+8. **OAuth flow is fully mocked.** `setTimeout`-driven consent → auth → success animation; "Connected · synced 4 min ago" string is hardcoded. WIRING-POINTS.md tracks this; deferred until post-hackathon.
+
+9. **Profile sub-pages (Account, Preferences, Help) are static UI with no auth backend.** Per ADR 0002 V1 single-user. Toggles + form fields are local state only.
 
 ## Follow-ups (pending manual or flight-test)
 
