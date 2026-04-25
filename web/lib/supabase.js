@@ -2,32 +2,35 @@
 // loaded in index.html (`<script src=".../@supabase/supabase-js@2"></script>`)
 // which exposes `window.supabase = { createClient, ... }`.
 //
-// Reads URL + anon key from window.INTENTLY_CONFIG (set inline in index.html).
-// Anon key is RLS-gated and intentionally safe to commit; the service-role key
-// stays in BWS / Supabase env.
+// Reads URL + publishable key from window.INTENTLY_CONFIG (set inline in
+// index.html). Publishable key is RLS-gated and intentionally safe to commit;
+// the secret key stays in BWS / Supabase env.
+//
+// Auth: V1 single-user (ADR 0002). On first client construction we kick off an
+// anonymous sign-in so every browser session gets a stable auth.uid() that
+// satisfies the owner-only RLS policies in 0001/0003/0004/0005. Anonymous users
+// are persisted to localStorage (so refresh keeps the same uid + the same data),
+// and each browser/device gets its own scoped data — no multi-device sync until
+// real sign-in lands.
 //
 // Lazy: the client is created on first getSupabaseClient() call so the rest of
 // the prototype keeps loading even if the UMD script blocks or fails. Failure
 // surfaces at call-time, not at script-load time.
-//
-// Ported in spirit from app/lib/supabase.ts. Differences:
-//   - process.env.* → window.INTENTLY_CONFIG.*
-//   - TypeScript stripped
-//   - Singleton instead of module-level export
-//   - Exports attached to window for cross-script access
 
 let _client = null;
+let _authPromise = null;
 
 function getSupabaseClient() {
   if (_client) return _client;
 
   const cfg = window.INTENTLY_CONFIG || {};
   const url = cfg.supabaseUrl;
-  const anonKey = cfg.supabaseAnonKey;
+  // Accept either name during the anon→publishable transition window.
+  const apiKey = cfg.supabasePublishableKey || cfg.supabaseAnonKey;
 
-  if (!url || !anonKey) {
+  if (!url || !apiKey) {
     throw new Error(
-      'INTENTLY_CONFIG.supabaseUrl / supabaseAnonKey missing — cannot create Supabase client.',
+      'INTENTLY_CONFIG.supabaseUrl / supabasePublishableKey missing — cannot create Supabase client.',
     );
   }
 
@@ -38,24 +41,42 @@ function getSupabaseClient() {
     );
   }
 
-  _client = sb.createClient(url, anonKey, {
+  _client = sb.createClient(url, apiKey, {
     auth: {
-      // No auth flow yet (V1 single-user). Mirrors app/lib/supabase.ts.
-      persistSession: false,
-      autoRefreshToken: false,
+      // Persist the anonymous session so refresh keeps the same auth.uid()
+      // (and therefore the same scoped data).
+      persistSession: true,
+      autoRefreshToken: true,
       detectSessionInUrl: false,
+      storageKey: 'intently-auth',
     },
   });
   return _client;
 }
 
-// V1 single-user per ADR 0002 — Muxin dogfoods alone, no auth wired yet, so
-// every row gets stamped with this hardcoded UUID. Replace with the real
-// auth.uid() lookup once the auth flow lands.
-const V1_USER_ID = '00000000-0000-0000-0000-000000000000';
-
-function getCurrentUserId() {
-  return V1_USER_ID;
+// Ensure there's a session (anonymous if no real sign-in). Idempotent —
+// the same Promise is returned on concurrent calls.
+async function ensureAuthSession() {
+  if (_authPromise) return _authPromise;
+  _authPromise = (async () => {
+    const client = getSupabaseClient();
+    const { data } = await client.auth.getSession();
+    if (data && data.session && data.session.user) return data.session.user;
+    const { data: signed, error } = await client.auth.signInAnonymously();
+    if (error) {
+      _authPromise = null; // allow retry
+      throw error;
+    }
+    return signed.user;
+  })();
+  return _authPromise;
 }
 
-Object.assign(window, { getSupabaseClient, getCurrentUserId });
+// Returns the current auth.uid(). Awaits anonymous sign-in on first call so
+// inserts always include a user_id that matches RLS.
+async function getCurrentUserId() {
+  const user = await ensureAuthSession();
+  return user.id;
+}
+
+Object.assign(window, { getSupabaseClient, getCurrentUserId, ensureAuthSession });

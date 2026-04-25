@@ -19,8 +19,11 @@ function _client() {
   return window.getSupabaseClient();
 }
 
-function _userId() {
-  return window.getCurrentUserId();
+async function _userId() {
+  // window.getCurrentUserId() is async (kicks off anonymous sign-in on first
+  // call, then returns the cached auth.uid()). All entity helpers await it
+  // before stamping user_id on writes / filtering on reads.
+  return await window.getCurrentUserId();
 }
 
 function _throw(label, error) {
@@ -36,7 +39,7 @@ function _throw(label, error) {
 async function insertGoal(title) {
   const { data, error } = await _client()
     .from('goals')
-    .insert({ user_id: _userId(), title })
+    .insert({ user_id: (await _userId()), title })
     .select()
     .single();
   if (error) _throw('insertGoal', error);
@@ -47,7 +50,7 @@ async function listGoals() {
   const { data, error } = await _client()
     .from('goals')
     .select('*')
-    .eq('user_id', _userId())
+    .eq('user_id', (await _userId()))
     .is('archived_at', null)
     .order('position', { ascending: true, nullsFirst: false });
   if (error) _throw('listGoals', error);
@@ -57,7 +60,7 @@ async function listGoals() {
 // ─── Projects ───────────────────────────────────────────────────────────────
 
 async function insertProject(title, goalId) {
-  const row = { user_id: _userId(), title };
+  const row = { user_id: (await _userId()), title };
   if (goalId !== undefined && goalId !== null) row.goal_id = goalId;
   const { data, error } = await _client()
     .from('projects')
@@ -72,7 +75,7 @@ async function listProjects() {
   const { data, error } = await _client()
     .from('projects')
     .select('*')
-    .eq('user_id', _userId())
+    .eq('user_id', (await _userId()))
     .eq('status', 'active')
     .order('updated_at', { ascending: false });
   if (error) _throw('listProjects', error);
@@ -87,7 +90,7 @@ async function addProjectTodo(projectId, text) {
     .from('projects')
     .select('todos')
     .eq('id', projectId)
-    .eq('user_id', _userId())
+    .eq('user_id', (await _userId()))
     .single();
   if (readErr) _throw('addProjectTodo (read)', readErr);
 
@@ -99,7 +102,7 @@ async function addProjectTodo(projectId, text) {
     .from('projects')
     .update({ todos })
     .eq('id', projectId)
-    .eq('user_id', _userId())
+    .eq('user_id', (await _userId()))
     .select()
     .single();
   if (writeErr) _throw('addProjectTodo (write)', writeErr);
@@ -112,7 +115,7 @@ async function toggleProjectTodo(projectId, todoId) {
     .from('projects')
     .select('todos')
     .eq('id', projectId)
-    .eq('user_id', _userId())
+    .eq('user_id', (await _userId()))
     .single();
   if (readErr) _throw('toggleProjectTodo (read)', readErr);
 
@@ -124,7 +127,7 @@ async function toggleProjectTodo(projectId, todoId) {
     .from('projects')
     .update({ todos })
     .eq('id', projectId)
-    .eq('user_id', _userId())
+    .eq('user_id', (await _userId()))
     .select()
     .single();
   if (writeErr) _throw('toggleProjectTodo (write)', writeErr);
@@ -134,7 +137,7 @@ async function toggleProjectTodo(projectId, todoId) {
 // ─── Plan items ─────────────────────────────────────────────────────────────
 
 async function insertPlanItem(date, band, text, tier, durationMin) {
-  const row = { user_id: _userId(), date, band, text };
+  const row = { user_id: (await _userId()), date, band, text };
   if (tier !== undefined && tier !== null) row.tier = tier;
   if (durationMin !== undefined && durationMin !== null) row.duration_min = durationMin;
 
@@ -151,7 +154,7 @@ async function listPlanItems(date) {
   const { data, error } = await _client()
     .from('plan_items')
     .select('*')
-    .eq('user_id', _userId())
+    .eq('user_id', (await _userId()))
     .eq('date', date)
     .order('position', { ascending: true, nullsFirst: false });
   if (error) _throw('listPlanItems', error);
@@ -164,7 +167,7 @@ async function insertJournalEntry(text, date) {
   // Omit `at` when not provided so the column default (now()) fires. Passing
   // null would override the default with null and violate not-null.
   const row = {
-    user_id: _userId(),
+    user_id: (await _userId()),
     kind: 'journal',
     body_markdown: text,
     source: 'text',
@@ -187,7 +190,7 @@ async function listJournalEntries(opts) {
   let q = _client()
     .from('entries')
     .select('*')
-    .eq('user_id', _userId())
+    .eq('user_id', (await _userId()))
     .eq('kind', 'journal')
     .order('at', { ascending: false });
   if (limit !== null) q = q.limit(limit);
@@ -206,7 +209,7 @@ async function insertAdminReminder(text, remindOn) {
   const { data, error } = await _client()
     .from('reminders')
     .insert({
-      user_id: _userId(),
+      user_id: (await _userId()),
       text,
       remind_on: date,
       status: 'pending',
@@ -221,7 +224,7 @@ async function listAdminReminders() {
   const { data, error } = await _client()
     .from('reminders')
     .select('*')
-    .eq('user_id', _userId())
+    .eq('user_id', (await _userId()))
     .eq('status', 'pending')
     .order('remind_on', { ascending: true });
   if (error) _throw('listAdminReminders', error);
@@ -233,7 +236,7 @@ async function markAdminReminderDone(id) {
     .from('reminders')
     .update({ status: 'done' })
     .eq('id', id)
-    .eq('user_id', _userId())
+    .eq('user_id', (await _userId()))
     .select()
     .single();
   if (error) _throw('markAdminReminderDone', error);
