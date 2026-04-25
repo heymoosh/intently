@@ -15,7 +15,6 @@ Skills defined in `docs/product/requirements/life-ops-plugin-spec.md` that are d
 | Feature | Why deferred | Backlog priority |
 |---|---|---|
 | `daily-triage` | Pre-briefing inbox-sort skill. Spec'd but not a demo flow; backlogged per TRACKER.md locked decisions. | Med |
-| `monthly-review` | Deferred; `weekly-review` covers the demo arc. AI Eval Batch Steward still weight-1 on `monthly-review` if eval dataset exists, otherwise skipped. | Med |
 | `project-continue` | Generic project-re-orient skill. Post-V1. | Low |
 | `session-digest` | Sub-agent for transcript summarization. Post-V1. | Low |
 | `vault-drift-check` | Weekly maintenance scan for broken file references. Post-V1. | Low |
