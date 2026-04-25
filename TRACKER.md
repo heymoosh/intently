@@ -74,6 +74,8 @@ Project briefs at `.claude/handoffs/<slug>.md` — persist across sessions; neve
 
 ## Follow-ups (pending manual or flight-test)
 
+- Watch for false-positive blocks in genuine pure-read sessions where Claude needs to edit one file (rare; the fix is to write the intent file first per the prompt). ([PR #131](https://github.com/heymoosh/intently/pull/131))
+- Consider extending to `Bash` for git commits later, but the existing pre-commit hook is the better catch point — this hook is for "first substantive write," not commit time. ([PR #131](https://github.com/heymoosh/intently/pull/131))
 - Wire `onReviewComplete` to also call ma-proxy `daily-review` if not already (out of scope for this PR — already shipped in #115). ([PR #125](https://github.com/heymoosh/intently/pull/125))
 - Persist completion flags to Supabase post-hackathon so it works across devices, not just in localStorage. ([PR #125](https://github.com/heymoosh/intently/pull/125))
 - Cosmetic: at 3pm without brief done, greeting still reads "Good morning, Maya" — copy issue, not a state issue. Post-hackathon. ([PR #125](https://github.com/heymoosh/intently/pull/125))
