@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import Markdown from '@ronradtke/react-native-markdown-display';
 import AgentOutputCard from './components/AgentOutputCard';
+import BriefFlow, { BriefAnswers } from './components/BriefFlow';
 import JournalEditor from './components/JournalEditor';
 import VoiceModal from './components/VoiceModal';
 import { AgentOutput } from './lib/agent-output';
@@ -249,6 +250,10 @@ export default function App() {
   // Clock-derived phase with URL override; see derivePhase().
   const [phase, setPhase] = useState<PresentPhase>(() => derivePhase());
   const [voiceOpen, setVoiceOpen] = useState(false);
+  // BriefFlow is the conversational morning-brief overlay (design HANDOFF §6.1).
+  // Opens from the morning sunrise CTA — replaces the prior direct-agent-call pattern
+  // so the demo lands "the agent IS the interface" instead of "tap pill, see brief."
+  const [briefFlowOpen, setBriefFlowOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -319,14 +324,38 @@ export default function App() {
   // returns an error, we run the brief without them. The synthesis beat —
   // "you asked me last week to remind you about X, it's due now" — is the
   // demo moment that ties the memory architecture together on camera.
-  const handleGenerateLiveBrief = async () => {
+  //
+  // When BriefFlow surfaces user answers (alive / parking), append them to
+  // the input as "Today (in your words)" so the agent's draft reflects what
+  // the user just said in the conversation. Without answers we fall back to
+  // seed-only — keeps the regenerate path working without re-opening the flow.
+  const handleGenerateLiveBrief = async (answers?: BriefAnswers) => {
     const reminders = await fetchDueReminders();
-    const input = DAILY_BRIEF_DEMO_INPUT + formatRemindersForInput(reminders);
-    return runAgent('daily-brief', input, {
-      kind: 'brief',
-      title: 'Good morning, Sam',
-      inputTraces: ['calendar', 'journal'],
-    }, setLiveBrief);
+    const userBlock = answers
+      ? `\n\n## Today (in your words)\n- What's alive: ${answers.alive}\n- Parking: ${answers.park}\n`
+      : '';
+    const input =
+      DAILY_BRIEF_DEMO_INPUT + formatRemindersForInput(reminders) + userBlock;
+    return runAgent(
+      'daily-brief',
+      input,
+      {
+        kind: 'brief',
+        title: 'Good morning, Sam',
+        inputTraces: ['calendar', 'journal'],
+      },
+      setLiveBrief,
+    );
+  };
+
+  // BriefFlow accept → run the agent with the user's answers, then close the
+  // overlay and flip to planned so the populated brief shows in Present. We
+  // wait for the agent before closing so the in-flow "Drafting your day…"
+  // state is the user-facing loading signal, not a blank planned-phase card.
+  const handleBriefAccept = async (answers: BriefAnswers) => {
+    await handleGenerateLiveBrief(answers);
+    setBriefFlowOpen(false);
+    setPhase('planned');
   };
 
   const handleGenerateLiveReview = () =>
@@ -394,10 +423,7 @@ export default function App() {
               <PhaseCta
                 label="Start your daily brief"
                 loading={liveBrief.kind === 'loading'}
-                onPress={() => {
-                  handleGenerateLiveBrief();
-                  setPhase('planned');
-                }}
+                onPress={() => setBriefFlowOpen(true)}
               />
             </View>
           ) : (
@@ -497,6 +523,13 @@ export default function App() {
       <JournalEditor
         visible={journalOpen}
         onClose={() => setJournalOpen(false)}
+      />
+      <BriefFlow
+        visible={briefFlowOpen}
+        onClose={() => setBriefFlowOpen(false)}
+        onAccept={handleBriefAccept}
+        agentRunning={liveBrief.kind === 'loading'}
+        agentError={liveBrief.kind === 'error' ? liveBrief.message : null}
       />
       <StatusBar style="auto" />
     </View>
