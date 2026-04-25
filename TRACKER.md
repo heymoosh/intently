@@ -22,6 +22,8 @@ This section is the spine. Every topic with a "current truth" lives here as a po
 | **Acceptance criteria process** | `docs/process/acceptance-criteria.md` | Immutable during build; only Status + Last checked may change. |
 | **Release gates** | `docs/process/release-gates.md` | `release-gate.yml` enforces in CI. |
 | **Test scope** | Unit + E2E only for hackathon (skip integration). Post-hackathon to be re-decided. | Cap exists so coverage doesn't grow into time we don't have. |
+| **Editing + branching workflow** | `CONTRIBUTING.md` § Editing workflow | When to commit on `main` vs. spin up a worktree, never-`git-checkout`-in-primary rule, stash-to-worktree migration recipe. `<wt-root>` is per-developer. |
+| **Enforcement + drift-check tooling** | `.githooks/pre-commit`, `.github/workflows/docs-check.yml`, `scripts/session-precheck.sh`, `.claude/loops/decision-drift-check.md` | CLAUDE.md cap + secrets check (pre-commit + CI), session-start drift report, decision-drift safety-net loop. Update this row if any get renamed. |
 
 **Original-intent docs (archived, not current ground truth — bannered in-file):** `docs/product/vision.md`, `docs/product/requirements/life-ops-plugin-spec.md`, `docs/design/app-experience.md`, `docs/architecture/agent-memory.md`, `docs/architecture/data-model.md`, `docs/architecture/document-taxonomy.md`. Treat as historical reference for original intent; current product behavior derives from the rows above.
 

@@ -8,6 +8,16 @@ Branch and PR standards for this repo. Referenced from `CLAUDE.md`.
 - Feature branches: `feat/<short-description>`.
 - Keep branches scoped. A branch that touches three unrelated concerns should be three branches.
 
+## Editing workflow
+
+Match the tool to the situation, not a default-to-branch reflex:
+
+- **Single-session, small, user approving live** → commit directly on `main`, push. No branch, no PR. Branch/PR ceremony adds nothing when the user is the reviewer-in-real-time.
+- **Parallel agents / background work / multi-day stacked work** → worktree: `git worktree add <wt-root>/<slug> -b chat/<slug>`. Each concurrent session gets its own checkout + branch so filesystem writes can't silently clobber each other, and git forces a real merge if two branches touch the same file. This is the only thing that prevents silent data loss when sessions run concurrently. (`<wt-root>` is per-developer — Muxin uses `~/wt`.)
+- **Never** `git checkout` / `git switch` in the primary checkout — breaks editor state, agent processes, and `intently-track` worktrees. **Never** leave uncommitted edits across sessions.
+
+If edits accidentally landed on `main` uncommitted and need to migrate to a worktree (e.g. agent realized mid-task it should be parallel): `git stash push -- <paths>` → `git worktree add … -b chat/<slug>` → `git stash pop` in the new worktree.
+
 ## Pull requests
 
 - Every PR runs `ci.yml`. Schedule-relevant PRs (anything that affects workflow files, scheduled agents, or eval datasets) additionally run `security.yml` and `evals.yml`.
