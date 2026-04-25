@@ -566,7 +566,7 @@ function BriefFlow({ onClose, onComplete }) {
           {showBriefThinking && <AgentTyping />}
           {liveBrief && <ChatBubble role="agent" text={liveBrief} />}
           {briefError && <ChatBubble role="agent" text="(I couldn't reach the brief generator just now — here's your day shape anyway.)" />}
-          {showConfirm && <BriefConfirmCard onAccept={() => onComplete && onComplete(MOCK_PLAN)} />}
+          {showConfirm && <BriefConfirmCard plan={parseAgentPlan(liveBrief, MOCK_PLAN)} onAccept={() => onComplete && onComplete(parseAgentPlan(liveBrief, MOCK_PLAN))} />}
         </div>
       </div>
 
@@ -687,7 +687,83 @@ const MOCK_PLAN = {
   ],
 };
 
-function BriefConfirmCard({ onAccept }) {
+// Parse the agent's response into the plan shape the populated view consumes.
+//
+// Strategy:
+//   1. Look for a fenced ```json block at the end (the "Output contract" tail
+//      the daily-brief agent will emit once `agents/daily-brief/ma-agent-config.json`
+//      is updated + re-provisioned). If found, normalize it to our internal shape.
+//   2. If no JSON tail, derive pacing.body from the prose (first ~2 sentences)
+//      and keep the fallback's bands/flags/parked. The user still sees agent-
+//      driven framing on the populated view, even if the agent hasn't been
+//      re-provisioned with the structured-output prompt yet.
+//   3. If `prose` is empty/null, return the fallback unchanged.
+function parseAgentPlan(prose, fallback) {
+  if (!prose || typeof prose !== 'string') return fallback;
+  const trimmed = prose.trim();
+
+  // 1. Try the JSON tail.
+  const jsonMatch = trimmed.match(/```json\s*([\s\S]*?)\s*```\s*$/);
+  if (jsonMatch) {
+    try {
+      const parsed = JSON.parse(jsonMatch[1]);
+      const plan = { ...fallback };
+      if (parsed.pacing) {
+        plan.pacing = {
+          title: parsed.today_one_line || (parsed.pacing && parsed.pacing.title) || fallback.pacing.title,
+          body: (parsed.pacing && parsed.pacing.body) || trimmed.replace(/```json[\s\S]*$/, '').trim() || fallback.pacing.body,
+        };
+      }
+      if (Array.isArray(parsed.bands) && parsed.bands.length > 0) {
+        plan.bands = parsed.bands.map((b) => ({
+          when: (b.when || '').replace(/^./, (c) => c.toUpperCase()),
+          items: (b.items || []).map((it) => ({
+            g: glyphForTier(it.tier),
+            t: it.text || '',
+          })),
+        }));
+      }
+      if (Array.isArray(parsed.flags) && parsed.flags.length > 0) {
+        plan.flags = parsed.flags.map((f) => ({
+          k: flagKindFor(f.kind),
+          t: f.text || '',
+        }));
+      }
+      if (Array.isArray(parsed.parked) && parsed.parked.length > 0) {
+        plan.parked = parsed.parked.map((p) => p.text || String(p));
+      }
+      if (parsed.today_one_line) plan.todayOneLine = parsed.today_one_line;
+      if (parsed.carrying_into_tomorrow) plan.carryingIntoTomorrow = parsed.carrying_into_tomorrow;
+      plan.proseBody = trimmed.replace(/```json[\s\S]*$/, '').trim();
+      return plan;
+    } catch {
+      // fall through to prose-only path
+    }
+  }
+
+  // 2. Prose-only fallback — substitute pacing.body with the agent's words.
+  return {
+    ...fallback,
+    pacing: { title: fallback.pacing.title, body: trimmed },
+    proseBody: trimmed,
+  };
+}
+
+function glyphForTier(tier) {
+  if (tier === 'P1') return 'rocket';
+  if (tier === 'P3') return 'leaf';
+  return 'target';
+}
+
+function flagKindFor(kind) {
+  if (kind === 'health' || kind === 'time-sensitive') return 'urgent';
+  if (kind === 'override') return 'followup';
+  return 'parked';
+}
+
+Object.assign(window, { parseAgentPlan });
+
+function BriefConfirmCard({ onAccept, plan = MOCK_PLAN }) {
   return (
     <div style={{ marginTop: 4 }}>
       <div style={{
@@ -697,9 +773,9 @@ function BriefConfirmCard({ onAccept }) {
         boxShadow: '0 6px 20px rgba(31,27,21,0.08)',
       }}>
         <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: T.color.SupportingText, marginBottom: 6 }}>I'll draft your day as</div>
-        <div style={{ fontFamily: T.font.Display, fontSize: 22, lineHeight: '26px', fontStyle: 'italic', fontWeight: 500, color: T.color.PrimaryText, letterSpacing: -0.3, marginBottom: 12 }}>"{MOCK_PLAN.pacing.title}"</div>
+        <div style={{ fontFamily: T.font.Display, fontSize: 22, lineHeight: '26px', fontStyle: 'italic', fontWeight: 500, color: T.color.PrimaryText, letterSpacing: -0.3, marginBottom: 12 }}>"{plan.pacing.title}"</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
-          {MOCK_PLAN.bands.map((b, i) => (
+          {plan.bands.map((b, i) => (
             <div key={i} style={{ fontFamily: T.font.Reading, fontSize: 13, lineHeight: '19px', color: T.color.SupportingText }}>
               <span style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 0.8, textTransform: 'uppercase', color: T.color.PrimaryText, marginRight: 8 }}>{b.when}</span>
               {b.items.length} items
@@ -896,7 +972,7 @@ function ReviewFlow({ onClose, onComplete }) {
           {liveReview && <ChatBubbleDark role="agent" text={liveReview} />}
           {reviewError && <ChatBubbleDark role="agent" text="(I couldn't reach the review generator just now — saving what you said anyway.)" />}
           {showConfirm && (() => {
-            const parsed = liveReview ? (window.parseReviewProse && window.parseReviewProse(liveReview)) : null;
+            const parsed = liveReview ? (window.parseAgentReview && window.parseAgentReview(liveReview)) : null;
             return <ReviewConfirmCard parsed={parsed} onAccept={() => onComplete && onComplete(parsed)} />;
           })()}
         </div>
@@ -1020,8 +1096,9 @@ function AutoCheckList({ items, checkedIndex }) {
               <span style={{
                 flex: 1, fontFamily: T.font.Reading, fontSize: 14, lineHeight: '20px',
                 color: '#FBF6EA',
-                textDecoration: checked ? 'line-through' : 'none',
+                textDecorationLine: checked ? 'line-through' : 'none',
                 textDecorationColor: 'rgba(251,246,234,0.5)',
+                textDecorationStyle: 'solid',
               }}>{it}</span>
             </div>
           );
@@ -1225,8 +1302,13 @@ function PresentEmpty({ onStartBrief }) {
 
 // ─── END-OF-DAY (post-review) — simple closed-state ─────────────────
 function PresentClosed({ onReopenReview, review }) {
-  const oneLine  = (review && review.journal)  || 'The dry run actually went well. I walked in present.';
-  const tomorrow = (review && review.tomorrow) || 'Write the job pitch before opening Slack.';
+  // Review shape (from ReviewFlow → onComplete): { journalText, friction[], tomorrow[], calendar[] }
+  // Falls back to seeded copy when no live review has landed yet.
+  const oneLine = (review && (review.journalText || review.journal)) || 'The dry run actually went well. I walked in present.';
+  const tomorrowList = (review && Array.isArray(review.tomorrow)) ? review.tomorrow : null;
+  const tomorrow = tomorrowList && tomorrowList.length > 0
+    ? tomorrowList.map((t) => t.text || t).join(' · ')
+    : (review && typeof review.tomorrow === 'string' ? review.tomorrow : 'Write the job pitch before opening Slack.');
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
       <div style={{ padding: '14px 24px 10px' }}>
@@ -1251,11 +1333,11 @@ function PresentClosed({ onReopenReview, review }) {
           borderLeft: `3px solid ${T.color.TintLilac}`,
         }}>
           <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: T.color.SupportingText, marginBottom: 6 }}>Today, in one line</div>
-          <div style={{ fontFamily: T.font.Display, fontSize: 22, lineHeight: '29px', fontStyle: 'italic', color: T.color.PrimaryText, letterSpacing: -0.3 }}>"The dry run actually went well. I walked in present."</div>
+          <div style={{ fontFamily: T.font.Display, fontSize: 22, lineHeight: '29px', fontStyle: 'italic', color: T.color.PrimaryText, letterSpacing: -0.3 }}>"{oneLine}"</div>
         </div>
         <div style={{ padding: '14px 16px', borderRadius: 12, background: T.color.SecondarySurface, border: `1px solid ${T.color.EdgeLine}` }}>
           <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: T.color.SupportingText, marginBottom: 4 }}>For tomorrow</div>
-          <div style={{ fontFamily: T.font.Reading, fontSize: 15, lineHeight: '22px', color: T.color.PrimaryText }}>Write the job pitch before opening Slack.</div>
+          <div style={{ fontFamily: T.font.Reading, fontSize: 15, lineHeight: '22px', color: T.color.PrimaryText }}>{tomorrow}</div>
         </div>
         <div style={{ textAlign: 'center', padding: '20px 10px' }}>
           <div style={{ fontFamily: T.font.Reading, fontSize: 14, lineHeight: '20px', color: T.color.SubtleText, fontStyle: 'italic' }}>

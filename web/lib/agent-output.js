@@ -92,7 +92,32 @@ function parseBriefProse(text, opts = {}) {
   return { pacing: { title, body } };
 }
 
+// Parse the agent's daily-review response (prose + optional JSON tail per
+// `agents/daily-review/SKILL.md` Output contract).
+// Returns { journalText, friction[], tomorrow[], calendar[], proseBody } or
+// the parseReviewProse fallback shape ({ journal, friction, tomorrow }).
+function parseAgentReview(text) {
+  if (!text || typeof text !== 'string') return null;
+  const trimmed = text.trim();
+  const jsonMatch = trimmed.match(/```json\s*([\s\S]*?)\s*```\s*$/);
+  if (jsonMatch) {
+    try {
+      const parsed = JSON.parse(jsonMatch[1]);
+      return {
+        journalText: parsed.journal_text || '',
+        friction: Array.isArray(parsed.friction) ? parsed.friction : [],
+        tomorrow: Array.isArray(parsed.tomorrow) ? parsed.tomorrow : [],
+        calendar: Array.isArray(parsed.calendar) ? parsed.calendar : [],
+        proseBody: trimmed.replace(/```json[\s\S]*$/, '').trim(),
+      };
+    } catch {
+      // fall through to prose
+    }
+  }
+  return parseReviewProse(trimmed);
+}
+
 Object.assign(window, {
   kindMetaFor, formatGeneratedAt, labelForInputTrace,
-  parseReviewProse, parseBriefProse,
+  parseReviewProse, parseBriefProse, parseAgentReview,
 });

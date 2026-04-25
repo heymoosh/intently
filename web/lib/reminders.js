@@ -39,4 +39,25 @@ function formatRemindersForInput(reminders) {
   ].join('\n');
 }
 
-Object.assign(window, { fetchDueReminders, formatRemindersForInput });
+// Send a captured voice/text transcript to the classify-and-store Edge Function.
+// The agent decides reminder-vs-conversation and persists if applicable.
+// Returns { kind: 'reminder' | 'conversation' | 'noop', message?: string, reminder?: object }
+// or null on transport failure (caller renders a generic acknowledgment).
+async function classifyTranscript(transcript) {
+  const supabaseUrl = window.INTENTLY_CONFIG && window.INTENTLY_CONFIG.supabaseUrl;
+  if (!supabaseUrl || !transcript || !transcript.trim()) return null;
+  const endpoint = `${supabaseUrl.replace(/\/+$/, '')}/functions/v1/reminders/classify-and-store`;
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ transcript }),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+Object.assign(window, { fetchDueReminders, formatRemindersForInput, classifyTranscript });
