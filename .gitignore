@@ -74,3 +74,11 @@ docs/process/usr-*.md
 *.log
 tmp/
 .tmp/
+
+# === Playwright smoke artifacts ===
+# Screenshots and snapshot files written during interactive Playwright smoke
+# runs (e.g. `web/` daily-arc verification before recording the demo). Working
+# artifacts only — not project state.
+.playwright-mcp/
+smoke-*.png
+snap-*.yml
