@@ -102,6 +102,9 @@ End-to-end Playwright smoke against `intently-eta.vercel.app/?dev=1`. ma-proxy f
 
 ## Follow-ups (pending manual or flight-test)
 
+- Run `supabase db push` to apply migrations 0003, 0004, 0005 (currently NOT applied; persistence will 500 until done). ([PR #137](https://github.com/heymoosh/intently/pull/137))
+- If `supabaseAnonKey` was left as a TODO, paste the project's anon key into `web/index.html`. ([PR #137](https://github.com/heymoosh/intently/pull/137))
+- After db push: re-deploy `web/` to Vercel so the new supabase + entities script tags ship. ([PR #137](https://github.com/heymoosh/intently/pull/137))
 - Replace placeholder monograms with real brand logos (or properly licensed equivalents) once OAuth integrations are wired up. ([PR #136](https://github.com/heymoosh/intently/pull/136))
 - Re-test on the next session after this PR merges, since the hook only takes effect after settings.json is on disk. ([PR #132](https://github.com/heymoosh/intently/pull/132))
 - This workflow does not apply to its own merge. The OLD workflow runs on the merge that introduces the new behavior; effects start with the next PR. ([PR #129](https://github.com/heymoosh/intently/pull/129))
