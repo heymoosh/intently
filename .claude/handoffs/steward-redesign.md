@@ -1,8 +1,8 @@
 # Handoff — Session Handoff Steward redesign
 
 **Slug:** `steward-redesign` · **Tracked by:** `TRACKER.md` § Active handoffs
-**Started:** 2026-04-25 · **Last updated:** 2026-04-25
-**Status:** active (initial implementation in `chat/handoff-steward-redesign`; iterate as we use it)
+**Started:** 2026-04-25 · **Last updated:** 2026-04-25 (post-merge)
+**Status:** shipped — system live; doc preserved for pattern review. Iterate via separate handoffs if behavior needs to change.
 
 ## Original intent
 
@@ -30,6 +30,7 @@
 - **Never auto-delete.** Set `Status: shipped` and leave the file. — Pattern-review later may promote repeated patterns to durable process docs.
 - **Pattern-review routine deferred.** Scaffolded as bottom-of-TRACKER "way later" item. — Nothing to review against until ≥3 handoffs accumulate.
 - **No SessionEnd hook in v1.** Manual `/handoff` invocation only. — Cleaner v1; the harness hook can be added in a follow-up if friction emerges.
+- **SessionEnd hook deferred at v1.5 decision point too** (post-merge, 2026-04-25). — Muxin's explicit call after seeing the live system. Accept the manual-trigger reliability gap; reconsider if real friction emerges. The mitigation is documented and small (~30 lines of `.claude/settings.json` + a prompt hook), so reversal cost is low.
 
 ## Decision log (tried / rejected)
 
@@ -39,41 +40,45 @@
 - **Rename `.claude/session-handoffs/` → `.claude/project-briefs/`** — considered, rejected. Too narrative; `.claude/handoffs/` is shorter and reads cleanly as either session-or-project.
 - **Build the pattern-review routine in this PR** — rejected. Premature optimization; defer until ≥3 handoffs exist to mine.
 
-## State as of 2026-04-25
+## State as of 2026-04-25 (post-merge)
 
-**Branch:** `chat/handoff-steward-redesign` (this PR, not yet open).
+**Shipped via PR [#79](https://github.com/heymoosh/intently/pull/79)**, merged to `main` as commit `ce7d0c4` on 2026-04-25. Local main synced; `chat/handoff-steward-redesign` deleted. 21 files changed, +260 / −397.
 
-**Shipped in this branch:**
-- `.claude/commands/handoff.md` — `/handoff` slash command (CREATE + UPDATE flows, slug resolution, anti-duplication, TRACKER pointer wiring).
+**Live in main:**
+- `/handoff` slash command at `.claude/commands/handoff.md` — registered, confirmed in active skills list. CREATE + UPDATE flows, slug resolution, anti-duplication, TRACKER pointer wiring.
 - `.claude/handoffs/README.md` — convention summary.
-- `.claude/handoffs/steward-redesign.md` — this file (dogfood: the new system describing itself).
-- `CLAUDE.md` § "Session handoff" rewritten — triad described, kickoff heuristic embedded, in-conversation update rule + re-distill rule.
-- `docs/process/session-handoff.md` rewritten as the new convention reference.
-- `.claude/settings.json` permissions updated: removed writes to `.claude/session-handoff.md`, added writes to `.claude/handoffs/*`.
-- `.claude/commands/start-work.md` updated to reference `.claude/handoffs/` and `## Active handoffs`.
-- `.claude/routines/release-readiness-steward.md` + `scope-overnight-steward.md` references updated.
+- `.claude/handoffs/steward-redesign.md` — this file (the dogfood; updated post-merge in `chat/handoff-steward-status-shipped`).
+- `CLAUDE.md` § "Session handoff" — triad, kickoff heuristic, in-conversation update rule, re-distill rule.
+- `docs/process/session-handoff.md` — rewritten as the new convention reference.
+- `.claude/settings.json` permissions — handoff path scope.
+- `.claude/commands/start-work.md` — points at `.claude/handoffs/` and `§ Active handoffs`.
+- `.github/workflows/auto-merge-safe.yml` — `MECHANICAL_RE` regex updated; handoffs intentionally NOT mechanical (substantive artifacts → docs/config classifier → `needs-user-review`).
+- Two routine briefs + three loop/command briefs + parallel-tracks/definition-of-done/CONTRIBUTING references updated.
 
-**Removed:**
+**Removed (no longer in repo):**
 - `.claude/routines/session-handoff-steward.md` (the nightly cron brief).
 - `.claude/session-handoff.md` (stale 2026-04-22 nightly output; preserved in git history).
+- `.claude/launchd/plists/com.intently.session-handoff.plist` (tracked launchd plist).
 - `~/Library/LaunchAgents/com.intently.session-handoff.plist` — `launchctl unload` + plist file removed (system-level, this machine).
 
-**TRACKER updates:**
-- `## Active handoffs` section added pointing here.
-- Doc-hierarchy header line updated.
-- Old "Critical item #1 — steward redesign" + Follow-up bullet superseded with pointer to this handoff.
-- Renumbered Critical items: design-folder reconciliation = new #1, reminders intent = #2, parked worktree = #3.
-- "Way later" section added at bottom with the deferred pattern-review routine note.
+**TRACKER state:**
+- `## Active handoffs` lists this file with `Status: shipped`.
+- Doc-hierarchy header reflects the triad.
+- Critical items renumbered (design-folder reconciliation = new #1, reminders intent = #2, parked worktree = #3).
+- `## Way later` holds the deferred pattern-review routine + a stale-ref-sweep follow-up (Blueprint, design doc, acceptance-criteria, seed-data session prompt).
+
+**Stale-ref status:** All workflow-affecting references updated. Doc-only references (Blueprint section 9, design doc line 139, acceptance-criteria.md lines 3+50, seed-data session prompt line 137) are listed under TRACKER § Way later for a sweep when convenient — no runtime effect.
 
 ## Next steps
 
-1. Open PR for `chat/handoff-steward-redesign`. Confirm CI green (docs-check.yml will check CLAUDE.md size; should be ~78 lines, under the 100 cap).
-2. Merge. Delete the `.claude/worktrees/*` references in this branch only if they're tracked — leave detached worktrees on disk untouched (they're separate trees, will reconcile on their own when their branches rebase).
-3. **Resume the original /start-work flow** — pick up at the new Critical #1 (design folder reconciliation, applying spec-intent rule on the entries-architecture work). When that work coalesces enough to warrant a handoff, propose `/handoff entries-architecture` to dogfood the system on a real second project.
-4. After 3+ handoffs accumulate (current + entries-architecture + at least one more), revisit the deferred pattern-review routine. Add it as a real routine if the patterns are visible.
+1. **Resume the `/start-work` flow** at the new Critical #1 — read `docs/design/Intently - App/` end-to-end (`CLAUDE.md`, `BUILD-RULES.md`, `HANDOFF.md`, prototype files). Apply "Spec intent > spec letter" with Muxin on entries/reminders. Produce v2 entries-architecture session prompt.
+2. **Propose `/handoff entries-architecture`** when that work coalesces — the second real test of the system (UPDATE flow on a multi-session project, possibly across parallel `intently-track` worktrees).
+3. **After ≥3 shipped handoffs accumulate** (this one + entries-architecture + at least one more), revisit the deferred pattern-review routine. Build it if patterns are visible enough to mine.
+4. **Sweep doc-only stale refs** (`docs/Claude Code Repo-Ready Blueprint.md`, `docs/design/claude-code-implementation.md`, `docs/process/acceptance-criteria.md`, `docs/process/session-prompt-seed-data-v1.md`) at convenience. Tracked under TRACKER § Way later. No runtime effect; cleanup hygiene only.
 
 ## Open questions
 
+- **Manual-trigger reliability.** No automated trigger means we depend on Claude proposing `/handoff` at kickoff and Muxin invoking at session-end. Track real friction across the next 2–3 handoffs (entries-architecture and beyond). If active handoffs go stale repeatedly, revisit the deferred SessionEnd hook.
 - **Should `/handoff` auto-detect "kickoff" without me proposing it?** Currently the heuristic lives in CLAUDE.md as guidance for Claude to *propose* — Muxin still has to accept. Looser version: Claude just creates the file and tells Muxin. Decide after 2-3 real proposes.
-- **Worktree sessions and handoffs.** A handoff at `.claude/handoffs/<slug>.md` in main lives independently of any worktree. If a worktree session updates the handoff, that update is a tracked-file change in the worktree's branch and lands on main when the worktree's PR merges. This means parallel tracks on the same project would race on the handoff file — but in practice, parallel tracks slice the project into independent slugs, so each track has its own handoff. Confirm this assumption holds when the entries-architecture parallel tracks actually spawn.
-- **What lives in CLAUDE.md vs the convention doc.** Right now CLAUDE.md has the kickoff heuristic + update rules; the convention doc has the longer "what goes in" template. Watch for drift; fix CLAUDE.md first if so per its own house rule.
+- **Worktree sessions and handoffs.** A handoff at `.claude/handoffs/<slug>.md` in main lives independently of any worktree. If a worktree session updates the handoff, that update is a tracked-file change in the worktree's branch and lands on main when the worktree's PR merges. Parallel tracks on the same project would race on the handoff file — in practice, tracks slice the project into independent slugs, so each track has its own handoff. Confirm this assumption when entries-architecture parallel tracks actually spawn.
+- **What lives in CLAUDE.md vs the convention doc.** CLAUDE.md has the kickoff heuristic + update rules; the convention doc has the longer "what goes in" template. Watch for drift; fix CLAUDE.md first per its own house rule.

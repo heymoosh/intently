@@ -12,7 +12,7 @@
 **Status:** 🟢 daily-brief + 4 MA agents (daily/weekly/monthly review + brief) live; reminders backend deployed; voice modal wired; UX skeleton committed. Web app at https://intently-eta.vercel.app.
 **Last:** PR #75 (UX skeleton + voice + reminders + memory loop) and PR #76 (stranded build artifacts + entries session prompt) merged. Worktree `~/worktrees/intently/entries-architecture` exists but no work done in it yet — parked pending reconciliation.
 **Next:** **Reconciliation pass first** (see Critical items below) → revised entries plan → only then kick off the entries-architecture worktree session for implementation.
-**Last updated:** 2026-04-25 (handoff-steward redesign in flight; new `.claude/handoffs/` convention live).
+**Last updated:** 2026-04-25 (handoff-steward redesign shipped in PR #79; per-project handoffs live).
 
 ### Go/No-Go (2026-04-24 EOD)
 
@@ -26,7 +26,8 @@
 
 Project briefs at `.claude/handoffs/<slug>.md` — persist across sessions; never auto-deleted. Convention: `docs/process/session-handoff.md`. Slash command: `/handoff`.
 
-- **`steward-redesign`** → `.claude/handoffs/steward-redesign.md` — new per-project handoff system shipping in `chat/handoff-steward-redesign`. The system describing itself (dogfood). Status: active.
+- **`steward-redesign`** → `.claude/handoffs/steward-redesign.md` — per-project handoff system. **Shipped 2026-04-25** in PR [#79](https://github.com/heymoosh/intently/pull/79) (commit `ce7d0c4`). Doc preserved for pattern review. Status: shipped.
+- **`entries-architecture`** → `.claude/handoffs/entries-architecture.md` — reconcile new design folder against current code, produce v2 session prompt, spawn parallel implementation tracks. Currently pre-Phase-1 (about to spawn Explore agents for design read + code survey). Status: active.
 
 ## Critical items awaiting review
 
