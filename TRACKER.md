@@ -23,17 +23,18 @@ This section is the spine. Every topic with a "current truth" lives here as a po
 | **Release gates** | `docs/process/release-gates.md` | `release-gate.yml` enforces in CI. |
 | **Test scope** | Unit + E2E only for hackathon (skip integration). Post-hackathon to be re-decided. | Cap exists so coverage doesn't grow into time we don't have. |
 | **Editing + branching workflow** | `CONTRIBUTING.md` § Editing workflow | When to commit on `main` vs. spin up a worktree, never-`git-checkout`-in-primary rule, stash-to-worktree migration recipe. `<wt-root>` is per-developer. |
+| **Parallel-session coordination** | `.claude/commands/start-work.md` § step 7 — per-worktree `.claude/wt-intent.md` (gitignored) | Sibling Claude sessions in different worktrees declare a one-sentence intent + `ref:` pointing at a row in this TRACKER, so other sessions can read it on `/start-work`. Worktree dirs and branches keep timestamp slugs; the file is the coordination signal. |
 | **Enforcement + drift-check tooling** | `.githooks/pre-commit`, `.github/workflows/docs-check.yml`, `scripts/session-precheck.sh`, `.claude/loops/decision-drift-check.md` | CLAUDE.md cap + secrets check (pre-commit + CI), session-start drift report, decision-drift safety-net loop. Update this row if any get renamed. |
 
 **Original-intent docs (archived, not current ground truth — bannered in-file):** `docs/product/vision.md`, `docs/product/requirements/life-ops-plugin-spec.md`, `docs/design/app-experience.md`, `docs/architecture/agent-memory.md`, `docs/architecture/data-model.md`, `docs/architecture/document-taxonomy.md`. Treat as historical reference for original intent; current product behavior derives from the rows above.
 
 ## Status
 
-**Phase:** Submission — `web/` daily arc live in code AND deployed at `intently-eta.vercel.app`. Smoke-test + demo recording remaining.
-**Status:** 🟢 web/ live-wired and live-deployed. Voice (Web Speech), morning brief, evening review all call live ma-proxy. Vercel cutover landed — curl confirms `<title>Intently — Prototype</title>`.
-**Last:** Vercel Root Directory cleared; URL now serves the inherited prototype (was Expo build before).
-**Next:** Smoke-test deployed URL (mic, brief, review, ma-proxy network), record demo, submit Sun 8 PM EDT.
-**Last updated:** 2026-04-25 (cutover confirmed live via curl).
+**Phase:** Submission — `web/` daily arc live in code AND on the deployed URL. Demo recording + submission remaining.
+**Status:** 🟢 `intently-eta.vercel.app` serves the inherited prototype (verified via `curl` 2026-04-25 — `<title>Intently — Prototype</title>`). Voice (Web Speech), morning brief, evening review all call live ma-proxy.
+**Last:** 5 PRs landed in the web-wiring sprint — #111 (web/lib port), #112 (live voice in HeroListening), #113 (live brief in BriefFlow), #114 (vercel.json cutover staged), #115 (live review in ReviewFlow). Vercel Root Directory cleared after that. Main at `ea1ca4a`.
+**Next:** Manual smoke on the deployed URL → demo recording → submit Sun 8 PM EDT.
+**Last updated:** 2026-04-25 (Vercel cutover confirmed live; deploy no longer blocking).
 
 ### Go/No-Go (2026-04-24 EOD)
 
@@ -73,7 +74,14 @@ Project briefs at `.claude/handoffs/<slug>.md` — persist across sessions; neve
 
 ## Follow-ups (pending manual or flight-test)
 
-- The hook from #121 currently fires on every `Edit`/`Write` regardless of file path — including writes to `~/.bashrc` and `/tmp/`. Make it path-aware: only block when the target file is inside the repo root. Cheap fix, ~10 lines in `scripts/session-locks.sh`. ([PR #122](https://github.com/heymoosh/intently/pull/122))
+- Watch for false-positive blocks in genuine pure-read sessions where Claude needs to edit one file (rare; the fix is to write the intent file first per the prompt). ([PR #131](https://github.com/heymoosh/intently/pull/131))
+- Consider extending to `Bash` for git commits later, but the existing pre-commit hook is the better catch point — this hook is for "first substantive write," not commit time. ([PR #131](https://github.com/heymoosh/intently/pull/131))
+- Wire `onReviewComplete` to also call ma-proxy `daily-review` if not already (out of scope for this PR — already shipped in #115). ([PR #125](https://github.com/heymoosh/intently/pull/125))
+- Persist completion flags to Supabase post-hackathon so it works across devices, not just in localStorage. ([PR #125](https://github.com/heymoosh/intently/pull/125))
+- Cosmetic: at 3pm without brief done, greeting still reads "Good morning, Maya" — copy issue, not a state issue. Post-hackathon. ([PR #125](https://github.com/heymoosh/intently/pull/125))
+- The wt-intent file format may evolve; if a tool starts parsing it programmatically, consider a stricter schema (frontmatter YAML). ([PR #125](https://github.com/heymoosh/intently/pull/125))
+- Re-run smoke against `https://intently-eta.vercel.app` after merge to verify the fix on prod. ([PR #123](https://github.com/heymoosh/intently/pull/123))
+- **[Resolved 2026-04-25] Path-aware session-locks hook.** `block-if-sibling` now reads `tool_input.file_path` from the hook event JSON and only blocks when the target is inside `REPO_ROOT`. Edits to `~/.bashrc`, `/tmp/`, and other out-of-repo paths pass through. Bash smoke test in PR description; fails open on missing jq / unparseable path / no `file_path`.
 - **[Shipped 2026-04-25] Session Handoff Steward redesign.** Implemented in `chat/handoff-steward-redesign` — replaced per-session/nightly model with **per-project** handoffs at `.claude/handoffs/<slug>.md`, conversational kickoff trigger + manual `/handoff`, never auto-deleted. Old nightly launchd job + plist removed. Full decisions and divergence-from-original-spec rationale: `.claude/handoffs/steward-redesign.md`.
 - **[Resolved 2026-04-25] MA agents provisioned via `scripts/provision-ma-agents.ts`.** All four agents (daily-brief, daily-review, weekly-review, monthly-review) now exist in the daily-brief workspace; Supabase `MA_AGENT_ID_*` secrets refreshed (DAILY_REVIEW + WEEKLY_REVIEW digests changed — they were stale before); ma-proxy redeployed. Branch `feat/track-ma-provisioning` (PR #84) introduces the script.
 - **[Resolved 2026-04-25] Anthropic API key rotated twice + consolidated.** First rotation (last night) collapsed two keys into one. Second rotation (today) was forced when raw `bws secret list` echoed the value into a Claude transcript during BWS cleanup. Current consolidated key digest is `af4a5420…2b5a796e` (BWS + Supabase agree); ma-proxy redeployed. Memory `feedback-bws-never-list-raw.md` records the lesson: always pipe `bws secret list` through `jq` to strip `.value`.
@@ -85,7 +93,7 @@ Project briefs at `.claude/handoffs/<slug>.md` — persist across sessions; neve
 - **Stewards leave working-tree mods uncommitted.** Release-readiness + spec-conformance stewards edit tracked files overnight without committing. Design fix: auto-commit to `auto/steward/*` branches + draft PR.
 - **Post-first-live-run baseline floor.** Run daily-brief against `evals/datasets/daily-brief/cases.json` once, raise per-axis `minScores` in `evals/baselines/daily-brief.json` from 0 to observed floor, flip `axisStatus` from `unknown` to `baselined`.
 - **[Post-hackathon] Wire `decision-drift-check` to launchd.** Brief at `.claude/loops/decision-drift-check.md` now covers two passes: missed-decision drift + CLAUDE.md leanness audit (3-weeks test). Currently manual-only — no plist in `.claude/launchd/plists/`. Add `com.intently.decision-drift.plist` matching the existing pack, daily evening. Defer until after submission (2026-04-26 8 PM EDT) so we don't add a launchd job mid-crunch right after disabling two for safety.
-- **[Resolved 2026-04-25] Vercel cutover live.** `intently-eta.vercel.app` now serves the inherited prototype (`<title>Intently — Prototype</title>` confirmed via curl). Vercel Root Directory was cleared in parallel-session work earlier this evening.
+- **[Resolved 2026-04-25] Vercel cutover live.** Project Root Directory cleared from `app/`; `intently-eta.vercel.app` now serves the inherited prototype (`vercel.json` from #114 active). Verified: `curl -s https://intently-eta.vercel.app | head` returns `<title>Intently — Prototype</title>`. Vercel MCP installed but unauthenticated — only `authenticate` / `complete_authentication` tools exposed; not needed since cutover already done.
 
 ## MA API schema — empirical corrections (captured for posterity)
 
@@ -102,7 +110,7 @@ Three bugs found during Friday's first live smoke tests. Fixes shipped in #68, #
 
 1. **Manual smoke on the deployed URL** (`intently-eta.vercel.app`) — Chrome only:
    - Tap mic → grant permission → speak → real words appear (#112)
-   - Tap morning CTA → walk 3 conversational steps → real `daily-brief` agent response renders before the confirm card (#113)
+   - Tap morning CTA → walk 3 conversational steps → real `daily-brief` agent response renders before the confirm card (#113) — note: PR #123 (in flight) fixes BriefFlow step 0 unstick, needed for this beat to work end-to-end.
    - Tap evening CTA → walk 3 reflection steps → real `daily-review` agent response renders before the confirm card (#115)
    - DevTools Network tab: requests hit `cjlktjrossrzmswrayfz.supabase.co/functions/v1/ma-proxy`
 

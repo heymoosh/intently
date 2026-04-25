@@ -3,8 +3,10 @@ The user invoked `/start-work` to resume working on Intently. Pick up cleanly fr
 ## Steps
 
 0. **Check for parallel work before touching shared files.** Two surfaces silently clobber TRACKER / `.claude/handoffs/` / CLAUDE if ignored:
-   - **Parallel worktrees** — run `git worktree list`. If any entry is outside the primary checkout, name them in your Critical-items walkthrough.
+   - **Parallel worktrees** — run `git worktree list`. For each entry outside this session's cwd, also read `<that-path>/.claude/wt-intent.md` if it exists; that file declares what the sibling worktree is working on (written by `/start-work` in that session — see step 7).
    - **Sibling sessions in the same checkout** — the SessionStart `[session-locks]` report (if any) lists other live Claude sessions in this same cwd.
+
+   When surfacing siblings in the Critical-items walkthrough, name them by their declared intent (e.g. *"`~/wt/hide-dev-sidebar` — hide the dev sidebar in prod (declared 15:30)"*) when an intent file exists, or just by path with *"intent not declared"* otherwise. Worktrees with intents that overlap this session's planned work are the coordination risk — call those out specifically.
 
    If either signal is non-empty, ask Muxin one question before any edits to TRACKER/handoffs/CLAUDE: *"is this session its own track, or piggybacking on main?"* If piggybacking and he plans to touch shared files, propose spawning a worktree per `CONTRIBUTING.md` § Editing workflow:
    ```
@@ -26,6 +28,24 @@ The user invoked `/start-work` to resume working on Intently. Pick up cleanly fr
 5. **Then state what's Next** — read TRACKER's Next queue, summarize in 3–5 bullets, and confirm starting point.
 
 6. **Apply the "Spec intent > spec letter" rule** if any Critical item or Next queue item references a spec, design doc, or handoff. Elicit Muxin's intent in his own words before reading the doc cold. Reason: this rule exists because the prior session's reminders misread came from skipping it.
+
+7. **Declare this worktree's intent.** Once Muxin has named what this session will work on, write `.claude/wt-intent.md` in *this* worktree (gitignored, ephemeral). This is the file sibling sessions in other worktrees read in step 0. **Keep it terse — body is one sentence max.** It is not a handoff doc and not a TODO list; it is a pointer to TRACKER. Format:
+
+   ```
+   slug: <kebab-case-slug>
+   declared_at: <ISO 8601 timestamp>
+   branch: <current branch name from `git rev-parse --abbrev-ref HEAD`>
+   ref: TRACKER § <section> — <row name or bullet phrase>
+
+   <one sentence — what this worktree is doing>
+   ```
+
+   Rules:
+   - **`ref:` must point at a TRACKER row.** TRACKER tracks everything; it's the single hub. If a row points further (handoff doc, ADR, PR), that is the trail — but the trail starts at TRACKER. PR numbers and handoff slugs are *not* valid first-class refs.
+   - **No TRACKER row yet?** Add one **before** declaring intent. The right home is usually `Next`, `Follow-ups`, `Active handoffs`, or — for permanent additions — `Current state pointers`. If the work doesn't fit any TRACKER section, that is a signal it needs scoping with Muxin before declaring intent at all. `ref: exploratory` exists as an escape hatch but should be rare and is itself a smell.
+   - **Body is one sentence.** If the worktree is doing two unrelated things, that is a smell — split into two worktrees.
+   - **Re-declare each session.** If the file exists from a prior session and intent differs, overwrite it. If it matches, leave it alone. If the work pivots mid-session, update the file.
+   - **Do NOT** auto-rename the worktree directory or branch to match the slug — that's a destructive mid-session move that breaks the running shell's cwd.
 
 ## What NOT to do
 
