@@ -45,6 +45,7 @@ At minimum:
 - **No secrets in git.** Bitwarden Secrets Manager is the only allowed store. Enforced by `.githooks/pre-commit` locally and `security.yml` (gitleaks) in CI. See `docs/security/privacy-policy-for-builders.md`.
 - **Never commit acceptance-criteria edits in the same PR as implementation for that skill.** See `docs/process/acceptance-criteria.md`.
 - **Never `--no-verify` past a failing hook** unless the hook itself is broken. If it is, fix the hook in a separate PR.
+- **Never auto-resolve merge conflicts.** When `git merge` / `git rebase` / `git cherry-pick` reports a conflict, surface both sides (and any policy collision — e.g. main was trimmed while the PR was open) and wait for an explicit decision before running `checkout --ours/--theirs`, editing conflict markers, or committing. Resolution is a content/policy choice the user owns.
 
 ## See also
 
