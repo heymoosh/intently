@@ -223,25 +223,36 @@ function ProcessingArc() {
 }
 
 // Full-screen takeover — "big empty space feels like an invitation to fill it."
+// Wired to the live Web Speech API via window.useVoiceInput (web/lib/voice.js).
 function HeroListening({ onDone }) {
-  const [t, setT] = React.useState('');
-  const full = "I'm moving the Thursday pitch review to Friday morning — Anya's out Thursday afternoon and I want a clear head for it.";
-  React.useEffect(() => {
-    let i = 0;
-    const id = setInterval(() => {
-      i += 2;
-      setT(full.slice(0, i));
-      if (i >= full.length) clearInterval(id);
-    }, 45);
-    return () => clearInterval(id);
-  }, []);
+  const { state, start, stop } = useVoiceInput();
+
+  // Auto-start the mic when the listening surface mounts.
+  React.useEffect(() => { start(); }, [start]);
+
+  // Derive what to display from the voice-state machine.
+  const t =
+    state.kind === 'listening' ? state.interim :
+    state.kind === 'stopped'   ? state.transcript : '';
+  const placeholder =
+    state.kind === 'unsupported' ? "Voice isn't supported here. Try Chrome."
+    : state.kind === 'error'     ? state.message
+    : "I'm listening.";
+  const isListening = state.kind === 'listening';
+
+  // Stop the recognizer, then exit. Brief delay lets the final result flush.
+  const handleStop = React.useCallback(() => {
+    stop();
+    setTimeout(() => { if (onDone) onDone(); }, 150);
+  }, [stop, onDone]);
+
   return (
     <div style={{
       position: 'absolute', inset: 0, background: T.color.PrimarySurface,
       zIndex: 50, display: 'flex', flexDirection: 'column',
       }}>
       <div style={{ flex: '0 0 auto', paddingTop: 60, paddingInline: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <button onClick={onDone} aria-label="Close voice" style={{
+        <button onClick={handleStop} aria-label="Close voice" style={{
           width: 44, height: 44, borderRadius: 999, background: 'transparent',
           border: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
           cursor: 'pointer', color: T.color.SupportingText, margin: -8,
@@ -272,8 +283,8 @@ function HeroListening({ onDone }) {
           letterSpacing: -0.3, fontStyle: t ? 'normal' : 'italic',
           minHeight: 168,
         }}>
-          {t || "I'm listening."}
-          {t && t.length < full.length && <span style={{
+          {t || placeholder}
+          {isListening && t && <span style={{
             display: 'inline-block', width: 2, height: 28, background: T.color.FocusObject,
             verticalAlign: -4, marginLeft: 3, animation: 'intentlyPulse 1s step-end infinite',
           }} />}
@@ -299,7 +310,7 @@ function HeroListening({ onDone }) {
         }}>
           <VoiceWaveform color={T.color.FocusObject} amplitude={0.85} />
         </div>
-        <button onClick={onDone} aria-label="Stop and send" style={{
+        <button onClick={handleStop} aria-label="Stop and send" style={{
           width: 64, height: 64, borderRadius: 999,
           background: T.color.FocusObject, border: 'none',
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
