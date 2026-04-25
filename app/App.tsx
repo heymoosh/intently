@@ -14,12 +14,15 @@ import {
   View,
 } from 'react-native';
 import Markdown from '@ronradtke/react-native-markdown-display';
+import { Handshake, Leaf, Rocket } from 'lucide-react-native';
 import AgentOutputCard from './components/AgentOutputCard';
 import BriefFlow, { BriefAnswers } from './components/BriefFlow';
 import GoalDetail from './components/GoalDetail';
 import JournalEditor from './components/JournalEditor';
+import PainterlyBlock from './components/painterly/PainterlyBlock';
 import ProjectCard from './components/ProjectCard';
 import ProjectDetail from './components/ProjectDetail';
+import ReviewFlow, { ReviewAnswers } from './components/ReviewFlow';
 import VoiceModal from './components/VoiceModal';
 import { AgentOutput } from './lib/agent-output';
 import { callMaProxy, MaProxyError, MaSkill, toAgentOutput } from './lib/ma-client';
@@ -56,17 +59,16 @@ type LiveState =
 // clock-driven; for demo we expose a dev toggle so we can record each beat.
 type PresentPhase = 'morning' | 'planned' | 'evening';
 
-// Three goals at a time per MVP spec (§2.1). Sourced from fixtures so the
-// Future band, GoalDetail drill-down, and ProjectDetail all read from one
-// place — keeps the Sam persona consistent across the demo (no Maya drift).
-//
-// Tints are the painterly-tint families translated to flat card surfaces;
-// each goal still varies enough that the three cards read distinct.
-const GOAL_TINTS = [
-  'ConfirmationCardSurface',
-  'QuestCardSurface',
-  'UncertainCardSurface',
-] as const;
+// Goal data lives in fixtures (Sam-flavored — no Maya drift across the demo).
+// The fixture supplies a 4-stop painterly `pal` and a string `glyph` name;
+// this map turns the glyph names into the lucide icon components Track B's
+// PainterlyBlock corner-glyph pattern expects. Add an entry here when adding
+// a new goal whose glyph isn't already mapped.
+const GLYPH_BY_NAME: Record<string, typeof Rocket> = {
+  rocket: Rocket,
+  leaf: Leaf,
+  handshake: Handshake,
+};
 
 // Detail-view navigation state. Both detail screens are rendered as full-bleed
 // overlays above the swipe shell when set (BriefFlow Modal pattern). Mutually
@@ -197,8 +199,11 @@ function derivePhase(now: Date = new Date()): PresentPhase {
 }
 
 // Morning/evening phase CTA — larger, visually weighted as the focal
-// affordance on the screen. Sunrise for morning, midnight for evening.
-// Gradient is deferred per "functionality first"; solid tint carries intent.
+// affordance on the screen. Sunrise for morning (warm peach → terracotta),
+// midnight for evening (deep indigo → slate violet). Gradient applies via
+// react-native-web's `backgroundImage` passthrough on web; native falls back
+// to a solid mid-stop. Soft glow shadow per design canvas.
+// Source: intently-screens.jsx PresentMorning + PresentPlan(evening) buttons.
 function PhaseCta({
   label,
   onPress,
@@ -210,12 +215,22 @@ function PhaseCta({
   loading?: boolean;
   variant?: 'morning' | 'evening';
 }) {
-  const bg =
-    variant === 'evening' ? t.colors.PrimaryText : t.colors.UndoAffordance;
-  const fg = t.colors.InverseText;
+  const isEvening = variant === 'evening';
+  const fg = '#FBF6EA'; // matches design canvas — warm cream, not the cooler InverseText
+  const fallback = isEvening
+    ? t.gradients.EveningCtaFallback
+    : t.gradients.MorningCtaFallback;
+  const gradient = isEvening ? t.gradients.EveningCta : t.gradients.MorningCta;
   return (
     <Pressable
-      style={[styles.phaseCta, { backgroundColor: bg }]}
+      style={[
+        styles.phaseCta,
+        isEvening ? styles.phaseCtaEvening : styles.phaseCtaMorning,
+        { backgroundColor: fallback },
+        // Web-only: react-native-web passes `backgroundImage` through to the
+        // DOM; the cast is required because RN's ViewStyle typing rejects it.
+        { backgroundImage: gradient } as any,
+      ]}
       onPress={loading ? undefined : onPress}
     >
       {loading ? (
@@ -271,6 +286,15 @@ export default function App() {
   const openProject = (project: Project) =>
     setDetailView({ kind: 'project', id: project.id });
   const closeDetail = () => setDetailView(null);
+  // ReviewFlow is the conversational evening daily-review overlay — same pattern as
+  // BriefFlow, opens from the evening midnight CTA. Replaces the prior direct
+  // handleGenerateLiveReview call so the agent walks the user through 3 questions
+  // (highlight / friction / tomorrow seed) before the MA runs.
+  const [reviewFlowOpen, setReviewFlowOpen] = useState(false);
+  // Tracks whether we've auto-fired the weekly review yet this session. Without
+  // this guard the effect would re-fire every time the user swiped back to a
+  // Past slot. liveWeekly.kind !== 'idle' is also a guard but adds idempotency.
+  const weeklyAutoFired = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -416,12 +440,35 @@ export default function App() {
     setPhase('planned');
   };
 
-  const handleGenerateLiveReview = () =>
-    runAgent('daily-review', DAILY_REVIEW_DEMO_INPUT, {
-      kind: 'review',
-      title: 'Today, in review',
-      inputTraces: ['calendar', 'journal'],
-    }, setLiveReview);
+  // ReviewFlow surfaces 3 user answers (highlight / friction / tomorrow seed). When
+  // present, append them as a "Today (in your words)" block so the agent's daily
+  // review reflects what the user just said in the conversation. Without answers
+  // we fall back to seed-only — keeps the regenerate path working without
+  // re-opening the flow.
+  const handleGenerateLiveReview = (answers?: ReviewAnswers) => {
+    const userBlock = answers
+      ? `\n\n## Today (in your words)\n- Highlight: ${answers.highlight}\n- Friction: ${answers.friction}\n- Tomorrow seed: ${answers.tomorrow}\n`
+      : '';
+    return runAgent(
+      'daily-review',
+      DAILY_REVIEW_DEMO_INPUT + userBlock,
+      {
+        kind: 'review',
+        title: 'Today, in review',
+        inputTraces: ['calendar', 'journal'],
+      },
+      setLiveReview,
+    );
+  };
+
+  // ReviewFlow accept → fire the daily-review MA call with the user's answers,
+  // then close the overlay. Mirrors the brief accept pattern — wait for the
+  // agent before closing so the in-flow "Closing the day…" state is the
+  // user-facing loading signal, not a blank evening-phase card.
+  const handleReviewAccept = async (answers: ReviewAnswers) => {
+    await handleGenerateLiveReview(answers);
+    setReviewFlowOpen(false);
+  };
 
   const handleGenerateLiveWeekly = () =>
     runAgent('weekly-review', WEEKLY_REVIEW_DEMO_INPUT, {
@@ -491,7 +538,7 @@ export default function App() {
                 <PhaseCta
                   label="Start your daily review"
                   loading={liveReview.kind === 'loading'}
-                  onPress={handleGenerateLiveReview}
+                  onPress={() => setReviewFlowOpen(true)}
                   variant="evening"
                 />
               ) : null}
@@ -531,23 +578,39 @@ export default function App() {
             it into weekly and daily moves on Present.
           </Text>
           {GOAL_DATA.map((g, i) => {
-            const tintToken = GOAL_TINTS[i % GOAL_TINTS.length];
+            const Glyph = GLYPH_BY_NAME[g.glyph] ?? Rocket;
             return (
               <Pressable
                 key={g.id}
                 onPress={() => openGoal(g)}
                 accessibilityLabel={`Open goal ${g.title}`}
-                style={[
-                  styles.goalCard,
-                  { backgroundColor: t.colors[tintToken] },
-                ]}
+                style={styles.goalCardShell}
               >
-                <Text style={styles.goalTitle}>{g.title}</Text>
-                <View style={styles.goalDivider} />
-                <Text style={styles.goalMonthlyEyebrow}>APRIL</Text>
-                <Text style={styles.goalMonthly}>
-                  {g.month.replace(/^April:\s*/, '')}
-                </Text>
+                <PainterlyBlock
+                  palette={g.pal}
+                  seed={3 + i}
+                  style={styles.goalCardPainterly}
+                >
+                  {/* Oversize atmospheric glyph in the bottom-right corner —
+                      reads as background texture, not iconography. */}
+                  <View pointerEvents="none" style={styles.goalCornerGlyph}>
+                    <Glyph
+                      size={150}
+                      color={t.colors.PrimaryText}
+                      strokeWidth={1.4}
+                    />
+                  </View>
+                  <View style={styles.goalCardInner}>
+                    <Text style={styles.goalTitle}>{g.title}</Text>
+                    <View style={styles.goalDivider} />
+                    <View style={styles.goalMonthlyRow}>
+                      <Text style={styles.goalMonthlyEyebrow}>APRIL</Text>
+                      <Text style={styles.goalMonthly}>
+                        {g.month.replace(/^April:\s*/, '')}
+                      </Text>
+                    </View>
+                  </View>
+                </PainterlyBlock>
               </Pressable>
             );
           })}
@@ -593,6 +656,22 @@ export default function App() {
         showsHorizontalScrollIndicator={false}
         style={styles.pager}
         onContentSizeChange={onPagerContentSized}
+        // Auto-fire the weekly-review MA call the first time the user reaches
+        // any Past slot in this session. Past = slot % 3 === 0 (see CYCLES /
+        // SCREENS_PER_CYCLE comment above). Guards: a useRef latch so we don't
+        // re-fire on every swipe, plus the idle-state check so a manual rerun
+        // doesn't get clobbered. Fires onMomentumScrollEnd so we trigger after
+        // the user actually lands on Past, not while they're mid-drag.
+        onMomentumScrollEnd={(e) => {
+          if (weeklyAutoFired.current) return;
+          if (liveWeekly.kind !== 'idle') return;
+          if (!pageWidth) return;
+          const slot = Math.round(e.nativeEvent.contentOffset.x / pageWidth);
+          if (slot % SCREENS_PER_CYCLE === 0) {
+            weeklyAutoFired.current = true;
+            handleGenerateLiveWeekly();
+          }
+        }}
       >
         {Array.from({ length: TOTAL_SLOTS }, (_, i) => {
           const kind = i % SCREENS_PER_CYCLE; // 0 Past, 1 Present, 2 Future
@@ -638,6 +717,17 @@ export default function App() {
         onOpenGoal={openGoal}
         onOpenProject={openProject}
       /> : null}
+      {/* Same defensive conditional-mount pattern as BriefFlow — keeps the
+          evening overlay's portal off the tree until the user opens it. */}
+      {reviewFlowOpen ? (
+        <ReviewFlow
+          visible={reviewFlowOpen}
+          onClose={() => setReviewFlowOpen(false)}
+          onAccept={handleReviewAccept}
+          agentRunning={liveReview.kind === 'loading'}
+          agentError={liveReview.kind === 'error' ? liveReview.message : null}
+        />
+      ) : null}
       <StatusBar style="auto" />
     </View>
   );
@@ -843,7 +933,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 56,
-    ...t.elevation.Raised,
+  },
+  // Morning glow — warm terracotta drop + subtle inner highlight. Native
+  // shadowColor approximates the multi-layer glow on web; RN doesn't compose
+  // multiple shadows the way CSS does.
+  phaseCtaMorning: {
+    shadowColor: '#C66B3F',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.42,
+    shadowRadius: 28,
+    elevation: 6,
+  },
+  phaseCtaEvening: {
+    shadowColor: '#1C1638',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.38,
+    shadowRadius: 26,
+    elevation: 6,
   },
   phaseCtaLabel: {
     fontFamily: t.typography.fonts.UISemi,
@@ -865,37 +971,67 @@ const styles = StyleSheet.create({
     color: t.colors.SupportingText,
     fontStyle: 'italic',
   },
-  goalCard: {
-    padding: t.spacing['5'],
+  // Goal card shell — outer wrapper holds the shadow and rounded mask. The
+  // PainterlyBlock inside provides the painted background; we keep the shell
+  // separate so SVG/blob clipping works (overflow: hidden + radius on the
+  // PainterlyBlock would stamp on the children's z-index on web).
+  goalCardShell: {
     borderRadius: t.radius.Card,
     marginBottom: t.spacing['4'],
+    overflow: 'hidden',
     ...t.elevation.Raised,
+  },
+  goalCardPainterly: {
+    minHeight: 210,
+    borderRadius: t.radius.Card,
+  },
+  goalCardInner: {
+    padding: t.spacing['5'],
+    paddingTop: t.spacing['5'],
+    paddingBottom: t.spacing['5'],
+    position: 'relative',
+    zIndex: 2,
+  },
+  // Bottom-right faded glyph — atmospheric texture, not iconography. Matches
+  // the design canvas placement (negative offset so the icon partially
+  // bleeds off the corner). opacity 0.20 reads as a watermark.
+  goalCornerGlyph: {
+    position: 'absolute',
+    right: -18,
+    bottom: -24,
+    opacity: 0.2,
+    zIndex: 1,
   },
   goalTitle: {
     fontFamily: t.typography.fonts.Display,
-    fontSize: 24,
-    lineHeight: 28,
+    fontSize: 28,
+    lineHeight: 32,
     color: t.colors.PrimaryText,
-    letterSpacing: -0.3,
+    letterSpacing: -0.5,
+    fontStyle: 'italic',
+    maxWidth: '88%',
   },
   goalDivider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: t.colors.EdgeLine,
-    marginVertical: t.spacing['3'],
-    opacity: 0.5,
+    height: 1,
+    backgroundColor: 'rgba(31,27,21,0.22)',
+    marginTop: t.spacing['4'],
+    marginBottom: t.spacing['3'],
+  },
+  goalMonthlyRow: {
+    maxWidth: '88%',
   },
   goalMonthlyEyebrow: {
     fontFamily: t.typography.fonts.UISemi,
     fontSize: 10,
     letterSpacing: 1.2,
     color: t.colors.PrimaryText,
-    opacity: 0.55,
+    opacity: 0.6,
     marginBottom: t.spacing['1'],
   },
   goalMonthly: {
     fontFamily: t.typography.fonts.Reading,
     fontSize: 15,
-    lineHeight: 22,
+    lineHeight: 23,
     color: t.colors.PrimaryText,
     opacity: 0.86,
   },
