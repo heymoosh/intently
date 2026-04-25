@@ -293,6 +293,32 @@ export default function App() {
     }
   }, [screenWidth]);
 
+  // Arrow-key navigation between tense slots. Browsers do a small px-step on
+  // ArrowLeft/ArrowRight that doesn't trigger scroll-snap (the spec says it
+  // should; implementations don't). We intercept and programmatically scroll
+  // exactly one slot width, which lands cleanly on a snap point. Skips the
+  // intercept while a text input is focused (so typing in BriefFlow stays
+  // local to that field).
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const ref = pager.current as unknown as { getScrollableNode?: () => HTMLElement } | null;
+    if (!ref || !screenWidth) return;
+    const node = ref.getScrollableNode ? ref.getScrollableNode() : (ref as unknown as HTMLElement);
+    if (!node) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      const tag = (document.activeElement as HTMLElement | null)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      const currentSlot = Math.round(node.scrollLeft / screenWidth);
+      const nextSlot = e.key === 'ArrowRight' ? currentSlot + 1 : currentSlot - 1;
+      if (nextSlot < 0 || nextSlot >= TOTAL_SLOTS) return;
+      e.preventDefault();
+      node.scrollTo({ left: nextSlot * screenWidth, behavior: 'smooth' });
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [screenWidth]);
+
   if (!fontsLoaded) return null;
 
   const pageWidth = screenWidth;
