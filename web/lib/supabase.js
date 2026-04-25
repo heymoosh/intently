@@ -17,11 +17,11 @@
 // the prototype keeps loading even if the UMD script blocks or fails. Failure
 // surfaces at call-time, not at script-load time.
 
-let _client = null;
+let _supabaseClient = null;
 let _authPromise = null;
 
 function getSupabaseClient() {
-  if (_client) return _client;
+  if (_supabaseClient) return _supabaseClient;
 
   const cfg = window.INTENTLY_CONFIG || {};
   const url = cfg.supabaseUrl;
@@ -41,7 +41,7 @@ function getSupabaseClient() {
     );
   }
 
-  _client = sb.createClient(url, apiKey, {
+  _supabaseClient = sb.createClient(url, apiKey, {
     auth: {
       // Persist the anonymous session so refresh keeps the same auth.uid()
       // (and therefore the same scoped data).
@@ -51,7 +51,7 @@ function getSupabaseClient() {
       storageKey: 'intently-auth',
     },
   });
-  return _client;
+  return _supabaseClient;
 }
 
 // Ensure there's a session (anonymous if no real sign-in). Idempotent —

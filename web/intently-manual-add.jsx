@@ -230,7 +230,16 @@ function AddZone({ addLabel, placeholder, onCommit, helper, compact, tint, right
 }
 
 // ─── useManualAdds ─── tiny state bag the prototype threads through.
-// In production this is replaced by a real store; the component signatures stay.
+//
+// State stays in-memory for instant UI feedback. Each add ALSO fires the
+// matching window.entities.* helper as fire-and-forget so rows persist to
+// Supabase. Errors log to console — UI never blocks on the network.
+//
+// Toggles (adminReminder.done, projectTodo.done) currently stay in-memory:
+// the optimistic local IDs (`r-...`, `pt-...`) don't map to DB UUIDs in this
+// session. Real toggle-persistence needs (a) the insert helper to return the
+// row id and (b) read-on-mount to hydrate from Supabase so the local id maps
+// to a real one. Flagged as a follow-up after the read-on-mount lands.
 function useManualAdds() {
   const [state, setState] = React.useState({
     // Present-plan additions, keyed by band name ('Morning' | 'Afternoon' | 'Evening')
@@ -247,41 +256,81 @@ function useManualAdds() {
     projectTodos: {},
   });
 
+  // Fire-and-forget persistence: never blocks UI, never throws to React.
+  // Logs the failure so devtools surfaces it; the in-memory item stays visible.
+  const _persist = (label, fn) => {
+    if (typeof fn !== 'function') return;
+    Promise.resolve()
+      .then(() => fn())
+      .catch((e) => console.warn(`[entities] ${label} failed:`, e && e.message ? e.message : e));
+  };
+  const _today = () => new Date().toISOString().slice(0, 10);
+
   return {
     state,
-    addPlanItem: (band, text) =>
+    addPlanItem: (band, text) => {
       setState((s) => ({
         ...s,
         plan: { ...s.plan, [band]: [...s.plan[band], { text, id: `p-${Date.now()}` }] },
-      })),
-    addJournal: (dayId, text) =>
+      }));
+      _persist('insertPlanItem', () =>
+        window.insertPlanItem && window.insertPlanItem(_today(), band.toLowerCase(), text),
+      );
+    },
+    addJournal: (dayId, text) => {
       setState((s) => ({
         ...s,
         journal: { ...s.journal, [dayId]: [...(s.journal[dayId] || []), { text, id: `j-${Date.now()}`, at: new Date() }] },
-      })),
-    addGoal: (text) =>
-      setState((s) => ({ ...s, goals: [...s.goals, { text, id: `g-${Date.now()}` }] })),
-    addProject: (text) =>
-      setState((s) => ({ ...s, projects: [...s.projects, { text, id: `pr-${Date.now()}` }] })),
-    addAdminReminder: (text) =>
+      }));
+      // 'today' maps to undefined so the column default (now()) fires; future
+      // day ids could pass an ISO date if the prototype ever wires past-day adds.
+      const at = dayId === 'today' ? undefined : dayId;
+      _persist('insertJournalEntry', () =>
+        window.insertJournalEntry && window.insertJournalEntry(text, at),
+      );
+    },
+    addGoal: (text) => {
+      setState((s) => ({ ...s, goals: [...s.goals, { text, id: `g-${Date.now()}` }] }));
+      _persist('insertGoal', () => window.insertGoal && window.insertGoal(text));
+    },
+    addProject: (text) => {
+      setState((s) => ({ ...s, projects: [...s.projects, { text, id: `pr-${Date.now()}` }] }));
+      _persist('insertProject', () => window.insertProject && window.insertProject(text));
+    },
+    addAdminReminder: (text) => {
       setState((s) => ({
         ...s,
         adminReminders: [...s.adminReminders, { text, id: `r-${Date.now()}`, done: false }],
-      })),
+      }));
+      _persist('insertAdminReminder', () =>
+        window.insertAdminReminder && window.insertAdminReminder(text),
+      );
+    },
     toggleAdminReminder: (id) =>
+      // In-memory only — see header comment.
       setState((s) => ({
         ...s,
         adminReminders: s.adminReminders.map((r) => (r.id === id ? { ...r, done: !r.done } : r)),
       })),
-    addProjectTodo: (projectId, text) =>
+    addProjectTodo: (projectId, text) => {
       setState((s) => ({
         ...s,
         projectTodos: {
           ...s.projectTodos,
           [projectId]: [...(s.projectTodos[projectId] || []), { text, id: `pt-${Date.now()}`, done: false }],
         },
-      })),
+      }));
+      // Only persist when projectId looks like a real DB UUID; the prototype's
+      // PROJECT_DATA fixtures use string keys like 'demo-pitch' that won't satisfy
+      // the foreign-key constraint on projects.id. Skip cleanly in that case.
+      if (typeof projectId === 'string' && /^[0-9a-f]{8}-/.test(projectId)) {
+        _persist('addProjectTodo', () =>
+          window.addProjectTodo && window.addProjectTodo(projectId, text),
+        );
+      }
+    },
     toggleProjectTodo: (projectId, id) =>
+      // In-memory only — see header comment.
       setState((s) => ({
         ...s,
         projectTodos: {
