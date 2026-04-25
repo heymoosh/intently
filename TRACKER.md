@@ -28,6 +28,7 @@ Project briefs at `.claude/handoffs/<slug>.md` — persist across sessions; neve
 
 - **`steward-redesign`** → `.claude/handoffs/steward-redesign.md` — per-project handoff system. **Shipped 2026-04-25** in PR [#79](https://github.com/heymoosh/intently/pull/79) (commit `ce7d0c4`). Doc preserved for pattern review. Status: shipped.
 - **`entries-architecture`** → `.claude/handoffs/entries-architecture.md` — reconcile new design folder against current code, produce v2 session prompt, spawn parallel implementation tracks. Currently pre-Phase-1 (about to spawn Explore agents for design read + code survey). Status: active.
+- **`overnight-build-loops`** → `.claude/handoffs/overnight-build-loops.md` — robustness rewrite for the overnight build loop: no iter cap, safe-task gate, hourly inline `/babysit-prs`, terminal-only summary, launchd-not-caffeinate. Driven by 2026-04-25 night failure (1 of 3 iters silently failed; 9-hour Mac-sleep gap). Status: active.
 
 ## Critical items awaiting review
 
