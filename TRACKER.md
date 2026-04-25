@@ -102,6 +102,7 @@ End-to-end Playwright smoke against `intently-eta.vercel.app/?dev=1`. ma-proxy f
 
 ## Follow-ups (pending manual or flight-test)
 
+- **Toggle persistence** (`adminReminder.done`, `projectTodo.done`) is now technically possible since real DB UUIDs are in state. Wiring needs an `updateAdminReminderStatus` helper + the existing `toggleProjectTodo` helper from entities.js. Smaller follow-up. ([PR #143](https://github.com/heymoosh/intently/pull/143))
 - **Re-run `supabase db push`** to apply migration `0005_plan_items.sql`. The earlier db push happened before PR #137 was merged, so the plan_items table doesn't exist yet. Smoke result: `insertPlanItem` returns "Could not find the table 'public.plan_items' in the schema cache". ([PR #141](https://github.com/heymoosh/intently/pull/141))
 - **Read-on-mount queries** — replace hardcoded fixtures (`PROJECT_DATA`, `ENTRY_DATA`, journal `DayView` fixtures) with `listGoals` / `listProjects` / `listJournalEntries` / `listPlanItems(today)` calls on mount, falling back to seed when empty. Required before toggle-persistence becomes possible (need real DB UUIDs in state). ([PR #141](https://github.com/heymoosh/intently/pull/141))
 - **AddZones + read-on-mount wiring** is deferred — depends on PR #137 (entities lib + 0005 plan_items migration) merging first, plus `supabase db push` to apply migrations 0003/0004/0005, plus anonymous Supabase auth on app load OR RLS relaxation (current owner-only policies will reject anon writes from the browser). ([PR #139](https://github.com/heymoosh/intently/pull/139))
