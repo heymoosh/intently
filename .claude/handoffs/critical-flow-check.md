@@ -48,6 +48,8 @@
 - Yesterday's AC update added the strict CR-03 ("does not synthesize multi-day patterns") and CR-05 ("informational only — does not propose how to sequence") boundaries that today's auto-fix tried to enforce.
 - The CR-03 / CR-05 boundary is a real product call (does daily-review own multi-day pattern detection or hand it to weekly-review?) — and Muxin has not signed off on it.
 
+**Related routine — `criteria-sync` — also disabled 2026-04-25 (same session).** This is the steward that maintains the AC files themselves, and is the most likely upstream of today's 08:55 auto-update. Same disable treatment: `launchctl unload ~/Library/LaunchAgents/com.intently.criteria-sync.plist`, plist renamed `.disabled`. Repo brief at `.claude/loops/criteria-sync-loop.md` and canonical plist at `.claude/launchd/plists/com.intently.criteria-sync.plist` left intact for re-enablement. The two routines are coupled: `criteria-sync` writes AC, `critical-flow-check` reads AC and enforces it against implementation. Disabling only one would still leave the closed-loop problem (auto-author OR auto-enforce). Re-enable them together once the AC governance question is resolved.
+
 ## Next steps
 
 Ordered by impact + dependency.
