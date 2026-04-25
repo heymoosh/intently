@@ -6,6 +6,25 @@
 
 **Submission tracking** (video, artifacts, deadline): `docs/hackathon/Submission Tracker.md`.
 
+## Current state — pointers per topic
+
+This section is the spine. Every topic with a "current truth" lives here as a pointer to the doc that owns it. **When a session decides something that shifts a topic, update the pointer here AND drop a stub ADR in `docs/decisions/`** (see CLAUDE.md § Session-end discipline). When this table supersedes an old doc, that old doc gets a banner — never delete; always banner.
+
+| Topic | Current truth | Notes |
+|---|---|---|
+| **UX / interaction model** | `docs/design/Intently - App/HANDOFF.md` + the prototype JSX in that folder | Replaces vision.md + app-experience.md framing for current product behavior. |
+| **Agent behavior (per skill)** | `agents/<skill>/SKILL.md` + `agents/<skill>/ma-agent-config.json` | Each agent's prompt is its own truth. Don't re-derive from old spec docs. |
+| **Stack** | ADR 0004 (web-only pivot, supersedes 0003) | Plain React 18 + Babel-standalone (no build step) + Supabase + Managed Agents. Existing `app/` (Expo + RN-Web) being phased out via Saturday wiring-port. |
+| **Secrets store** | ADR 0005 (Supabase env). BWS deferred until multi-user / scale. | "No secrets in git" is universal (CLAUDE.md). The *store* is conditional. |
+| **Active decisions** | `docs/decisions/` — newest active ADR per topic | Superseded ADRs get a `> SUPERSEDED by ADR-NNNN` header. |
+| **Routine + loop pack** | `docs/Claude Code Repo-Ready Blueprint.md` | Listing + schedules + structural authority. Drift-check loop spec: `.claude/loops/decision-drift-check.md`. |
+| **Session handoff process** | `docs/process/session-handoff.md` + `.claude/handoffs/<slug>.md` per project | Per-project handoffs; never auto-deleted. Slash command: `/handoff`. |
+| **Acceptance criteria process** | `docs/process/acceptance-criteria.md` | Immutable during build; only Status + Last checked may change. |
+| **Release gates** | `docs/process/release-gates.md` | `release-gate.yml` enforces in CI. |
+| **Test scope** | Unit + E2E only for hackathon (skip integration). Post-hackathon to be re-decided. | Cap exists so coverage doesn't grow into time we don't have. |
+
+**Original-intent docs (archived, not current ground truth — bannered in-file):** `docs/product/vision.md`, `docs/product/requirements/life-ops-plugin-spec.md`, `docs/design/app-experience.md`, `docs/architecture/agent-memory.md`, `docs/architecture/data-model.md`, `docs/architecture/document-taxonomy.md`. Treat as historical reference for original intent; current product behavior derives from the rows above.
+
 ## Status
 
 **Phase:** Reconcile — design folder fully replaced 2026-04-24; entries-architecture plan needs sanity-check against new design before any build.

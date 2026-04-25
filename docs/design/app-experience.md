@@ -1,3 +1,7 @@
+> **⚠ ORIGINAL INTENT — not current ground truth.** Captures pre-2026-04-25 framing. Current UX truth lives in `docs/design/Intently - App/HANDOFF.md` + the prototype JSX in that folder; for full pointers see `TRACKER.md § Current state`. Treat this doc as historical reference for original intent — **do not derive current product behavior from it**.
+
+---
+
 # App Experience — Design Direction
 
 **Type:** Design doc — how the app looks, feels, and is operated. Evolves as we build and test.

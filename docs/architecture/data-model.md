@@ -1,3 +1,7 @@
+> **⚠ ORIGINAL INTENT — not current ground truth.** Captures pre-2026-04-25 framing (markdown-vault-as-source-of-truth, pre-DB-cutover). Current data model derives from `TRACKER.md § Current state pointers` (UX shapes = `docs/design/Intently - App/HANDOFF.md` §2; runtime DB = `supabase/migrations/`; render layer = `app/lib/render/`). Treat this doc as historical reference for original intent — **do not derive current schema from it**.
+
+---
+
 # Life Ops Plugin — File Schema & Contracts
 
 **Purpose:** This document defines the *shape* of every file the Life Ops plugin creates, reads, or writes. For each file type it specifies: required sections, format, which skills write to it, which skills read from it, first-run state, and missed-run behavior.
