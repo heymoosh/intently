@@ -103,6 +103,8 @@ End-to-end Playwright smoke against `intently-eta.vercel.app/?dev=1`. ma-proxy f
 
 ## Follow-ups (pending manual or flight-test)
 
+- **Run `supabase db push`** to apply `0006_calendar_email.sql` so the assembler can read calendar + email context (currently skips cleanly with 404s in console). ([PR #145](https://github.com/heymoosh/intently/pull/145))
+- Sam's seed lands on your session automatically. To start fresh: `await window.clearAllUserData()` in the console, then refresh. ([PR #145](https://github.com/heymoosh/intently/pull/145))
 - **Toggle persistence** (`adminReminder.done`, `projectTodo.done`) is now technically possible since real DB UUIDs are in state. Wiring needs an `updateAdminReminderStatus` helper + the existing `toggleProjectTodo` helper from entities.js. Smaller follow-up. ([PR #143](https://github.com/heymoosh/intently/pull/143))
 - **Re-run `supabase db push`** to apply migration `0005_plan_items.sql`. The earlier db push happened before PR #137 was merged, so the plan_items table doesn't exist yet. Smoke result: `insertPlanItem` returns "Could not find the table 'public.plan_items' in the schema cache". ([PR #141](https://github.com/heymoosh/intently/pull/141))
 - **Read-on-mount queries** — replace hardcoded fixtures (`PROJECT_DATA`, `ENTRY_DATA`, journal `DayView` fixtures) with `listGoals` / `listProjects` / `listJournalEntries` / `listPlanItems(today)` calls on mount, falling back to seed when empty. Required before toggle-persistence becomes possible (need real DB UUIDs in state). ([PR #141](https://github.com/heymoosh/intently/pull/141))
