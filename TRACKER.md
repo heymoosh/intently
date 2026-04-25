@@ -24,11 +24,13 @@
 
 ## Critical items awaiting review
 
-1. **Design folder was completely replaced 2026-04-24.** New version at `docs/design/Intently - App/` ships an interactive prototype + updated `CLAUDE.md`, `BUILD-RULES.md`, `HANDOFF.md`. Prior plans (including the entries-architecture session prompt at `docs/process/session-prompt-entries-architecture.md`) were written against the *old* version. **First action of next session:** read the new design folder end-to-end, apply the "Spec intent > spec letter" rule with Muxin (elicit intent in his own words), reconcile the entries-architecture plan against new content. The session prompt has a STOP banner at the top that walks through this protocol — follow it.
+1. **[BLOCKING — DO FIRST] Session Handoff Steward redesign.** Spec captured in Follow-ups below. Why first: the entries-reconciliation session is meant to spawn parallel `intently-track` worktrees, and per Muxin's design each session needs its own `.claude/session-handoffs/<slug>.md` for deep context. Without the redesign, parallel tracks have no clean place to dump their state and pollute TRACKER instead. ~30–60 min: rewrite the steward brief, change/disable the daily launchd job, build the per-session trigger (Stop hook), build delete-on-completion lifecycle. Lands the three-tier doc hierarchy (`launch-plan` → `TRACKER` → `session-handoffs/<slug>.md`).
 
-2. **Reminders intent reconciliation.** Muxin's stated intent (in his own words, captured in the entries-architecture session prompt): "*reminders was more like, 'keep track of this and surface it in daily briefing' not specifically 'you asked me to remind you to...' so that if i say, dropped in a 'hey add this somewhere' and leave a voice memo the agent's like 'cool got it' and it stashes it somewhere where it will pull it up again during our daily briefing... it tracks time sensitivity.*" Current shipped reminders flow is still narrow date-anchored (classify prompt rejects anything without a clear date). The reconciliation pass needs to confirm whether the new design folder has a different/better model for this — and whether "Entry as canonical, reminders as projection" still holds.
+2. **Design folder was completely replaced 2026-04-24.** New version at `docs/design/Intently - App/` ships an interactive prototype + updated `CLAUDE.md`, `BUILD-RULES.md`, `HANDOFF.md`. Prior plans (including the entries-architecture session prompt at `docs/process/session-prompt-entries-architecture.md`) were written against the *old* version. **After the steward redesign lands:** read the new design folder end-to-end, apply the "Spec intent > spec letter" rule with Muxin (elicit intent in his own words), reconcile the entries-architecture plan against new content. The session prompt has a STOP banner at the top that walks through this protocol — follow it.
 
-3. **Worktree at `~/worktrees/intently/entries-architecture` is parked.** It was created via `intently-track entries-architecture` but no Claude session has done work in it. After reconciliation, decide: continue in that worktree, destroy + recreate fresh, or skip the worktree pattern entirely if the new plan doesn't fit it. Don't run `claude` in it until the reconciliation is done; otherwise that session starts building from a stale plan.
+3. **Reminders intent reconciliation.** Muxin's stated intent (in his own words, captured in the entries-architecture session prompt): "*reminders was more like, 'keep track of this and surface it in daily briefing' not specifically 'you asked me to remind you to...' so that if i say, dropped in a 'hey add this somewhere' and leave a voice memo the agent's like 'cool got it' and it stashes it somewhere where it will pull it up again during our daily briefing... it tracks time sensitivity.*" Current shipped reminders flow is still narrow date-anchored (classify prompt rejects anything without a clear date). The reconciliation pass needs to confirm whether the new design folder has a different/better model for this — and whether "Entry as canonical, reminders as projection" still holds.
+
+4. **Worktree at `~/worktrees/intently/entries-architecture` is parked.** It was created via `intently-track entries-architecture` but no Claude session has done work in it. After reconciliation, decide: continue in that worktree, destroy + recreate fresh, or skip the worktree pattern entirely if the new plan doesn't fit it. Don't run `claude` in it until the reconciliation is done; otherwise that session starts building from a stale plan.
 
 ## Follow-ups (pending manual or flight-test)
 
@@ -58,15 +60,17 @@ Three bugs found during Friday's first live smoke tests. Fixes shipped in #68, #
 
 ## Next (in order — start here)
 
-1. **[BLOCKING] Read the new `docs/design/Intently - App/` folder end-to-end** — `CLAUDE.md`, `BUILD-RULES.md`, `HANDOFF.md`, plus the interactive prototype files. Take notes on anything that diverges from current shipped behavior or from the entries-architecture plan.
+1. **[BLOCKING #1] Session Handoff Steward redesign.** Per Muxin's spec in Follow-ups: rewrite brief, disable daily launchd cron, wire per-session trigger (Stop hook in `.claude/settings.json` is most natural), build per-session output to `.claude/session-handoffs/<timestamp>-<slug>.md`, build delete-on-completion lifecycle. Update CLAUDE.md "Session handoff" section + TRACKER.md doc-hierarchy line to reference the three-tier system. Confirm with Muxin before disabling the existing nightly job.
 
-2. **[BLOCKING] Apply "Spec intent > spec letter" with Muxin.** Per the rule in root `CLAUDE.md`: ask Muxin in his own words how Entry + capture/reminders should *feel* — what's the user beat. State back one sentence, get confirmation. The reminders narrow-vs-capture misread came from skipping this step; don't repeat it.
+2. **[BLOCKING #2] Read the new `docs/design/Intently - App/` folder end-to-end** — `CLAUDE.md`, `BUILD-RULES.md`, `HANDOFF.md`, plus the interactive prototype files. Take notes on anything that diverges from current shipped behavior or from the entries-architecture plan.
 
-3. **[BLOCKING] Reconcile** — does the new design content support "Entry as canonical, reminders as projection"? Two tables vs one? Hero-mediated capture? Update or supersede `docs/process/session-prompt-entries-architecture.md` with the revised plan. The STOP banner at the top of that prompt walks through the reconciliation protocol.
+3. **[BLOCKING #3] Apply "Spec intent > spec letter" with Muxin.** Per the rule in root `CLAUDE.md`: ask Muxin in his own words how Entry + capture/reminders should *feel* — what's the user beat. State back one sentence, get confirmation. The reminders narrow-vs-capture misread came from skipping this step; don't repeat it.
 
-4. **Then** — kick off (or resume in) the `~/worktrees/intently/entries-architecture` worktree with the revised plan. If the worktree's branching point is now stale relative to a revised plan, destroy + recreate.
+4. **[BLOCKING #4] Reconcile** — produce `docs/process/session-prompt-entries-architecture-v2.md` per the 5-section deliverable in the v1 prompt's STOP banner (new-design summary / current code / gap / clarifying questions / parallel-track slicing). Muxin signs off before tracks spawn.
 
-5. **Other in-flight items** (do after reconciliation lands):
+5. **Then** — spawn parallel `intently-track` worktrees per the slicing plan in the v2 prompt. Each track gets its own session-handoff doc (now possible because of #1).
+
+6. **Other in-flight items** (do as scope permits):
    - Design-fidelity pass per `docs/process/session-prompt-design-fidelity.md` (phone frame, TenseNav, painterly CTAs, hero state machine, typography).
    - Video script + practice takes.
    - Final recording + submission (Sunday 8 PM EDT).
