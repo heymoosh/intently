@@ -5,39 +5,42 @@
 1. **Don't dump this whole folder.** Paste the prompt below + ONE reference image max (`cool-logo.png` — the Rescript Journal page — for *line quality and warmth only*, not layout). Multiple references confuse the model and average it back to generic.
 2. Generate 4–8 variations per run.
 3. Iterate by changing **one variable at a time** (color, then form, then flourish). Don't rewrite the whole prompt between runs.
-4. If you want a wordmark version, generate the icon FIRST and lock it. Then run a second prompt that places the locked eye on the left and handwrites "ntently" beside it — don't try to do both in one shot.
+4. If you want a wordmark version, generate the "i" FIRST and lock it. Then run a second prompt that places the locked "i" on the left and handwrites "ntently" beside it — don't try to do both in one shot.
 
 ---
 
 ## The prompt (copy-paste)
 
 ```
-Generate a single iOS app icon for an app called Intently. One subject only — an eye.
+Generate a single iOS app icon for an app called Intently. One subject only — the lowercase letter "i".
 
-The eye: hand-drawn as if inked with a brush pen in one continuous fluid line. Slightly asymmetric, organic, confident — looks like a person drew it freehand, not a designer's vector. The eye shape is elongated vertically — almond on its long axis, gently pinched at the top and bottom corners — so it can also read as a stylized capital letter "I" when placed inside the wordmark "Intently."
+The "i": hand-drawn as if inked with a brush pen, written freehand in one confident gesture. Slightly asymmetric, organic — looks like a person wrote it on warm paper, not a designer's typeface. Two parts only: a vertical stem and a small round dot (the tittle) floating above it with a clean gap of cream negative space between them.
 
 Form details:
-- Single continuous brushed/inked stroke for the eye outline
-- Slight calligraphic weight contrast: thicker through the curves, tapering at the corners
-- A small filled circular pupil in the center of the eye
-- One small optional flourish — a single soft curl below the eye, like a quiet underline written with the same pen — adding personality without clutter
-- Imperfect, handmade character: slight wobble, organic line. NOT vector-clean. NOT geometric.
+- The stem: one downward brushed/inked stroke, gently tapered at the top and bottom, with a slight calligraphic weight contrast — thicker through the middle, lighter at the ends. Slight organic wobble, not perfectly straight.
+- The tittle: a small filled circular dot, centered horizontally above the stem, sitting in clean empty space. NOT enclosed by any outline, almond, eye-shape, or container. Just a floating dot.
+- One small optional flourish — a single soft curl at the base of the stem, like a quiet underline written with the same pen — adding personality without clutter.
+- Imperfect, handmade character: slight wobble, organic line. NOT vector-clean. NOT a system font glyph.
 
 Color — use exact hex values, no substitutions:
-- Eye outline stroke: #3A4E3A (deep forest moss)
-- Pupil: #5F8A72 (sage green — the brand color)
+- Stem stroke: #3A4E3A (deep forest moss)
+- Tittle / dot: #5F8A72 (sage green — the brand color)
 - Background: #F5EEE0 (warm linen cream), filling the entire canvas edge to edge
 - No other colors. No gradients. No drop shadows. No outlines around the background. No 3D shading. No metallic effects.
 
 Composition:
 - Square canvas, 1:1 aspect ratio
-- Eye centered, occupying roughly 50–55% of the canvas width — comfortable iOS app icon padding
+- The "i" centered, occupying roughly 50–55% of the canvas height — comfortable iOS app icon padding
 - Render as a flat square. Do NOT add iOS rounded corners — the OS masks them.
-- NO text, NO letters, NO wordmark, NO taglines anywhere in the image. Just the eye on the cream background.
+- NO text other than the single lowercase "i". NO additional letters, NO wordmark, NO taglines. Just the "i" on the cream background.
 
 Tone: warm, personal, handmade, quietly bookish. The feeling of a fountain pen mark on warm paper. Reference the line quality of a journal sketch — confident but not perfect.
 
-Avoid: clip-art eyes, emoji-style eyes, anatomical realism, eyelashes drawn as a bouquet, mascara, rainbow colors, tech-startup minimalism, gradient meshes, neon, glow, photorealism, drop shadows, 3D, embossing.
+CRITICAL avoidances:
+- NO eye, NO eyeball, NO almond/lens/leaf shape around the dot. The dot must float in open negative space — never enclosed, never surrounded, never framed by an outline.
+- NO pupil-in-an-eye reading, NO iris, NO eyelashes, NO eyelid, NO sclera.
+- NO horizontal almond, NO vertical almond, NO ovals or curves wrapping the dot.
+- NO clip-art letters, NO font-perfect typography, NO geometric vector shapes, NO rainbow colors, NO tech-startup minimalism, NO gradient meshes, NO neon, NO glow, NO photorealism, NO drop shadows, NO 3D, NO embossing.
 ```
 
 ---
@@ -45,22 +48,22 @@ Avoid: clip-art eyes, emoji-style eyes, anatomical realism, eyelashes drawn as a
 ## Variant tweaks (swap one line at a time if v1 doesn't land)
 
 **If the two-color combo isn't working**, go monochrome:
-> Eye outline stroke and pupil: #5F8A72 (sage green). Background: #F5EEE0 warm linen.
+> Stem and tittle: both #5F8A72 (sage green). Background: #F5EEE0 warm linen.
 
 **If moss reads too heavy / funeral-dark**, flip the colors:
-> Eye outline stroke: #5F8A72 (sage green). Pupil: #3A4E3A (moss). Background: #F5EEE0.
+> Stem stroke: #5F8A72 (sage green). Tittle: #3A4E3A (moss). Background: #F5EEE0.
 
 **If the line is too clean / vector-y**, add:
 > The line should look painted, not drawn — visible brush character, slight ink pooling at the curves, organic edge variation. As if painted in a single breath with a wide-tipped brush pen.
 
-**If it looks like a real eye (creepy realism)**, add:
-> Highly abstract — just an almond outline with a single dot pupil. No white sclera, no iris detail, no eyelashes drawn as separate lines, no eyelid crease. Pictogram-level simplicity.
+**If it's still drawing an eye / almond around the dot**, add (this is the most common failure mode):
+> Absolutely no shape, outline, or enclosure around the tittle. The dot sits alone in empty cream space, with only the vertical stem below it. If you find yourself drawing a curve around the dot — stop. Erase it. The composition is two separate marks: a stem and a floating dot. Nothing else.
+
+**If the "i" looks too font-perfect / typographic**, add:
+> More handwritten, less typographic. Treat it as a journal mark, not a glyph from a typeface. The stem can have slight character variation along its length; the dot can be slightly imperfect — not a perfect circle.
 
 **If it looks too playful / cartoony**, add:
 > Reduce flourishes. More restrained, more bookish, more like a journal sketch than an illustration.
-
-**If you want the eye-as-letter reading to be stronger**, add:
-> The eye's vertical proportions should be exaggerated — taller than wide, with sharp pinched corners at the top and bottom. The shape should be unambiguously readable as both an eye and a stylized capital "I."
 
 ---
 
