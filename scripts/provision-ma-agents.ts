@@ -251,7 +251,12 @@ export async function provision(opts: ProvisionOpts): Promise<ProvisionRunResult
           result.message = `update unsupported by this SDK; edit manually at ${url}`;
         } else {
           try {
-            const updated = await opts.client.update(existing.id, params);
+            // The Anthropic Managed Agents API requires the agent's current
+            // `version` on update (optimistic concurrency). It comes from the
+            // list response (existing.version). Cast to bypass the narrower
+            // CreateAgentParams type — runtime accepts the extra field.
+            const updateParams = { ...params, version: Number(existing.version) } as CreateAgentParams;
+            const updated = await opts.client.update(existing.id, updateParams);
             log(`✓ ${skill}: updated → ${updated.id}`);
           } catch (err) {
             const msg = (err as Error).message;
