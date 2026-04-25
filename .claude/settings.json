@@ -82,6 +82,10 @@
           {
             "type": "command",
             "command": "bash scripts/session-locks.sh block-if-sibling"
+          },
+          {
+            "type": "command",
+            "command": "bash scripts/wt-intent.sh block-if-missing"
           }
         ]
       }
