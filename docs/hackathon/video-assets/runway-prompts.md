@@ -81,7 +81,7 @@ Camera positioned behind @AppHero, looking past her shoulder into the scene. She
 ## Scene 8 — The question mark
 
 ```
-Wide open empty space — the heat has drained out of the scene but it isn't calm yet. A single oversized question mark floating in the center, slightly above eye level. Clean, simple, bold. The emptiness around it is intentional — this is the only thing in frame. Flat 2D vector illustration style — clean geometric shapes, smooth rounded forms, minimal. Background: solid flat fill of #CFC9EB (transitional soft lilac), filling the entire frame.
+Wide open empty space — the heat has drained out of the scene but it isn't calm yet. A single oversized question mark floating in the center, slightly above eye level — the only thing in frame. Drawn in a soft-serif, hand-inked style: organic calligraphic weight contrast (thicker on the curve, tapering at the terminals), slightly asymmetric, like it was brushed by hand rather than typed. Warm and characterful, not geometric or sans-serif. The curved body of the question mark is a deep forest green #3A4E3A. The dot at the bottom is a sage green #5F8A72 — a small seed of color planted inside the question. Both colors flat-filled, no gradients, no drop shadows, no outlines. Background: solid flat fill of #CFC9EB (transitional soft lilac), filling the entire frame.
 ```
 
 ---
@@ -89,7 +89,7 @@ Wide open empty space — the heat has drained out of the scene but it isn't cal
 ## Scene 9 — @AppHero reappears, thoughtful
 
 ```
-@AppHero has reappeared, small in frame, standing below and looking up at the large floating question mark. Posture is contemplative — head slightly tilted, one hand near her chin. Not scared, just thinking. Flat 2D vector illustration style — clean geometric shapes, simplified character with expressive face, smooth rounded forms, minimal. Background: solid flat fill of #CFC9EB (transitional soft lilac), quieter than the previous scenes but not yet warm.
+@AppHero has reappeared, small in frame near the lower portion of the composition, standing below and looking up at the large floating question mark from Scene 8. Posture is contemplative — head slightly tilted, one hand near her chin. Not scared, just thinking. The question mark above her is the same as Scene 8 — drawn in a soft-serif, hand-inked style with organic calligraphic weight contrast (thicker on the curve, tapering at the terminals), slightly asymmetric. The curved body is deep forest green #3A4E3A; the dot at the bottom is sage green #5F8A72. @AppHero herself is rendered in flat 2D vector illustration style — clean geometric shapes, simplified character with expressive face, smooth rounded forms. Background: solid flat fill of #CFC9EB (transitional soft lilac), quieter than the previous scenes but not yet warm.
 ```
 
 ---
