@@ -73,6 +73,7 @@ Project briefs at `.claude/handoffs/<slug>.md` — persist across sessions; neve
 
 ## Follow-ups (pending manual or flight-test)
 
+- Re-run smoke against `https://intently-eta.vercel.app` after merge to verify the fix on prod. ([PR #123](https://github.com/heymoosh/intently/pull/123))
 - The hook from #121 currently fires on every `Edit`/`Write` regardless of file path — including writes to `~/.bashrc` and `/tmp/`. Make it path-aware: only block when the target file is inside the repo root. Cheap fix, ~10 lines in `scripts/session-locks.sh`. ([PR #122](https://github.com/heymoosh/intently/pull/122))
 - **[Shipped 2026-04-25] Session Handoff Steward redesign.** Implemented in `chat/handoff-steward-redesign` — replaced per-session/nightly model with **per-project** handoffs at `.claude/handoffs/<slug>.md`, conversational kickoff trigger + manual `/handoff`, never auto-deleted. Old nightly launchd job + plist removed. Full decisions and divergence-from-original-spec rationale: `.claude/handoffs/steward-redesign.md`.
 - **[Resolved 2026-04-25] MA agents provisioned via `scripts/provision-ma-agents.ts`.** All four agents (daily-brief, daily-review, weekly-review, monthly-review) now exist in the daily-brief workspace; Supabase `MA_AGENT_ID_*` secrets refreshed (DAILY_REVIEW + WEEKLY_REVIEW digests changed — they were stale before); ma-proxy redeployed. Branch `feat/track-ma-provisioning` (PR #84) introduces the script.
