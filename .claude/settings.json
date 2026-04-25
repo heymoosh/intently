@@ -52,6 +52,10 @@
         "hooks": [
           {
             "type": "command",
+            "command": "bash scripts/session-sync-tracker.sh"
+          },
+          {
+            "type": "command",
             "command": "bash scripts/session-precheck.sh"
           },
           {
