@@ -1,0 +1,863 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Intently — Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,400&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; background: #e8e4dc; font-family: "Inter", system-ui, sans-serif; color: #2B2118; -webkit-font-smoothing: antialiased; min-height: 100vh; }
+  * { box-sizing: border-box; }
+  @keyframes intentlyWave { from { transform: scaleY(0.45); } to { transform: scaleY(1); } }
+  @keyframes intentlyBreath { 0%,100% { transform: scale(1); opacity: 0.2; } 50% { transform: scale(1.18); opacity: 0; } }
+  @keyframes intentlySpin { to { transform: rotate(360deg); } }
+  @keyframes intentlyPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+  @keyframes intentlyFade { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes intentlyRise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes intentlyMenuIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  ::-webkit-scrollbar { display: none; }
+  * { scrollbar-width: none; }
+  .intro-note {
+    max-width: 600px; margin: 36px auto 20px; padding: 0 24px;
+    font-family: "Inter", system-ui; color: #2B2118;
+  }
+  .intro-note h1 { font-family: "Fraunces", Georgia, serif; font-style: italic; font-weight: 500; font-size: 30px; line-height: 34px; letter-spacing: -0.5px; margin: 0 0 8px; }
+  .intro-note p { font-family: "Source Serif 4", Georgia, serif; font-size: 14px; line-height: 21px; color: #6E604D; margin: 0 0 6px; }
+  .phone-stage { display: flex; justify-content: center; align-items: flex-start; gap: 24px; padding: 20px 20px 80px; }
+
+  /* Dev toggle — outside phone frame */
+  .dev-panel {
+    position: sticky; top: 20px;
+    width: 220px; padding: 16px 16px 18px;
+    background: #FBF6EA;
+    border: 1px solid rgba(31,27,21,0.08);
+    border-radius: 14px;
+    box-shadow: 0 4px 14px rgba(31,27,21,0.06);
+    font-family: "Inter", system-ui;
+  }
+  .dev-panel .dev-label {
+    font-size: 10px; font-weight: 700; letter-spacing: 1.4px;
+    text-transform: uppercase; color: #9A8A72; margin-bottom: 10px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .dev-panel .dev-label::before {
+    content: ''; width: 6px; height: 6px; border-radius: 50%; background: #C66B3F;
+  }
+  .dev-panel button {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    padding: 9px 10px; margin-bottom: 4px;
+    background: transparent; border: none; border-radius: 8px;
+    font-family: "Inter", system-ui; font-size: 13px; color: #2B2118;
+    cursor: pointer; text-align: left;
+    transition: background 120ms ease;
+  }
+  .dev-panel button:hover { background: rgba(31,27,21,0.04); }
+  .dev-panel button.on { background: #2B2118; color: #FBF6EA; }
+  .dev-panel button .dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    background: rgba(31,27,21,0.2);
+  }
+  .dev-panel button.on .dot { background: #FBF6EA; }
+  .dev-panel .dev-caption {
+    font-family: "Source Serif 4", Georgia, serif; font-size: 12px; line-height: 17px;
+    color: #9A8A72; margin-top: 10px; font-style: italic;
+  }
+
+  /* ─── Responsive: on phones, stack vertically. Dev panel becomes a compact strip. ─── */
+  @media (max-width: 880px) {
+    .intro-note { margin: 24px auto 16px; }
+    .intro-note h1 { font-size: 24px; line-height: 28px; }
+    .phone-stage { flex-direction: column; align-items: center; gap: 14px; padding: 12px 8px 60px; }
+    .dev-panel {
+      position: static;
+      width: min(420px, calc(100% - 16px));
+      padding: 10px 12px 12px;
+    }
+    .dev-panel .dev-label { margin-bottom: 6px; }
+    .dev-panel .dev-grid {
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px;
+    }
+    .dev-panel button { padding: 7px 8px; font-size: 12px; margin-bottom: 0; }
+    .dev-panel .dev-caption { display: none; }
+  }
+  @media (min-width: 881px) {
+    .dev-panel .dev-grid { display: contents; }
+  }
+</style>
+</head>
+<body>
+
+<div class="intro-note">
+  <div style="font-family:Inter,system-ui; font-size:11px; font-weight:700; letter-spacing:1.4px; text-transform:uppercase; color:#9A8A72; margin-bottom:6px;">Clickable prototype</div>
+  <h1>A day in Intently.</h1>
+  <p>Walk through the arc: start-of-day → daily brief → plan populates → mid-day → evening review → day closed. Swipe between Past · Present · Future. Tap goals to expand. Tap projects to dive in. Long-press the mic for quick actions.</p>
+  <p style="color:#9A8A72;">Use the <strong>Dev toggle</strong> on the left to jump between day-states without waiting for the clock. It's a prototype-only affordance — not in the real app.</p>
+</div>
+
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="intently-tokens.jsx"></script>
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="intently-imagery.jsx"></script>
+<script type="text/babel" src="intently-cards.jsx"></script>
+<script type="text/babel" src="intently-hero.jsx"></script>
+<script type="text/babel" src="intently-glyphs.jsx"></script>
+<script type="text/babel" src="intently-journal.jsx"></script>
+<script type="text/babel" src="intently-projects.jsx"></script>
+<script type="text/babel" src="intently-screens.jsx"></script>
+<script type="text/babel" src="intently-shell.jsx"></script>
+<script type="text/babel" src="intently-manual-add.jsx"></script>
+<script type="text/babel" src="intently-screens-prototype.jsx"></script>
+<script type="text/babel" src="intently-flows.jsx"></script>
+<script type="text/babel" src="intently-extras.jsx"></script>
+<script type="text/babel" src="intently-profile.jsx"></script>
+<script type="text/babel" src="intently-reading.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+function Phone({ children }) {
+  return (
+    <IOSDevice width={390} height={844}>
+      <div style={{ position: 'absolute', inset: 0, background: T.color.PrimarySurface, overflow: 'hidden' }}>
+        <IOSStatusBar />
+        {children}
+      </div>
+    </IOSDevice>
+  );
+}
+
+// Past → Day with a manual-add trailing row.
+function PastJournalProto({ adds, onAddJournal, onPickEntry }) {
+  const [zoom, setZoom] = React.useState('Day');
+  const subtitle = { Year: '2026', Month: 'April 2026', Week: 'Week 17 · Apr 20–26', Day: 'Thursday · Apr 23' }[zoom];
+  const title = { Year: 'The year, at a glance.', Month: 'This month.', Week: 'What this week is for.', Day: 'Today, in your words.' }[zoom];
+  const addedJournal = (adds && adds.journal && adds.journal.today) || [];
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: T.color.PrimarySurface }}>
+      <JournalHeader zoom={zoom} onZoom={setZoom} title={title} subtitle={subtitle} />
+      {zoom === 'Year'  && <YearView  onPickMonth={() => setZoom('Month')} onPickDay={() => setZoom('Day')} />}
+      {zoom === 'Month' && <MonthView onPickDay={() => setZoom('Day')} />}
+      {zoom === 'Week'  && <WeekView  onPickDay={() => setZoom('Day')} />}
+      {zoom === 'Day'   && (
+        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ flex: '0 0 auto' }}>
+            <DayView onBack={() => setZoom('Week')} onPickEntry={onPickEntry} />
+          </div>
+          <div style={{ padding: '0 20px 140px', marginTop: -120 }}>
+            {addedJournal.slice().reverse().map((j) => (
+              <div key={j.id} style={{
+                marginBottom: 12, padding: '14px 16px',
+                background: T.color.TintLilac + '33',
+                border: `1.5px solid ${T.color.TintLilac}88`,
+                borderRadius: 12,
+              }}>
+                <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 0.8, textTransform: 'uppercase', color: T.color.FocusObject, marginBottom: 6 }}>Just added · manual</div>
+                <div style={{ fontFamily: T.font.Reading, fontSize: 15, lineHeight: '22px', color: T.color.PrimaryText, fontStyle: 'italic' }}>"{j.text}"</div>
+              </div>
+            ))}
+            <AddZone
+              addLabel="Add a journal entry"
+              placeholder="A thought, right now…"
+              helper="Saves to today · no AI"
+              onCommit={(v) => onAddJournal && onAddJournal('today', v)}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Planned-phase Present, with optional populate-animation and optional evening CTA.
+function PresentPlanProtoAnimated({ phase, adds, onAddPlan, onAddJournal, animate, onStartReview }) {
+  const populated = window.usePopulate(PLAN_DATA.bands);
+  const total = PLAN_DATA.bands.reduce((a, b) => a + b.items.length, 0);
+  // When animating, we splice in the fade by replacing bands with a visibility-count per band.
+  const visibleBands = React.useMemo(() => {
+    if (!animate) return PLAN_DATA.bands.map(b => ({ ...b, items: b.items }));
+    let remaining = populated;
+    return PLAN_DATA.bands.map(b => {
+      const take = Math.max(0, Math.min(b.items.length, remaining));
+      remaining -= b.items.length;
+      return { ...b, items: b.items.slice(0, take) };
+    });
+  }, [animate, populated]);
+  const animationDone = !animate || populated >= total;
+
+  return (
+    <PresentPlanShell
+      phase={phase}
+      adds={adds}
+      onAddPlan={onAddPlan}
+      onAddJournal={onAddJournal}
+      bands={visibleBands}
+      hideFlags={animate && populated < 2}
+      onStartReview={onStartReview}
+      addZonesReady={animationDone}
+    />
+  );
+}
+
+// Shell copy of PresentPlanProto but accepts a bands override. Keeps add-zones
+// hidden until animation completes.
+function PresentPlanShell({ phase, adds, onAddPlan, onAddJournal, bands, hideFlags, onStartReview, addZonesReady }) {
+  const isEvening = phase === 'evening';
+  const done = {
+    'Hackathon build — light touch. One trial run for the demo.': true,
+    '11:00 AM CST — AMA with Thariq (Anthropic). Show up. Ask one question.': true,
+    '2:00 PM CST — WIP AI Weekly demo. Walk in present.': true,
+    'Movement — light, not a workout.': true,
+  };
+
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
+      <div style={{ padding: '14px 24px 6px' }}>
+        <div style={{
+          fontFamily: T.font.UI, fontSize: 11, fontWeight: 700, letterSpacing: 1.4,
+          textTransform: 'uppercase', color: T.color.SupportingText, marginBottom: 4,
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+        }}>
+          {isEvening
+            ? <Icon.Moon size={12} color={T.color.SupportingText} />
+            : <Icon.Sun size={12} color={T.color.SupportingText} />}
+          {isEvening ? 'Thursday · Today, in review' : "Thursday · Today's plan"}
+        </div>
+        <div style={{
+          fontFamily: T.font.Display, fontSize: 28, fontWeight: 500, lineHeight: '32px',
+          color: T.color.PrimaryText, letterSpacing: -0.5, fontStyle: 'italic',
+          marginTop: 2,
+        }}>{isEvening ? 'How the day landed.' : PLAN_DATA.pacing.title}</div>
+      </div>
+
+      <div style={{ flex: 1, overflowY: 'auto', padding: '10px 20px 160px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+        {!isEvening && (
+          <div style={{ fontFamily: T.font.Reading, fontSize: 15, lineHeight: '23px', color: T.color.SupportingText, fontStyle: 'italic' }}>{PLAN_DATA.pacing.body}</div>
+        )}
+
+        {!isEvening && !hideFlags && (
+          <div style={{ }}>
+            <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: T.color.SupportingText, marginBottom: 8 }}>Flags</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {PLAN_DATA.flags.map((f, i) => {
+                const m = FLAG_META[f.k];
+                return (
+                  <div key={i} style={{
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
+                    background: `${m.tint}22`, border: `1px solid ${m.tint}55`, borderRadius: 10,
+                  }}>
+                    <Glyph name={m.glyph} size={16} color={m.tint} stroke={1.9} />
+                    <span style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', color: m.tint, flexShrink: 0 }}>{m.label}</span>
+                    <span style={{ flex: 1, fontFamily: T.font.Reading, fontSize: 13, lineHeight: '18px', color: T.color.PrimaryText }}>{f.t}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {bands.map((b, bi) => {
+          const added = (adds && adds.plan && adds.plan[b.when]) || [];
+          return (
+            <div key={bi}>
+              <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: T.color.SupportingText, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ flex: '0 0 auto' }}>{b.when}</span>
+                <span style={{ flex: 1, height: 1, background: T.color.EdgeLine }} />
+              </div>
+              <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {b.items.map((it, i) => {
+                  const isDone = isEvening && done[it.t];
+                  return (
+                    <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, }}>
+                      <span style={{
+                        width: 28, height: 28, borderRadius: 8,
+                        background: isDone ? T.color.TintSage : T.color.SecondarySurface,
+                        border: `1px solid ${isDone ? T.color.TintSageDeep : T.color.EdgeLine}`,
+                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                      }}>
+                        {isDone
+                          ? <Icon.Check size={14} color={T.color.TintMoss} />
+                          : <Glyph name={it.g} size={16} color={T.color.PrimaryText} stroke={1.75} />}
+                      </span>
+                      <span style={{
+                        flex: 1, fontFamily: T.font.Reading, fontSize: 15, lineHeight: '22px',
+                        color: T.color.PrimaryText, paddingTop: 4,
+                        textDecoration: isDone ? 'line-through' : 'none',
+                        opacity: isDone ? 0.55 : 1,
+                      }}>{it.t}</span>
+                    </li>
+                  );
+                })}
+                {added.map((it) => (
+                  <li key={it.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                    <span style={{
+                      width: 28, height: 28, borderRadius: 8,
+                      background: T.color.SecondarySurface,
+                      border: `1.5px solid ${T.color.FocusObject}55`,
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    }}>
+                      <Icon.Pencil size={14} color={T.color.FocusObject} />
+                    </span>
+                    <span style={{
+                      flex: 1, fontFamily: T.font.Reading, fontSize: 15, lineHeight: '22px',
+                      color: T.color.PrimaryText, paddingTop: 4,
+                    }}>{it.text}</span>
+                  </li>
+                ))}
+                {addZonesReady && (
+                  <li style={{ marginTop: 4, marginLeft: 40 }}>
+                    <AddZone
+                      addLabel={`Add to ${b.when.toLowerCase()}`}
+                      placeholder={`Something you'll do this ${b.when.toLowerCase()}…`}
+                      helper="Saves to your plan · no AI"
+                      compact
+                      onCommit={(v) => onAddPlan && onAddPlan(b.when, v)}
+                    />
+                  </li>
+                )}
+              </ul>
+            </div>
+          );
+        })}
+
+        {addZonesReady && (
+          <div>
+            <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: T.color.SupportingText, marginBottom: 10 }}>Journal</div>
+            <AddZone
+              addLabel="Add a journal entry"
+              placeholder="A thought, right now…"
+              helper="Saves to today in Past · no AI"
+              onCommit={(v) => onAddJournal && onAddJournal('today', v)}
+            />
+            {(adds && adds.journal && adds.journal.today || []).slice().reverse().map((j) => (
+              <div key={j.id} style={{
+                marginTop: 8, padding: '10px 12px',
+                background: T.color.TintLilac + '22',
+                border: `1px solid ${T.color.TintLilac}55`,
+                borderRadius: 10,
+                fontFamily: T.font.Reading, fontSize: 14, lineHeight: '20px', color: T.color.PrimaryText,
+                fontStyle: 'italic',
+              }}>"{j.text}"</div>
+            ))}
+          </div>
+        )}
+
+        {addZonesReady && (
+          <div>
+            <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: T.color.SupportingText, marginBottom: 10 }}>Consciously parked today</div>
+            <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {PLAN_DATA.parked.map((p, i) => (
+                <li key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, fontFamily: T.font.Reading, fontSize: 14, lineHeight: '20px', color: T.color.SubtleText, fontStyle: 'italic' }}>
+                  <span style={{ width: 16, height: 1, background: T.color.EdgeLine, flexShrink: 0 }} />
+                  {p}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+
+      {isEvening && (
+        <div style={{ position: 'absolute', left: 0, right: 0, bottom: 78, display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
+          <button onClick={onStartReview} style={{
+            pointerEvents: 'auto',
+            display: 'inline-flex', alignItems: 'center', gap: 10, padding: '16px 26px',
+            background: 'linear-gradient(135deg, #2A2348 0%, #3D3565 55%, #5A4E7E 100%)',
+            color: '#FBF6EA',
+            border: 'none', borderRadius: 999, cursor: 'pointer',
+            fontFamily: T.font.UI, fontSize: 15, fontWeight: 600, letterSpacing: 0.2,
+            boxShadow: '0 8px 26px rgba(28,22,56,0.38), inset 0 1px 0 rgba(251,246,234,0.15)',
+          }}>
+            <Icon.Moon size={16} color="#FBF6EA" />
+            Start your daily review
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Future screen: same as FutureScreenProto but goals are tappable.
+function FutureWithGoalTap(props) {
+  const { onOpenGoal } = props;
+  // Wrap goals in clickable shells by monkey-patching via a new component.
+  // Simplest: re-render the goals with a button wrapper — but FutureScreenProto
+  // renders them inline. We overlay transparent click zones on top instead.
+  // Cleaner approach: fork the Future screen here. For brevity, we provide a
+  // thin wrapper that renders FutureScreenProto then overlays tap zones.
+  return <FutureScreenProtoTappable {...props} onOpenGoal={onOpenGoal} />;
+}
+
+// Forked Future with tappable goal cards.
+function FutureScreenProtoTappable({ adds, onOpenProject, onOpenGoal, onAddGoal, onAddProject, onAddAdminReminder, onToggleAdminReminder }) {
+  const goals = window.GOAL_DATA;
+  const addedGoals = (adds && adds.goals) || [];
+  const addedProjects = (adds && adds.projects) || [];
+  const admin = (adds && adds.adminReminders) || [];
+
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
+      <ScreenHeader tense="Future" title="What this month is for." caption="Three long-term visions. Each one gets a monthly slice — then the agent cascades it into weekly and daily moves on Present." />
+      <div style={{ flex: 1, overflowY: 'auto', padding: '4px 20px 140px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {goals.map((g, i) => (
+          <button key={g.id} onClick={() => onOpenGoal && onOpenGoal(g)} style={{
+            textAlign: 'left', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer',
+            borderRadius: T.radius.Card, boxShadow: T.shadow.Raised, flexShrink: 0, overflow: 'hidden',
+          }}>
+            <PainterlyBlock palette={g.pal} seed={i + 3} style={{ padding: '22px 24px 22px', minHeight: 210, position: 'relative', borderRadius: T.radius.Card, overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', right: -18, bottom: -24, opacity: 0.20, pointerEvents: 'none', lineHeight: 0 }}>
+                <Glyph name={g.glyph} size={150} color={T.color.PrimaryText} stroke={1.4} />
+              </div>
+              <div style={{ position: 'relative' }}>
+                <div style={{ fontFamily: T.font.Display, fontSize: 28, lineHeight: '32px', fontStyle: 'italic', fontWeight: 500, color: T.color.PrimaryText, letterSpacing: -0.5, textWrap: 'pretty', maxWidth: '88%' }}>{g.title}</div>
+                <div style={{ marginTop: 18, marginBottom: 14, height: 1, background: 'rgba(31,27,21,0.22)' }} />
+                <div style={{ fontFamily: T.font.Reading, fontSize: 15, lineHeight: '23px', color: T.color.PrimaryText, opacity: 0.86, maxWidth: '88%' }}>
+                  <span style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: T.color.PrimaryText, opacity: 0.6, marginRight: 8 }}>April</span>
+                  {g.month.replace(/^April:\s*/, '')}
+                </div>
+              </div>
+              <div style={{ position: 'absolute', top: 14, right: 14, display: 'inline-flex', alignItems: 'center', gap: 4, fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: T.color.PrimaryText, opacity: 0.5 }}>
+                Open <Icon.Chev size={12} color={T.color.PrimaryText} />
+              </div>
+            </PainterlyBlock>
+          </button>
+        ))}
+
+        {addedGoals.map((g) => (
+          <div key={g.id} style={{
+            borderRadius: T.radius.Card, padding: '20px 22px', minHeight: 110,
+            background: T.color.SecondarySurface,
+            border: `1.5px dashed ${T.color.FocusObject}66`,
+          }}>
+            <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: T.color.FocusObject, marginBottom: 8 }}>Just added · tap the mic to flesh it out</div>
+            <div style={{ fontFamily: T.font.Display, fontSize: 22, lineHeight: '28px', fontStyle: 'italic', fontWeight: 500, color: T.color.PrimaryText, letterSpacing: -0.3 }}>{g.text}</div>
+          </div>
+        ))}
+
+        <AddZone
+          addLabel="Add a goal"
+          placeholder="Name a long-term vision…"
+          helper="Just a one-liner · AI can help you flesh it out later"
+          onCommit={(v) => onAddGoal && onAddGoal(v)}
+        />
+
+        <div style={{ marginTop: 26 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 }}>
+            <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', color: T.color.SupportingText }}>Projects</div>
+            <div style={{ fontFamily: T.font.UI, fontSize: 11, color: T.color.SubtleText }}>{PROJECT_DATA.length + addedProjects.length} active</div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            {PROJECT_DATA.map(p => <ProjectCard key={p.id} p={p} onOpen={() => onOpenProject && onOpenProject(p)} />)}
+            {addedProjects.map((p) => (
+              <div key={p.id} style={{
+                background: T.color.SecondarySurface,
+                border: `1.5px dashed ${T.color.FocusObject}66`,
+                borderRadius: 14, padding: 14, minHeight: 110,
+                display: 'flex', flexDirection: 'column', gap: 6,
+              }}>
+                <div style={{ fontFamily: T.font.UI, fontSize: 9, fontWeight: 700, letterSpacing: 0.8, textTransform: 'uppercase', color: T.color.FocusObject }}>Just added</div>
+                <div style={{ fontFamily: T.font.Display, fontSize: 15, lineHeight: '20px', fontStyle: 'italic', fontWeight: 500, color: T.color.PrimaryText, letterSpacing: -0.2 }}>{p.text}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop: 10 }}>
+            <AddZone
+              addLabel="Add a project"
+              placeholder="Name something you're working on…"
+              helper="Just a one-liner · AI can help you flesh it out later"
+              compact
+              onCommit={(v) => onAddProject && onAddProject(v)}
+            />
+          </div>
+        </div>
+
+        <div style={{ marginTop: 26 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 }}>
+            <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', color: T.color.SupportingText }}>Admin · misc reminders</div>
+            <div style={{ fontFamily: T.font.UI, fontSize: 11, color: T.color.SubtleText }}>{admin.filter(a => !a.done).length} open</div>
+          </div>
+          <div style={{
+            background: T.color.SecondarySurface,
+            border: `1px solid ${T.color.EdgeLine}`,
+            borderRadius: 14, padding: 10, display: 'flex', flexDirection: 'column', gap: 8,
+          }}>
+            {admin.length === 0 && (
+              <div style={{ padding: '6px 4px', fontFamily: T.font.Reading, fontSize: 13, lineHeight: '18px', color: T.color.SubtleText, fontStyle: 'italic' }}>
+                Nothing here yet. Things like "renew passport" or "call the vet" — stuff that isn't tied to a project.
+              </div>
+            )}
+            {admin.map((r) => (
+              <button key={r.id} onClick={() => onToggleAdminReminder && onToggleAdminReminder(r.id)} style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '8px 4px',
+                background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left',
+              }}>
+                <span style={{
+                  width: 20, height: 20, borderRadius: 6, flexShrink: 0,
+                  background: r.done ? T.color.TintSage : 'transparent',
+                  border: `1.5px solid ${r.done ? T.color.TintSageDeep : T.color.SubtleText}`,
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  {r.done && <Icon.Check size={12} color={T.color.TintMoss} stroke={2.5} />}
+                </span>
+                <span style={{
+                  flex: 1, fontFamily: T.font.Reading, fontSize: 14, lineHeight: '20px',
+                  color: T.color.PrimaryText,
+                  textDecoration: r.done ? 'line-through' : 'none',
+                  opacity: r.done ? 0.5 : 1,
+                }}>{r.text}</span>
+              </button>
+            ))}
+            <AddZone
+              addLabel="Add a reminder"
+              placeholder="e.g. renew passport"
+              helper="Saves to Admin · no AI"
+              compact
+              onCommit={(v) => onAddAdminReminder && onAddAdminReminder(v)}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Day-states:
+//   'morning-empty'  → pre-brief
+//   'brief'          → brief chat flow
+//   'brief-accepted' → planned, with populate animation
+//   'planned'        → mid-day
+//   'evening'        → plan visible with CTA to start review
+//   'review'         → review chat flow
+//   'closed'         → end-of-day summary
+const DAY_STATES = [
+  { key: 'morning-empty', label: 'Morning · empty' },
+  { key: 'brief',         label: 'Brief · in chat' },
+  { key: 'planned',       label: 'Mid-day · planned' },
+  { key: 'evening',       label: 'Evening · pre-review' },
+  { key: 'review',        label: 'Review · in chat' },
+  { key: 'closed',        label: 'Closed · reflected' },
+];
+
+function PrototypePhone({ dayState, setDayState }) {
+  const [idx, setIdx] = React.useState(1);
+  const [heroState, setHeroState] = React.useState('idle');
+  const [openProject, setOpenProject] = React.useState(null);
+  const [openGoal, setOpenGoal] = React.useState(null);
+  const [briefJustAccepted, setBriefJustAccepted] = React.useState(false);
+  const [showJournal, setShowJournal] = React.useState(false);
+  const [showConnections, setShowConnections] = React.useState(false);
+  const [profileView, setProfileView] = React.useState(null); // null | 'sheet' | 'account' | 'preferences' | 'help'
+  const [oauthIntegration, setOauthIntegration] = React.useState(null);
+  const [openEntry, setOpenEntry] = React.useState(null); // reading-mode entry id
+  const m = useManualAdds();
+  const conn = useConnections();
+
+  React.useEffect(() => {
+    if (heroState === 'processing') {
+      const id = setTimeout(() => setHeroState('idle'), 1800);
+      return () => clearTimeout(id);
+    }
+  }, [heroState]);
+
+  // When dayState changes via dev toggle, close overlays & reset
+  React.useEffect(() => {
+    setOpenProject(null);
+    setOpenGoal(null);
+    setShowJournal(false);
+    setShowConnections(false);
+    setProfileView(null);
+    setOauthIntegration(null);
+    setOpenEntry(null);
+    setBriefJustAccepted(false);
+    if (dayState === 'morning-empty' || dayState === 'brief' || dayState === 'planned' || dayState === 'evening' || dayState === 'review' || dayState === 'closed') {
+      setIdx(1); // snap to Present
+    }
+  }, [dayState]);
+
+  // When Brief completes, advance to planned with the populate flag
+  const onBriefComplete = () => {
+    setBriefJustAccepted(true);
+    setDayState('planned');
+  };
+  const onReviewComplete = () => {
+    setDayState('closed');
+  };
+
+  const micDim = heroState === 'listening' || heroState === 'expanded';
+
+  // Choose the Present view based on day state
+  const presentView = (() => {
+    if (dayState === 'morning-empty') {
+      return <PresentEmpty onStartBrief={() => setDayState('brief')} />;
+    }
+    if (dayState === 'closed') {
+      return <PresentClosed />;
+    }
+    if (dayState === 'evening') {
+      return (
+        <PresentPlanProtoAnimated
+          phase="evening"
+          adds={m.state}
+          onAddPlan={m.addPlanItem}
+          onAddJournal={m.addJournal}
+          animate={false}
+          onStartReview={() => setDayState('review')}
+        />
+      );
+    }
+    // 'planned' or post-brief
+    return (
+      <PresentPlanProtoAnimated
+        phase="planned"
+        adds={m.state}
+        onAddPlan={m.addPlanItem}
+        onAddJournal={m.addJournal}
+        animate={briefJustAccepted}
+      />
+    );
+  })();
+
+  // ─── Reading-mode entries (full-fidelity records of what was logged today)
+  const ENTRY_DATA = React.useMemo(() => ({
+    'journal-10-32': {
+      kind: 'journal',
+      mood: 'dusk',
+      dayLabel: 'Thursday',
+      dateLabel: 'April 23',
+      eyebrow: 'Thursday · April 23 · 2 min read',
+      title: 'On the data slide.',
+      readMin: 2,
+      body: [
+        { kind: 'p-drop', text: 'Rewrote the opening this morning. The old frame was defensive — I kept apologizing for what the numbers didn\'t say, instead of pointing at what they did.' },
+        { kind: 'p', text: 'New shape: here is what we learned. Here is what it implies. Here is what we are doing about it. Three beats. Each one earns the next.' },
+        { kind: 'quote', text: 'A defensive opening teaches the room to argue with you.' },
+        { kind: 'p', text: 'Anya will push back on beat two. That\'s fine — that\'s the one I want her on. The implication is the load-bearing claim, and if it survives her, it survives the room.' },
+      ],
+    },
+    'chat-14-50': {
+      kind: 'chat',
+      dayLabel: 'Thursday',
+      timeLabel: '14:50',
+      title: 'Walk timing — moved to after dinner.',
+      summary: 'You moved the walk so it doesn\'t collide with the 3pm review. I rebalanced the afternoon block.',
+      messages: [
+        { from: 'user',  t: '14:48', text: "Hey — can we move the walk to after dinner? The 3 ran long and I don't want to stack." },
+        { from: 'agent', t: '14:48', text: "Yep, sliding it. Dinner's around 7, so I'll put it 7:45–8:30. The afternoon block reopens to 3:30." },
+        { from: 'user',  t: '14:49', text: "Perfect. Use the reopened block for the data slide." },
+        { from: 'agent', t: '14:49', text: "Done. 'Data slide rewrite' is now your 3:30. Want me to ping you ten minutes before, or trust the calendar?" },
+        { from: 'user',  t: '14:50', text: "Trust the calendar. Don't ping." },
+        { from: 'agent', t: '14:50', text: "Okay — silent. I'll log this so tomorrow's brief knows you prefer evening walks when the day stacks." },
+      ],
+    },
+    'review-21-06': {
+      kind: 'review',
+      dayLabel: 'Thursday',
+      timeLabel: '21:06',
+      title: 'Shipped the slide. Walked. Good day.',
+      highlight: 'Shipped the slide rewrite — and it actually feels like a different argument, not a polish.',
+      friction: 'Said yes to Raj\'s 4pm even though I knew it would push the walk. Caught it, rerouted. Notice the pattern.',
+      tomorrow: 'Write the data-slide voiceover before opening Slack.',
+      calendar: [
+        { t: '9:30 AM',  body: 'Anya — pitch follow-up' },
+        { t: '12:00 PM', body: 'Lunch w/ Jordan (finally)' },
+        { t: '4:00 PM',  body: 'Hackathon retro' },
+      ],
+    },
+  }), []);
+  const currentEntry = openEntry ? ENTRY_DATA[openEntry] : null;
+
+  return (
+    <Phone>
+      <div style={{ position: 'absolute', top: 62, left: 0, right: 0, bottom: 0 }}>
+        <SwipeShell index={idx} onIndex={setIdx}>
+          {[
+            <PastJournalProto key="p" adds={m.state} onAddJournal={m.addJournal} onPickEntry={setOpenEntry} />,
+            <div key="c" style={{ height: '100%' }}>{presentView}</div>,
+            <FutureScreenProtoTappable
+              key="f"
+              adds={m.state}
+              onOpenProject={setOpenProject}
+              onOpenGoal={setOpenGoal}
+              onAddGoal={m.addGoal}
+              onAddProject={m.addProject}
+              onAddAdminReminder={m.addAdminReminder}
+              onToggleAdminReminder={m.toggleAdminReminder}
+            />,
+          ]}
+        </SwipeShell>
+      </div>
+
+      {/* Goal detail — takes over */}
+      {openGoal && (
+        <div style={{ position: 'absolute', top: 62, left: 0, right: 0, bottom: 0, zIndex: 40 }}>
+          <GoalDetail
+            goal={openGoal}
+            onBack={() => setOpenGoal(null)}
+            onOpenProject={(p) => { setOpenGoal(null); setOpenProject(p); }}
+          />
+        </div>
+      )}
+
+      {/* Project detail — takes over */}
+      {openProject && (
+        <div style={{ position: 'absolute', top: 62, left: 0, right: 0, bottom: 0, zIndex: 50, }}>
+          <ProjectDetailV2
+            p={openProject}
+            adds={m.state}
+            onBack={() => setOpenProject(null)}
+            onAddProjectTodo={m.addProjectTodo}
+            onToggleProjectTodo={m.toggleProjectTodo}
+            onOpenGoal={(g) => { setOpenProject(null); setOpenGoal(g); }}
+          />
+        </div>
+      )}
+
+      {/* Brief flow overlay */}
+      {dayState === 'brief' && (
+        <BriefFlow
+          onClose={() => setDayState('morning-empty')}
+          onComplete={onBriefComplete}
+        />
+      )}
+
+      {/* Review flow overlay */}
+      {dayState === 'review' && (
+        <ReviewFlow
+          onClose={() => setDayState('evening')}
+          onComplete={onReviewComplete}
+        />
+      )}
+
+      {/* Profile button — bottom-left, persistent across all tenses */}
+      {dayState !== 'brief' && dayState !== 'review' && !openGoal && !openProject && !showJournal && !showConnections && !profileView && !openEntry && (
+        <ProfileButton onClick={() => setProfileView('sheet')} dim={micDim} />
+      )}
+
+      {/* Journal composer overlay */}
+      {showJournal && (
+        <JournalComposer
+          onClose={() => setShowJournal(false)}
+          onSave={(text) => {
+            m.addJournal('today', text);
+            setShowJournal(false);
+          }}
+        />
+      )}
+
+      {/* Profile sheet — opened from avatar */}
+      {profileView === 'sheet' && (
+        <ProfileSheet
+          connectedCount={Object.keys(conn.connected).length}
+          onClose={() => setProfileView(null)}
+          onOpenConnections={() => { setProfileView(null); setShowConnections(true); }}
+          onOpenAccount={() => setProfileView('account')}
+          onOpenPreferences={() => setProfileView('preferences')}
+          onOpenHelp={() => setProfileView('help')}
+          onSignOut={() => setProfileView(null)}
+        />
+      )}
+      {profileView === 'account' && (
+        <AccountPage onBack={() => setProfileView('sheet')} />
+      )}
+      {profileView === 'preferences' && (
+        <PreferencesPage onBack={() => setProfileView('sheet')} />
+      )}
+      {profileView === 'help' && (
+        <HelpPage onBack={() => setProfileView('sheet')} />
+      )}
+
+      {/* Connections page */}
+      {showConnections && (
+        <ConnectionsPage
+          connected={conn.connected}
+          onClose={() => { setShowConnections(false); setProfileView('sheet'); }}
+          onConnect={(it) => setOauthIntegration(it)}
+          onDisconnect={(id) => conn.disconnect(id)}
+        />
+      )}
+
+      {/* Reading-mode overlay — opened from Past → Day entries */}
+      {currentEntry && (
+        <ReadingMode entry={currentEntry} onClose={() => setOpenEntry(null)} />
+      )}
+
+      {/* OAuth flow */}
+      {oauthIntegration && (
+        <OAuthFlow
+          integration={oauthIntegration}
+          onCancel={() => setOauthIntegration(null)}
+          onConnected={(id) => { conn.connect(id); setOauthIntegration(null); }}
+        />
+      )}
+
+      {/* Chrome: tense nav + hero — hidden during brief/review chat / overlays */}
+      {dayState !== 'brief' && dayState !== 'review' && !openGoal && !openProject && !showJournal && !showConnections && !profileView && !openEntry && (
+        <>
+          <TenseNav index={idx} onIndex={setIdx} dim={micDim} />
+          <HeroAffordance
+            state={heroState}
+            onChange={setHeroState}
+            onPick={(key) => {
+              if (key === 'journal') {
+                setHeroState('idle');
+                setShowJournal(true);
+                return true;
+              }
+              return false;
+            }}
+          />
+        </>
+      )}
+      {(openGoal || openProject) && dayState !== 'brief' && dayState !== 'review' && !showJournal && !showConnections && !profileView && (
+        <HeroAffordance
+          state={heroState}
+          onChange={setHeroState}
+          onPick={(key) => {
+            if (key === 'journal') {
+              setHeroState('idle');
+              setShowJournal(true);
+              return true;
+            }
+            return false;
+          }}
+        />
+      )}
+    </Phone>
+  );
+}
+
+function DevPanel({ dayState, setDayState }) {
+  return (
+    <div className="dev-panel">
+      <div className="dev-label">Dev · day state</div>
+      <div className="dev-grid">
+      {DAY_STATES.map(s => (
+        <button key={s.key} onClick={() => setDayState(s.key)} className={dayState === s.key ? 'on' : ''}>
+          <span className="dot" />
+          {s.label}
+        </button>
+      ))}
+      </div>
+      <div className="dev-caption">Prototype-only. The real app infers day-state from time-of-day + whether the brief/review have been done.</div>
+    </div>
+  );
+}
+
+function App() {
+  const [dayState, setDayState] = React.useState('planned');
+  return (
+    <div className="phone-stage">
+      <DevPanel dayState={dayState} setDayState={setDayState} />
+      <PrototypePhone dayState={dayState} setDayState={setDayState} />
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
