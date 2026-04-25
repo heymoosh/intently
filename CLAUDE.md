@@ -14,7 +14,7 @@ Stable context for every Claude session in this repo. If guidance drifts from re
 
 ## Product intent
 
-Intently is a mobile app that turns recurring life operations (daily triage, morning briefing, weekly review, meal planning, monthly review) into an agent-native experience. Scheduled managed agents do the work; the mobile UI reflects state, triggers runs, and renders output.
+Intently is a **web app** (mobile-first responsive — renders well on phone screens AND desktop) that turns recurring life operations (daily triage, morning briefing, weekly review, meal planning, monthly review) into an agent-native experience. Scheduled managed agents do the work; the UI reflects state, triggers runs, and renders output. Distribution = a shareable URL (`intently-eta.vercel.app`); iOS/Android deployment deferred indefinitely (per ADR 0004).
 
 Primary journeys (also the demo flows and Spec Conformance Steward targets): **daily brief**, **daily review**, **weekly review**. Full behavior lives in `docs/product/requirements/life-ops-plugin-spec.md`; MVP cut in `TRACKER.md` § Locked decisions.
 

@@ -88,7 +88,7 @@ Three bugs found during Friday's first live smoke tests. Fixes shipped in #68, #
 ## Locked decisions
 
 - MVP: 5 skills (setup, daily-brief, update-tracker, daily-review, weekly-review). Demo priority: daily-brief > daily-review > weekly-review.
-- Stack (ADR 0003): Expo Web + TypeScript · Supabase (DB + Edge Functions) · Managed Agents · Bitwarden Secrets Manager.
+- Stack (ADR 0004, supersedes 0003): **Plain React 18 + Babel-standalone (no build step)** inheriting `web/index.html` from the design prototype · Supabase (DB + Edge Functions) · Managed Agents · Bitwarden Secrets Manager. **Web-only**; iOS/Android deferred. Existing `app/` (Expo + RN-Web) being phased out via Saturday wiring-port.
 - Managed Agents = runtime, not state (ADR 0001). State of truth = Markdown in Supabase.
 - V1 single-user (Muxin dogfoods); per-user isolation deferred.
 - Swipe: 21-slot repeat pattern (not clone-wrap). Infinite-feel rotation with no wrap handler complexity.

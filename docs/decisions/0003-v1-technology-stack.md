@@ -1,8 +1,10 @@
 # 0003 — V1 technology stack
 
-**Status:** Accepted
+**Status:** Superseded by [ADR 0004](0004-web-only-prototype-inherit.md) on 2026-04-25
 **Date:** 2026-04-22
 **Decider:** muxin
+
+**Why superseded:** premise reversed. This ADR locked Expo + RN-Web because "Must run on iOS and Android; web is a V2-but-nice-to-have." Mid-hackathon (2026-04-24) it became clear the demo requires a shareable URL, so web is the actual goal — iOS/Android deferred indefinitely. RN-Web's translation cost vs. the design folder's plain-React prototype was no longer justified. ADR 0004 inherits the prototype HTML directly.
 
 ## Context
 
