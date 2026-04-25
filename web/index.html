@@ -19,13 +19,18 @@
   @keyframes intentlyMenuIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
   ::-webkit-scrollbar { display: none; }
   * { scrollbar-width: none; }
-  .intro-note {
+  /* Intro-note + dev-panel are prototype-only affordances. Hidden by default;
+     shown when html.dev-mode is set (localhost auto-on, or ?dev=1 anywhere). */
+  .intro-note { display: none; }
+  html.dev-mode .intro-note {
+    display: block;
     max-width: 600px; margin: 36px auto 20px; padding: 0 24px;
     font-family: "Inter", system-ui; color: #2B2118;
   }
   .intro-note h1 { font-family: "Fraunces", Georgia, serif; font-style: italic; font-weight: 500; font-size: 30px; line-height: 34px; letter-spacing: -0.5px; margin: 0 0 8px; }
   .intro-note p { font-family: "Source Serif 4", Georgia, serif; font-size: 14px; line-height: 21px; color: #6E604D; margin: 0 0 6px; }
   .phone-stage { display: flex; justify-content: center; align-items: flex-start; gap: 24px; padding: 20px 20px 80px; }
+  html:not(.dev-mode) .phone-stage { padding-top: 40px; }
 
   /* Dev toggle — outside phone frame */
   .dev-panel {
@@ -97,6 +102,30 @@
 </div>
 
 <div id="root"></div>
+
+<!-- Dev-mode detection: localhost auto-on, ?dev=1 forces on, ?dev=0 forces off.
+     Sets html.dev-mode CSS class + window.INTENTLY_DEV / INTENTLY_FORCE_STATE
+     for the React tree to consume. -->
+<script>
+  (function() {
+    try {
+      var url = new URL(location.href);
+      var devParam = url.searchParams.get('dev');
+      var host = location.hostname;
+      var isLocal = host === 'localhost' || host === '127.0.0.1' || host === '';
+      var dev;
+      if (devParam === '1') dev = true;
+      else if (devParam === '0') dev = false;
+      else dev = isLocal;
+      window.INTENTLY_DEV = dev;
+      window.INTENTLY_FORCE_STATE = url.searchParams.get('state') || null;
+      if (dev) document.documentElement.classList.add('dev-mode');
+    } catch (e) {
+      window.INTENTLY_DEV = false;
+      window.INTENTLY_FORCE_STATE = null;
+    }
+  })();
+</script>
 
 <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
@@ -594,12 +623,15 @@ function PrototypePhone({ dayState, setDayState }) {
     }
   }, [dayState]);
 
-  // When Brief completes, advance to planned with the populate flag
+  // When Brief completes, advance to planned with the populate flag.
+  // Persist completion so refresh keeps the user in the right state until midnight.
   const onBriefComplete = () => {
     setBriefJustAccepted(true);
+    markCompletedToday('brief');
     setDayState('planned');
   };
   const onReviewComplete = () => {
+    markCompletedToday('review');
     setDayState('closed');
   };
 
@@ -863,11 +895,55 @@ function DevPanel({ dayState, setDayState }) {
   );
 }
 
+// ─── Real day-state inference ────────────────────────────────────────────────
+// Drives the app from time-of-day + persistent completion flags (localStorage),
+// instead of the dev sidebar's hard-set buttons. The dev sidebar still works in
+// dev mode for testing; in production it's hidden and the user moves through
+// the day naturally.
+
+const VALID_STATES = ['morning-empty', 'brief', 'planned', 'evening', 'review', 'closed'];
+
+function todayKey() {
+  // Local-time YYYY-MM-DD; flips at midnight, which resets brief/review flags.
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function lsKey(kind) { return `intently:${kind}:${todayKey()}`; }
+
+function isCompletedToday(kind) {
+  try { return localStorage.getItem(lsKey(kind)) === '1'; } catch (e) { return false; }
+}
+
+function markCompletedToday(kind) {
+  try { localStorage.setItem(lsKey(kind), '1'); } catch (e) {}
+}
+
+function inferDayState(now) {
+  const h = (now || new Date()).getHours();
+  const briefDone = isCompletedToday('brief');
+  const reviewDone = isCompletedToday('review');
+  if (reviewDone) return 'closed';
+  if (h >= 17) return 'evening';
+  if (briefDone) return 'planned';
+  return 'morning-empty';
+}
+
 function App() {
-  const [dayState, setDayState] = React.useState('planned');
+  // Initial state: dev override (?state=) wins; else inferred from time + flags.
+  const initial = (() => {
+    const forced = window.INTENTLY_FORCE_STATE;
+    if (forced && VALID_STATES.includes(forced)) return forced;
+    return inferDayState();
+  })();
+  const [dayState, setDayState] = React.useState(initial);
+  const dev = !!window.INTENTLY_DEV;
   return (
     <div className="phone-stage">
-      <DevPanel dayState={dayState} setDayState={setDayState} />
+      {dev && <DevPanel dayState={dayState} setDayState={setDayState} />}
       <PrototypePhone dayState={dayState} setDayState={setDayState} />
     </div>
   );

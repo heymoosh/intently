@@ -58,6 +58,11 @@ supabase/seed.sql.bak
 .claude/launchd/bin/
 .claude/settings.local.json
 .claude/sessions/
+# Per-worktree intent file. Written by /start-work when intent is named.
+# Surfaces "what is this worktree working on" to sibling sessions in other
+# worktrees, who read it during their own /start-work parallel-work check.
+# Not committed — purely a runtime coordination signal, ephemeral per worktree.
+.claude/wt-intent.md
 
 # === User-local scratch ===
 # Files under docs/process/usr-*.md are per-user notes (command cheatsheets,
