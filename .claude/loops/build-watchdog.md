@@ -1,7 +1,7 @@
 ---
 name: Build Watchdog
 type: loop
-invocation: auto-scheduled via launchd every 30 min during 07:30–22:30 local
+invocation: auto-scheduled via launchd every 30 min, 24/7 (per Muxin 2026-04-25 — was 07:30-22:30 originally)
 priority: P0 (MVP-10 #5)
 owner: muxin
 ---
@@ -14,9 +14,9 @@ Fast local feedback while editing. Catches the cheap stuff (lint errors, type er
 
 ## Cadence
 
-`/loop 30m <prompt below>`
+Every 30 minutes, 24/7, via launchd (`StartInterval 1800` in `com.intently.build-watchdog.plist`). The wrapper script `~/.intently/bin/intently-routine.sh` (NOT tracked in repo — see follow-ups) runs `npm ci` + `npm run lint` + (optional) `tsc --noEmit` + `npm test --passWithNoTests` from `$REPO`. Silent on green; AI-led failure analysis on red.
 
-Run only during active coding sessions. Stop the loop when you're not editing — it has nothing useful to do.
+Original 07:30-22:30 day-window framing was relaxed 2026-04-25 — overnight sub-agent execution wave benefits from continuous lint coverage so issues are caught between iterations, not at next-morning-batch.
 
 ## Loop prompt
 
@@ -43,11 +43,19 @@ Do not propose refactors. Do not add tests beyond what's needed to fix
 a failure. Stay scoped to making the build green.
 ```
 
-## Stack-dependent behavior
+## Current scope (2026-04-25)
 
-Until the stack is chosen (post-Thursday Apr 23), this loop has no commands to run. Either:
-- Skip the loop until `ci.yml` and CLAUDE.md required-commands section are wired, or
-- Run with a degenerate brief: "Verify all markdown files in docs/ have valid frontmatter and parse cleanly. Output nothing if all pass."
+ESLint covers `web/*.jsx` only (the deployed prototype). Config at repo-root `eslint.config.mjs` (PR #159). Rule choices documented in the config's leading comment.
+
+Out of scope:
+- `app/` (Expo + RN-Web, historical reference per ADR 0004) — separate config if/when revived.
+- `supabase/functions/` (TypeScript on Deno runtime) — separate effort if needed.
+- TypeScript typecheck — there is no `tsconfig.json` at root; the wrapper script skips `tsc` when missing. Add a config + `typecheck:web` script when JSDoc-typed JSX becomes a thing we care about.
+- Test suite — `tests/` is README-only; the wrapper passes `--if-present` + `--passWithNoTests` so the absence is silent.
+
+## Known follow-up (wrapper not versioned)
+
+`~/.intently/bin/intently-routine.sh` is the script launchd invokes for every routine including this one. It's not tracked in the repo. Changes to it (e.g., the 24/7 schedule, the path-repointing from `app/` to repo root) are made on the local file and aren't visible to other developers or rebuildable from a fresh clone. Follow-up: move the wrapper into the repo (e.g., `scripts/intently-routine.sh`) and have the launchd plist invoke it from there.
 
 ## Edge cases
 
