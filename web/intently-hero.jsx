@@ -460,9 +460,13 @@ function HeroChat({ onDone, onMic, seedTranscript = '', onTranscriptConsumed, on
   //      mode for everything else.
   // Appends each turn to the thread; falls back to a generic acknowledgement
   // only if every routed path fails.
-  const sendUtterance = React.useCallback(async (text) => {
+  const sendUtterance = React.useCallback(async (text, opts) => {
     const trimmed = (text || '').trim();
     if (!trimmed) return;
+    // 'voice' (default) for transcript seeding; 'text' for typed composer
+    // input. Plumbed into update-tracker so journal-entry rows it inserts
+    // get tagged with the right source.
+    const source = opts && opts.source === 'text' ? 'text' : 'voice';
     setThread((prev) => [...prev, { kind: 'user', t: trimmed }]);
     setPending(true);
     try {
@@ -470,7 +474,7 @@ function HeroChat({ onDone, onMic, seedTranscript = '', onTranscriptConsumed, on
       // tryUpdateTracker returns { handled: false } when the regex test
       // doesn't match, so casual chat falls through to the existing paths.
       if (window.tryUpdateTracker) {
-        const ut = await window.tryUpdateTracker(trimmed, { source: 'voice' });
+        const ut = await window.tryUpdateTracker(trimmed, { source });
         if (ut && ut.handled) {
           const reply = ut.reply || "Got it.";
           setThread((prev) => [...prev, { kind: 'agent', t: reply }]);
@@ -526,7 +530,7 @@ function HeroChat({ onDone, onMic, seedTranscript = '', onTranscriptConsumed, on
     const text = draft.trim();
     if (!text) return;
     setDraft('');
-    sendUtterance(text);
+    sendUtterance(text, { source: 'text' });
   };
   const onComposerKey = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitDraft(); }
