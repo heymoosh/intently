@@ -37,19 +37,30 @@ The fix is a single coherent thread: **anon-first, with optional account upgrade
 - Click → email/password (or Google) flow → Supabase `auth.linkIdentity()` attaches credentials to the existing anon user. Same uid, same data, no migration. They now have a real recoverable account.
 - Subsequent visits: real sign-in works; data and uid preserved.
 
-**Sam seed (developer affordance, not user-facing).**
-- `seedSamIfEmpty` survives, but only fires under `?dev=1` or `localhost`. Production strangers never see Sam.
-- A "Reseed Sam (dev)" button gated to dev-mode for fast iteration.
+**Sam seed — NOTE (amended 2026-04-25 by inbox 2230):**
+The dev-mode-only framing below is **superseded** by the `sam-demo-on-landing-page` handoff. Sam is no longer dev-only; he's the *public landing-page demo persona* embedded inline on `/`. The seed-gate AC bullets in this handoff still apply for the *real-app route* (Sam doesn't auto-load there), but the affordance lives on the landing-page demo, not behind `?dev=1`. See `.claude/handoffs/sam-demo-on-landing-page.md` for the embed architecture (option A: component embed) and Sam-data-completeness AC.
 
 ## Acceptance criteria
 
 These are the verifiable bullets that say this work is done. Drafted here per § AC location matrix (cross-cutting / multi-session → handoff). `/groom` confirms the location.
 
-**Sam-seed gate (small, do first):**
-- [ ] `seedSamIfEmpty` does NOT fire on production (`window.INTENTLY_DEV === false`). Verified: open prod URL in fresh incognito → goals table is empty for the new anon uid until setup runs.
-- [ ] `seedSamIfEmpty` still fires on `localhost` and `?dev=1` for development.
-- [ ] Hardcoded "Sam Tanaka" / "Good morning, Sam." strings are either parameterized to the user's display_name OR shown only in dev-mode. Listed locations: `intently-profile.jsx:119,289`, `intently-flows.jsx:431,1394`, `intently-screens.jsx:197`, `intently-reading.jsx:102`.
-- [ ] In dev-mode, a "Reseed Sam" button on the Profile sheet wipes + reseeds for fast iteration.
+**Sam-seed gate on the real-app route (small, do first):**
+- [ ] `seedSamIfEmpty` does NOT fire on the real-app route. Verified: open the real-app route in fresh incognito → goals table is empty for the new anon uid until setup runs.
+- [ ] `seedSamIfEmpty` continues to drive the embedded landing-page demo (per `sam-demo-on-landing-page` handoff, option A) using a stable Sam user_id that demo visitors read from.
+- [ ] Hardcoded "Sam Tanaka" / "Good morning, Sam." strings are parameterized to the user's `display_name` from a shared context. Listed locations: `intently-profile.jsx:119,289`, `intently-flows.jsx:431,1394`, `intently-screens.jsx:197`, `intently-reading.jsx:102`, `intently-extras.jsx:223` (the hardcoded "M" on the home-screen avatar), `intently-reading.jsx:101` (the hardcoded "S" inside JournalReader byline).
+
+**Shared identity component (folded in 2026-04-25 by inbox 2200-amend):**
+- [ ] Single reusable `<Avatar user={user} size={...} />` component (likely in `web/intently-cards.jsx` or new `web/intently-identity.jsx`). Reads `display_name` (or `email` fallback) from a single auth/user-context source. Computes initial letter from the name. Color/gradient from tokens.
+- [ ] All three current avatar locations replaced with `<Avatar>`:
+  - Home-screen profile button: `web/intently-extras.jsx:205-225` — currently hardcoded `>M</button>`.
+  - Profile sheet hero avatar: `web/intently-profile.jsx:104-113` — currently inline `<div>...>S</div>`.
+  - JournalReader byline avatar: `web/intently-reading.jsx:97-101` — currently inline `<span>...>S</span>` followed by hardcoded `Sam · ${entry.dateLabel}`.
+- [ ] Verified: changing `display_name` in DB updates all three surfaces consistently.
+
+**Reading-mode wiring gaps (folded in 2026-04-25 by inbox 2200-amend):**
+- [ ] `web/intently-reading.jsx:75` — `JournalReader`'s `onEdit={() => {}}` stub is wired to actually open the journal entry for editing (likely re-uses `JournalComposer` flow with the entry's body pre-filled, on save it `update`s the row instead of `insert`ing a new one).
+- [ ] `ChatReader` "Continue this conversation" button at `intently-reading.jsx:326-331` — currently no `onClick` handler — gets a wiring decision (wire OR explicitly defer in a TRACKER row).
+- [ ] `index.html:803-861` — `dbEntry` resolver gains a `kind='brief'` branch (and a `BriefReader` variant in `intently-reading.jsx`). Or, if briefs aren't meant to be tappable in the journal list, gate the "READ >" affordance to only render for tappable kinds.
 
 **First-run gate:**
 - [ ] On a fresh anon user (no goals in Supabase), the first navigation lands on the setup flow, not on Past/Present/Future. No way to swipe past until setup completes.
