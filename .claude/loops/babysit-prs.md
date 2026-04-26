@@ -107,15 +107,15 @@ Do NOT edit `TRACKER.md` directly — write a routine-output report and let rele
 
 ## Launch
 
-**Manual (this session):**
+**Current invocation (post-ADR 0007, 2026-04-25):** inline-hourly during the overnight build loop only. See `.claude/handoffs/overnight-build-loops.md` § "Decisions made". No standalone schedule.
+
+**Manual (ad-hoc, any session):**
 
 ```
 /loop 15m Read .claude/loops/babysit-prs.md and execute ONE iteration per the brief. Use Opus 4.7 at high effort. This loop may fire whether or not there is work; a no-op iteration should exit silently and write nothing. Honor all hard-stops in the brief, especially: do NOT merge anything auto-merge-safe.yml would merge (race conditions); do NOT push to main/feat/*/non-auto branches; do NOT remove needs-user-review labels; do NOT force-push without --force-with-lease; do NOT edit TRACKER.md, CLAUDE.md, or any file under .claude/handoffs/.
 ```
 
-**Recurring (via launchd, after first manual run proves clean):**
-
-Add a `babysit-prs` case to `~/.intently/bin/intently-routine.sh` using `ALLOWED_BASE,$ALLOWED_AUTOFIX` allowlist, and a launchd plist firing every 15 min in the existing loop window.
+**Recurring via standalone launchd:** decommissioned 2026-04-25 per ADR 0007. The standalone schedule fired 60+ times/day, every iteration a no-op, because `feat/track-*` branches only exist during overnight build loops. The inline-hourly invocation owned by the overnight loop covers the only window where work exists. If `feat/track-*` workflow is ever resurrected for daytime use, re-promoting is a one-file change (recreate plist at `~/Library/LaunchAgents/com.intently.babysit-prs.plist`, add the `babysit-prs)` case back to `~/.intently/bin/intently-routine.sh`).
 
 ## Follow-up after first flight
 
