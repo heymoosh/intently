@@ -428,6 +428,14 @@ function PresentPlanProtoAnimated({ phase, adds, onAddPlan, onAddJournal, onPick
   );
 }
 
+// FLAG_META — maps flag kind keys to display metadata (tint, glyph, label).
+// Keys come from flagKindFor() in intently-flows.jsx: 'urgent', 'followup', 'parked'.
+const FLAG_META = {
+  urgent:   { tint: T.color.TintClay,       glyph: 'flame', label: 'Urgent'    },
+  followup: { tint: T.color.TintLilac,      glyph: 'phone', label: 'Follow-up' },
+  parked:   { tint: T.color.SupportingText, glyph: 'leaf',  label: 'Parked'    },
+};
+
 // Shell copy of PresentPlanProto but accepts a bands override. Keeps add-zones
 // hidden until animation completes.
 function PresentPlanShell({ phase, adds, onAddPlan, onAddJournal, onPickEntry, bands, hideFlags, onStartReview, addZonesReady, plan = PLAN_DATA }) {
@@ -1078,6 +1086,49 @@ function PrototypePhone({ dayState, setDayState, idx, setIdx }) {
   const [briefJustAccepted, setBriefJustAccepted] = React.useState(false);
   const [livePlan, setLivePlan] = React.useState(null);   // agent-driven plan from latest BriefFlow accept
   const [liveReview, setLiveReview] = React.useState(null); // agent-driven review summary from latest ReviewFlow accept
+
+  // ─── Demo seed: populate livePlan / liveReview from SAM seed data on mount.
+  // Only runs when window.INTENTLY_DEMO is true and the seed has loaded.
+  // Mirrors the shape that BriefFlow/ReviewFlow produce so Present view renders
+  // bands, parked items, flags, and the closed-day summary without a live agent run.
+  React.useEffect(() => {
+    if (!window.INTENTLY_DEMO || !window.SAM_TODAY_BRIEF) return;
+    const _glyphForTier = (tier) => {
+      if (tier === 'P1') return 'rocket';
+      if (tier === 'P3') return 'leaf';
+      return 'target';
+    };
+    const _flagKindFor = (kind) => {
+      if (kind === 'health' || kind === 'time-sensitive') return 'urgent';
+      if (kind === 'override') return 'followup';
+      return 'parked';
+    };
+    const brief = window.SAM_TODAY_BRIEF;
+    const jt = brief.json_tail || {};
+    setLivePlan({
+      pacing: {
+        title: jt.today_one_line || '...',
+        body: (brief.body_markdown || '').split('\n\n')[0] || '...',
+      },
+      flags: (jt.flags || []).map((f) => ({ k: _flagKindFor(f.kind), t: f.text })),
+      bands: (jt.bands || []).map((b) => ({
+        when: (b.when || '').replace(/^./, (c) => c.toUpperCase()),
+        items: (b.items || []).map((it) => ({ g: _glyphForTier(it.tier), t: it.text })),
+      })),
+      parked: (jt.parked || []).map((p) => p.text || String(p)),
+    });
+    if (window.SAM_YESTERDAY_REVIEW) {
+      const rev = window.SAM_YESTERDAY_REVIEW;
+      const rjt = rev.json_tail || {};
+      setLiveReview({
+        journalText: rjt.journal_text || (rev.body_markdown || '').split('\n')[0],
+        friction: rjt.friction || [],
+        tomorrow: rjt.tomorrow || [],
+        calendar: rjt.calendar || [],
+      });
+    }
+  }, []); // mount-only
+
   const [showWeeklyReview, setShowWeeklyReview] = React.useState(false);
   const [showMonthlyRefresh, setShowMonthlyRefresh] = React.useState(false);
   const [showSetup, setShowSetup] = React.useState(false);
