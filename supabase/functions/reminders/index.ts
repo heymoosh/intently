@@ -5,15 +5,24 @@
 // public.reminders. Also exposes a /due read endpoint used by daily-brief
 // input assembly to pull pending reminders.
 //
-// V1 single-user shortcut:
-//   Writes use SUPABASE_SERVICE_ROLE_KEY (auto-injected by Supabase) to
-//   bypass RLS, and attribute every row to the first user in auth.users
-//   (matching supabase/seeds/reminders.sql). This is a hackathon-only
-//   pattern — before multi-user, swap to JWT passthrough + row-level RLS
-//   policies that are already in place from migration 0003.
+// Auth model:
+//   Both endpoints require an `Authorization: Bearer <user-jwt>` header. The
+//   JWT is forwarded to PostgREST as the user, so RLS policies from migration
+//   0003_reminders.sql (auth.uid() = user_id) attribute writes/reads to the
+//   actual caller. The `apikey` header carries the project's publishable
+//   (anon) key, NOT the service-role key — service-role bypasses RLS, which
+//   is exactly the bug we just fixed (silent data loss into the wrong owner).
+//
+// Date handling:
+//   /classify-and-store accepts an optional `today` field (YYYY-MM-DD) in the
+//   request body so the frontend can supply user-local-today. Falls back to
+//   server UTC only when the field is absent (graceful degradation for
+//   non-frontend callers; not user-correct for any user west of UTC during
+//   their evening hours).
 //
 // Endpoints:
-//   POST /functions/v1/reminders/classify-and-store   body: {transcript: string}
+//   POST /functions/v1/reminders/classify-and-store
+//        body: { transcript: string, today?: "YYYY-MM-DD" }
 //   GET  /functions/v1/reminders/due?date=YYYY-MM-DD
 //
 // CORS: mirrors ma-proxy (Access-Control-Allow-Origin: *). Lock down
@@ -40,6 +49,22 @@ function json(body: unknown, status = 200) {
 
 function errResp(status: number, message: string, detail?: unknown) {
   return json({ error: { message, detail } }, status);
+}
+
+// ---------- auth ----------
+
+// Extract the Bearer token from the Authorization header. Returns the raw
+// JWT string on success, null on missing/malformed. We don't crypto-verify
+// here — PostgREST will reject invalid signatures downstream and the only
+// thing the function needs to enforce is "the caller must be authenticated"
+// (i.e., they cannot fall back to anonymous service-role writes).
+function extractBearerToken(req: Request): string | null {
+  const header = req.headers.get('Authorization') || req.headers.get('authorization');
+  if (!header) return null;
+  const match = /^Bearer\s+(.+)$/i.exec(header.trim());
+  if (!match) return null;
+  const token = match[1].trim();
+  return token.length > 0 ? token : null;
 }
 
 // ---------- classification ----------
@@ -123,45 +148,41 @@ async function classifyTranscript(
   };
 }
 
-// ---------- PostgREST (service-role fetch; bypasses RLS) ----------
+// ---------- PostgREST (JWT-passthrough; RLS evaluates auth.uid()) ----------
 
-function supabaseHeaders(serviceKey: string): Record<string, string> {
+// PostgREST requires BOTH headers:
+//   - apikey: the project's publishable (anon) key — identifies the project
+//   - Authorization: Bearer <user-jwt> — identifies the user, drives auth.uid()
+// If apikey is the service-role key, RLS bypasses regardless of Authorization,
+// which would silently re-introduce the bug. Always anon for apikey here.
+function userScopedHeaders(anonKey: string, userJwt: string): Record<string, string> {
   return {
-    apikey: serviceKey,
-    Authorization: `Bearer ${serviceKey}`,
+    apikey: anonKey,
+    Authorization: `Bearer ${userJwt}`,
     'Content-Type': 'application/json',
   };
 }
 
-async function firstUserId(supabaseUrl: string, serviceKey: string): Promise<string | null> {
-  // auth.users is only reachable with the service role. We pick the earliest
-  // signup as the V1 owner (single-user dogfood). Matches seed behavior.
-  const res = await fetch(
-    `${supabaseUrl}/auth/v1/admin/users?page=1&per_page=1`,
-    { method: 'GET', headers: supabaseHeaders(serviceKey) },
-  );
-  if (!res.ok) return null;
-  const data = (await res.json()) as any;
-  const users = Array.isArray(data?.users) ? data.users : [];
-  // Admin API returns newest first; sort ascending by created_at to match
-  // seed's "first user" semantics.
-  users.sort((a: any, b: any) =>
-    (a?.created_at ?? '').localeCompare(b?.created_at ?? ''),
-  );
-  return users[0]?.id ?? null;
-}
-
 async function insertReminder(
   supabaseUrl: string,
-  serviceKey: string,
-  userId: string,
+  anonKey: string,
+  userJwt: string,
   text: string,
   remindOn: string,
 ): Promise<Record<string, unknown>> {
+  // No user_id in the body — RLS WITH CHECK (auth.uid() = user_id) is enforced
+  // server-side; we let Postgres derive user_id from the JWT via a default or
+  // we send it explicitly. Migration 0003 has user_id as NOT NULL with no
+  // default, so we must send it. Pull it from the JWT payload.
+  const userId = parseSubFromJwt(userJwt);
+  if (!userId) {
+    throw new Error('jwt payload missing sub (user id)');
+  }
+
   const res = await fetch(`${supabaseUrl}/rest/v1/reminders`, {
     method: 'POST',
     headers: {
-      ...supabaseHeaders(serviceKey),
+      ...userScopedHeaders(anonKey, userJwt),
       Prefer: 'return=representation',
     },
     body: JSON.stringify({ user_id: userId, text, remind_on: remindOn }),
@@ -176,10 +197,12 @@ async function insertReminder(
 
 async function fetchDueReminders(
   supabaseUrl: string,
-  serviceKey: string,
+  anonKey: string,
+  userJwt: string,
   date: string,
 ): Promise<unknown[]> {
   // Pending + remind_on <= date. PostgREST filters: status=eq.pending, remind_on=lte.<date>.
+  // RLS scopes the result set to auth.uid() = user_id automatically.
   const url = new URL(`${supabaseUrl}/rest/v1/reminders`);
   url.searchParams.set('status', 'eq.pending');
   url.searchParams.set('remind_on', `lte.${date}`);
@@ -188,7 +211,7 @@ async function fetchDueReminders(
 
   const res = await fetch(url.toString(), {
     method: 'GET',
-    headers: supabaseHeaders(serviceKey),
+    headers: userScopedHeaders(anonKey, userJwt),
   });
   if (!res.ok) {
     const detail = await safeReadBody(res);
@@ -212,10 +235,36 @@ async function safeReadBody(res: Response): Promise<unknown> {
   }
 }
 
+// Decode the JWT payload (no signature verification — PostgREST does that
+// downstream) and return the `sub` claim, which Supabase populates with the
+// user's auth.uid(). Returns null on any decode failure.
+function parseSubFromJwt(jwt: string): string | null {
+  try {
+    const parts = jwt.split('.');
+    if (parts.length !== 3) return null;
+    // base64url → base64
+    const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
+    const json = atob(padded);
+    const payload = JSON.parse(json);
+    return typeof payload?.sub === 'string' ? payload.sub : null;
+  } catch {
+    return null;
+  }
+}
+
+// Server-local UTC date as YYYY-MM-DD. Used only as a fallback when the
+// caller doesn't supply `today`. Implemented via Intl 'en-CA' (which formats
+// as YYYY-MM-DD) rather than toISOString().slice(0, 10) so the entire
+// reminders module is free of that off-by-one-prone idiom (see CR-09 in
+// docs/product/acceptance-criteria/chat-reminders-jwt-and-timezone.md).
 function todayIsoDate(): string {
-  // Server-local (UTC on Supabase Edge). Good enough for V1; post-hackathon
-  // we resolve against the user's profile timezone.
-  return new Date().toISOString().slice(0, 10);
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'UTC',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
 }
 
 function isValidIsoDate(s: string): boolean {
@@ -234,10 +283,20 @@ Deno.serve(async (req: Request) => {
   // Resolve shared env up front. Fail fast with a clear message.
   const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  if (!supabaseUrl || !serviceKey) {
-    console.error('[reminders] SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY missing (should be auto-injected)');
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
+  if (!supabaseUrl || !anonKey) {
+    console.error('[reminders] SUPABASE_URL or SUPABASE_ANON_KEY missing (should be auto-injected)');
     return errResp(500, 'server misconfigured: missing Supabase env');
+  }
+
+  // Both endpoints require an authenticated user. Reject early so callers
+  // get a clear 401 instead of a confusing PostgREST RLS error.
+  const userJwt = extractBearerToken(req);
+  if (!userJwt) {
+    return errResp(
+      401,
+      'missing or malformed Authorization header — expected `Authorization: Bearer <user-jwt>`',
+    );
   }
 
   // GET /reminders/due?date=YYYY-MM-DD ----------------------------------------
@@ -247,7 +306,7 @@ Deno.serve(async (req: Request) => {
       return errResp(400, 'date query param must be YYYY-MM-DD');
     }
     try {
-      const rows = await fetchDueReminders(supabaseUrl, serviceKey, date);
+      const rows = await fetchDueReminders(supabaseUrl, anonKey, userJwt, date);
       return json({ date, reminders: rows });
     } catch (err) {
       console.error('[reminders] /due error', err);
@@ -273,22 +332,27 @@ Deno.serve(async (req: Request) => {
       return errResp(400, 'body must include non-empty { transcript: string }');
     }
 
+    // Optional today (user-local YYYY-MM-DD). Falls back to server UTC.
+    let today: string;
+    if (typeof raw?.today === 'string' && raw.today.length > 0) {
+      if (!isValidIsoDate(raw.today)) {
+        return errResp(400, 'today must be YYYY-MM-DD');
+      }
+      today = raw.today;
+    } else {
+      today = todayIsoDate();
+    }
+
     try {
-      const today = todayIsoDate();
       const result = await classifyTranscript(anthropicKey, transcript, today);
       if (!result.classified) {
         return json({ classified: false, reason: result.reason });
       }
 
-      const userId = await firstUserId(supabaseUrl, serviceKey);
-      if (!userId) {
-        return errResp(500, 'no users in auth.users — cannot attribute reminder');
-      }
-
       const reminder = await insertReminder(
         supabaseUrl,
-        serviceKey,
-        userId,
+        anonKey,
+        userJwt,
         result.text,
         result.remind_on,
       );
