@@ -630,8 +630,74 @@ function BriefFlow({ onClose, onComplete }) {
   );
 }
 
+// Strip a trailing ```json ... ``` block from agent text before display.
+// Returns { display: string, jsonTail: object|null }.
+function stripJsonTail(text) {
+  if (!text) return { display: text, jsonTail: null };
+  const match = text.match(/^([\s\S]*?)\n*```json\s*([\s\S]*?)\n*```\s*$/);
+  if (match) {
+    let parsed = null;
+    try { parsed = JSON.parse(match[2]); } catch (_) { /* ignore */ }
+    return { display: match[1].trimEnd(), jsonTail: parsed };
+  }
+  return { display: text, jsonTail: null };
+}
+
+// Render a markdown string into an array of React elements.
+// Handles: **bold**, *italic*, `code`, - bullet lists, paragraph breaks, line breaks.
+function renderMarkdown(text) {
+  if (!text) return null;
+
+  // Inline: convert **bold**, *italic*, `code` within a segment.
+  function inlineToReact(str, keyPrefix) {
+    const parts = [];
+    // Split on **bold**, *italic*, `code`
+    const re = /(\*\*(.+?)\*\*|\*(.+?)\*|`([^`]+?)`)/g;
+    let last = 0;
+    let m;
+    let idx = 0;
+    while ((m = re.exec(str)) !== null) {
+      if (m.index > last) parts.push(str.slice(last, m.index));
+      if (m[2] !== undefined) parts.push(React.createElement('strong', { key: keyPrefix + 'b' + idx }, m[2]));
+      else if (m[3] !== undefined) parts.push(React.createElement('em', { key: keyPrefix + 'i' + idx }, m[3]));
+      else if (m[4] !== undefined) parts.push(React.createElement('code', { key: keyPrefix + 'c' + idx, style: { fontFamily: 'monospace', fontSize: '0.9em', background: 'rgba(0,0,0,0.08)', padding: '0 3px', borderRadius: 3 } }, m[4]));
+      last = m.index + m[0].length;
+      idx++;
+    }
+    if (last < str.length) parts.push(str.slice(last));
+    return parts.length === 1 && typeof parts[0] === 'string' ? parts[0] : parts;
+  }
+
+  const elements = [];
+  // Split into paragraphs on double newlines.
+  const paragraphs = text.split(/\n{2,}/);
+  paragraphs.forEach((para, pi) => {
+    const lines = para.split('\n');
+    // Check if all non-empty lines are bullet items.
+    const allBullets = lines.every(l => l.trim() === '' || /^[-*]\s/.test(l.trim()));
+    if (allBullets && lines.some(l => /^[-*]\s/.test(l.trim()))) {
+      const items = lines.filter(l => /^[-*]\s/.test(l.trim())).map((l, li) =>
+        React.createElement('li', { key: pi + '-li-' + li, style: { marginBottom: 2 } }, inlineToReact(l.trim().replace(/^[-*]\s/, ''), pi + '-li-' + li + '-'))
+      );
+      elements.push(React.createElement('ul', { key: pi, style: { margin: '2px 0 2px 18px', padding: 0 } }, items));
+    } else {
+      // Mixed or prose paragraph — render lines with <br /> between them.
+      const content = [];
+      lines.forEach((line, li) => {
+        if (li > 0) content.push(React.createElement('br', { key: pi + '-br-' + li }));
+        const rendered = inlineToReact(line, pi + '-' + li + '-');
+        if (Array.isArray(rendered)) content.push(...rendered);
+        else content.push(rendered);
+      });
+      elements.push(React.createElement('p', { key: pi, style: { margin: '0 0 6px 0' } }, content));
+    }
+  });
+  return elements;
+}
+
 function ChatBubble({ role, text, sub }) {
   const isUser = role === 'user';
+  const { display } = isUser ? { display: text } : stripJsonTail(text);
   return (
     <div style={{
       display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start',
@@ -646,7 +712,7 @@ function ChatBubble({ role, text, sub }) {
         fontFamily: T.font.Reading, fontSize: 15, lineHeight: '22px',
         boxShadow: isUser ? '0 4px 14px rgba(198,107,63,0.28)' : '0 2px 8px rgba(31,27,21,0.05)',
       }}>
-        <div>{text}</div>
+        <div>{isUser ? text : renderMarkdown(display)}</div>
         {sub && (
           <div style={{
             marginTop: 6,
@@ -1442,6 +1508,7 @@ function ReviewFlow({ onClose, onComplete }) {
 
 function ChatBubbleDark({ role, text, sub }) {
   const isUser = role === 'user';
+  const { display } = isUser ? { display: text } : stripJsonTail(text);
   return (
     <div style={{
       display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start',
@@ -1455,7 +1522,7 @@ function ChatBubbleDark({ role, text, sub }) {
         border: isUser ? 'none' : `1px solid rgba(251,246,234,0.14)`,
         fontFamily: T.font.Reading, fontSize: 15, lineHeight: '22px',
       }}>
-        <div>{text}</div>
+        <div>{isUser ? text : renderMarkdown(display)}</div>
         {sub && (
           <div style={{
             marginTop: 6,
