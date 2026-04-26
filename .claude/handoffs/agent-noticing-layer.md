@@ -34,7 +34,7 @@ Over time, agent notices recurring topics and assembles them into a project (usi
 
 Two-tier brain — MA memory (working, soft patterns the agent observes) + Supabase (long-term, durable, explicit user commitments). Promotion when a soft pattern repeats enough; the agent decides what's worth keeping.
 
-- **Built:** schema separates the two layers
+- **Built:** schema separates the two layers — `public.observations` table is the long-term durable tier (migration `0009_graph_schema.sql`; see ADR `docs/decisions/0010-graph-db-strategy.md` for why Postgres-native was chosen over Apache AGE / Neo4j)
 - **Missing:** `times_observed` counters, promotion logic, agent pass that asks "has this pattern recurred enough to durabilize?"
 - Already noted as V1.1 post-hackathon in TRACKER
 
@@ -65,6 +65,7 @@ Hackathon submission (2026-04-26 8 PM EDT deadline) ships without the noticing l
 - Memory: `project-inbox-capture-gap.md` — capture→route→surface loop is broken; demo narrative risk if not resolved
 - Memory: `project-memory-tiers.md` — two-tier brain spec, implementation absent
 - TRACKER § Critical items awaiting review #1–2 (entries-architecture reconciliation + reminders intent reconciliation) — both feed this handoff's design space; reconcile before activating
+- ADR: `docs/decisions/0010-graph-db-strategy.md` — why the `observations` table (workstream 3's durable tier) is Postgres-native; migration path to AGE / external graph DB preserved
 
 ## Open decisions (deferred to activation; will spawn their own ADRs)
 
