@@ -1,0 +1,45 @@
+{
+  "skill": "chat",
+  "cases": [
+    {
+      "id": "route-daily-brief",
+      "notes": "User asks for today's plan. Expected: chat routes to daily-brief. No conversational response needed — the brief output carries it.",
+      "input": {
+        "utterance": "What's on my plate today?"
+      },
+      "expected_skills": ["daily-brief"]
+    },
+    {
+      "id": "route-update-tracker",
+      "notes": "User adds a new project with a deadline. Expected: chat routes to update-tracker to record the new project entry.",
+      "input": {
+        "utterance": "Add a project: Move apartments by May 15"
+      },
+      "expected_skills": ["update-tracker"]
+    },
+    {
+      "id": "route-weekly-review",
+      "notes": "User asks how their week is going. Expected: chat routes to weekly-review.",
+      "input": {
+        "utterance": "How am I doing this week?"
+      },
+      "expected_skills": ["weekly-review"]
+    },
+    {
+      "id": "no-skill-conversational",
+      "notes": "User is thinking aloud — no action requested, no data change. Expected: chat responds directly, no skill invoked.",
+      "input": {
+        "utterance": "Just thinking about why I haven't started writing yet"
+      },
+      "expected_skills": []
+    },
+    {
+      "id": "multi-skill-brief-and-reminder",
+      "notes": "User requests two distinct actions in one utterance. Expected: chat invokes daily-brief AND reminders-classifier — both intents must be handled.",
+      "input": {
+        "utterance": "Do my morning brief and also remind me to call mom at 3pm"
+      },
+      "expected_skills": ["daily-brief", "reminders-classifier"]
+    }
+  ]
+}
