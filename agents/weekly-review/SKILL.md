@@ -18,13 +18,16 @@ The compounding engine. This is a conversation, not a report — pause and wait 
 
 Read the journal file (filename from `reflection_filename` in config). Pull entries from the past 7 days — both freeform reflections and tagged entries. Surface emotional threads, patterns, and insights before any tactical step.
 
-**Read by tag type first.** Journal entries from daily-review are tagged with the category they captured. Scan each type separately before combining into themes:
+**Read by tag type first.** Journal entries from daily-review are tagged with the category they captured. Scan each type separately before combining into themes. The canonical signal taxonomy — tags, framework provenance, and what each type means — is in `docs/product/signals.md`. The V1 canonical tags are: `#brag`, `#grow`, `#self`, `#ant`, `#ideas`, `#gtj`, `#bet`.
 
-- `#grow` — lessons from the week. What kept coming up? What did the user keep learning?
+Quick reference for this step:
+
+- `#grow` — lessons to act on. What kept coming up? What did the user keep learning?
 - `#self` — self-knowledge entries. What drained or energized them? Any pattern across days?
 - `#brag` — wins. Are there wins the user might have already forgotten by Friday?
 - `#ant` — limiting beliefs that surfaced. Did the same one appear more than once?
 - `#ideas` — ideas flagged for development. Any that gained momentum this week?
+- `#bet` — decisions or commitments recorded this week. Any that are now resolvable?
 
 Surface the strongest 1–2 signals per tag type that appear across **multiple days** — single-day entries are data; multi-day recurrence is a pattern worth naming.
 

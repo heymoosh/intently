@@ -1,6 +1,4 @@
-> **⚠ ORIGINAL INTENT — not current ground truth.** Captures pre-2026-04-25 framing. Current architecture derives from `TRACKER.md § Current state pointers` (stack = ADR 0004 web-only pivot; agent behavior = `agents/<skill>/SKILL.md`; data model = forthcoming ADR per design folder). Treat this doc as historical reference for original intent — **do not derive current architecture from it**.
-
----
+> **⚠ Original intent — implementation moved, contracts did not.** The architectural shape, schema-level contracts, and behavioral intent described here remain load-bearing. The "markdown-files-as-source-of-truth" implementation has been superseded by Supabase migrations (`supabase/migrations/0001-0010_*.sql`); markdown is now a render-on-demand view. **Read this doc for WHAT each entity is and WHY it exists; read the migrations for HOW it is currently stored.** Scope of supersession is locked in `docs/decisions/0011-scope-of-design-folder-supersession.md`.
 
 # Agent Memory — Intently (hackathon scope)
 

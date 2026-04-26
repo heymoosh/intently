@@ -34,13 +34,16 @@ Surface, in 4–6 bullets: what the goals actually are, what the current month w
 
 ## 2. Scan journal for Patterns
 
-Read the past 4 weeks of the journal file (filename from `reflection_filename` in config). Look for:
+Read the past 4 weeks of the journal file (filename from `reflection_filename` in config). The canonical signal taxonomy — tags, framework provenance, and what each signal type means — is in `docs/product/signals.md`. The V1 canonical tags are: `#brag`, `#grow`, `#self`, `#ant`, `#ideas`, `#gtj`, `#bet`.
+
+Look for:
 
 - **Recurring frustrations or friction points** — things that keep coming up across weeks.
 - **Self-insights tagged `#self` or `#grow`** — real signal about what's working.
 - **Automatic negative thoughts tagged `#ant`** — if the same one keeps appearing, name it.
 - **Wins tagged `#brag`** — any patterns in *what kind* of wins energized the user?
 - **Ideas tagged `#ideas`** — did any gain momentum, stall, or compound with others?
+- **Bets / decisions tagged `#bet`** — which past bets are now resolvable? What does the outcome reveal about reasoning quality?
 - **Energy patterns** — what gave energy, what drained it? Mismatch between time spent and what actually energizes?
 - **GTJ data (if present):** When `#gtj` entries exist, parse the structured Engagement/Energy/Context fields for concrete evidence. Cite specifics: "4 of 6 logged meetings scored Draining; the 2 that scored Energizing were both small-group problem-solving." This specificity is the payoff of structured capture.
 

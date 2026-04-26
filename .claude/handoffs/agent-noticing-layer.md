@@ -60,6 +60,12 @@ The three are NOT separate features — they're the same architectural pattern a
 
 Hackathon submission (2026-04-26 8 PM EDT deadline) ships without the noticing layer. This handoff exists to preserve the architectural framing so post-hackathon work doesn't re-litigate the decision to treat the three gaps as one arc.
 
+## Signal taxonomy dependency
+
+Workstream 4 (capture-time signal-type tagging, V1.1) will consume `docs/product/signals.md` as its single source of truth for what counts as a signal. That doc is now live and canonical — it hoists the reflection-tag taxonomy out of individual skill files, names framework provenance for each signal type (Designing Your Life, CBT, career coaching, decision science), and gives the rule for adding new ones. Any capture-routing or capture-tagging logic built under this arc must reference `docs/product/signals.md` and never embed the tag list inline.
+
+The V1 canonical signal set (as of 2026-04-26): `#brag`, `#grow`, `#self`, `#ant`, `#ideas`, `#gtj`, `#bet`. Two new types (`#gtj` hoisted from GTJ schema, `#bet` added new) were added during canonicalization.
+
 ## Related
 
 - Memory: `project-inbox-capture-gap.md` — capture→route→surface loop is broken; demo narrative risk if not resolved

@@ -1,6 +1,4 @@
-> **⚠ ORIGINAL INTENT — not current ground truth.** Captures pre-2026-04-25 framing. Current information-routing lives in `TRACKER.md § Current state pointers` (which itself is the new spine). Treat this doc as historical reference for original intent — **do not derive current doc-routing from it**.
-
----
+> **⚠ Original intent — implementation moved, contracts did not.** The architectural shape, schema-level contracts, and behavioral intent described here remain load-bearing. The "markdown-files-as-source-of-truth" implementation has been superseded by Supabase migrations (`supabase/migrations/0001-0010_*.sql`); markdown is now a render-on-demand view. **Read this doc for WHAT each entity is and WHY it exists; read the migrations for HOW it is currently stored.** Scope of supersession is locked in `docs/decisions/0011-scope-of-design-folder-supersession.md`.
 
 # Document Taxonomy
 
