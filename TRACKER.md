@@ -47,15 +47,15 @@ Project briefs at `.claude/handoffs/<slug>.md` — persist across sessions; neve
 
 ## Next (in priority order)
 
-Top of queue — `/work-next` picks from the top. Smaller items have inline AC; larger items reference their handoff.
+Top of queue — `/work-next` picks from the top. Items 1+2 are paired (run as parallel sub-agents — independent codebases, no merge collisions). All AC files live at `docs/product/acceptance-criteria/<topic>.md`.
 
-1. **Chat reminder Bug 3 — fix wrong user_id (silent data loss).** `supabase/functions/reminders/index.ts` writes via service-role-key to `auth.users[0]`, not the current anon session uid. Every reminder a real user creates today vanishes. **Fix:** JWT passthrough; use the user's session token; rely on RLS from migration 0003. Bundle Bug 2 (UTC date math, same Edge Function) into the same PR. AC: see inbox-now-archived `2300-chat-reminder-path-bugs` + the chat-reminder-path-bugs section of `wiring-audit.md`.
-2. **Wiring-audit pass 1.** Author `docs/product/interaction-inventory.md` — exhaustive enumeration of every interactive element with status/decision per § AC location matrix. AC inside `wiring-audit.md`.
-3. **Build-watchdog teeth (ESLint config covering `web/*.jsx` with `no-empty-function` on handler props).** Loop runs but is toothless; would have caught `onEdit={() => {}}` and friends. Folds into `wiring-audit` "tooling" AC OR ships standalone (lean: standalone, fast to land). AC: see archived inbox `2245-build-watchdog-toothless`.
-4. **Chat thinking indicator (Bug 1).** Insert "agent is thinking" bubble in chat thread while `pending===true`. Reuse the `ProcessingArc` motion vocabulary from `intently-hero.jsx`. ~30-min visual fix. AC: see archived inbox `2300` Bug 1 section.
-5. **Hero press-pattern redesign.** Long-press opens the menu sticky-style; tap-to-select instead of release-to-select. AC: see archived inbox `2201-hero-press-pattern-redesign`.
-6. **Update-tracker UI wiring + Markdown-vault-vs-Supabase reconciliation.** Decide path (re-prompt vs bridge) before wiring. AC: see archived inbox `2134-update-tracker-wiring`.
-7. **Babysit-prs known issues.** Diagnose what 1900 flagged; fix or remove the loop. The build-watchdog half is now item #3 above.
+1. **[PARALLEL] Chat reminder bugs — Bug 3 (wrong user_id, silent data loss) + Bug 2 (UTC date math).** JWT passthrough + client-supplied `today` parameter to `supabase/functions/reminders/index.ts`. Bundled in one PR (same Edge Function). AC: `docs/product/acceptance-criteria/chat-reminders-jwt-and-timezone.md`.
+2. **[PARALLEL] Build-watchdog teeth.** ESLint config covering `web/*.jsx` with `no-empty-function` on handler props + `lint` script in `package.json`. Force-multiplier: every subsequent sub-agent's work is then validated at lint time. AC: `docs/product/acceptance-criteria/build-watchdog-teeth.md`.
+3. **Wiring-audit pass 1.** Author `docs/product/interaction-inventory.md` — exhaustive enumeration of every interactive element with status/decision. AC inside `.claude/handoffs/wiring-audit.md`.
+4. **Chat thinking indicator (Bug 1).** Insert "agent is thinking" bubble in chat thread while `pending===true`. AC: `docs/product/acceptance-criteria/chat-thinking-indicator.md`.
+5. **Hero press-pattern redesign.** Long-press opens the menu sticky-style; tap-to-select instead of release-to-select. AC: `docs/product/acceptance-criteria/hero-press-pattern.md`.
+6. **Update-tracker UI wiring (option 1 — re-prompt to Supabase, locked 2026-04-25).** Rewrite agent prompt for Supabase reads/writes; wire at least one UI surface; eval cases. AC: appended in `docs/product/acceptance-criteria/update-tracker.md` (CR-update-tracker-supabase-wiring-01..).
+7. **Babysit-prs known issues.** Diagnose what 1900 flagged; fix or remove the loop. AC: `docs/product/acceptance-criteria/babysit-prs-diagnosis.md`.
 
 ## Critical items (post-launch reconciliation)
 

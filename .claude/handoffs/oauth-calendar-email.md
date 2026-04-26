@@ -13,7 +13,7 @@ This is the difference between a brief that says "you set goals around shipping 
 ## What — the target experience
 
 **Calendar (Google Calendar).**
-- Profile → "Connect Google Calendar" → standard OAuth flow → server stores refresh token (Supabase Vault or BWS, never in client) → background sync writes today's events into `calendar_events` rows.
+- Profile → "Connect Google Calendar" → standard OAuth flow → server stores refresh token in **Supabase Vault** (locked 2026-04-25 — BWS deferred until ADR 0005 trigger) → background sync writes today's events into `calendar_events` rows.
 - Sync cadence: pull on Profile-connect (initial backfill of today + tomorrow), and refresh on each daily-brief invocation (or on-demand from a "refresh" affordance) so events stay current.
 - Read-only for V1. We don't write events back; we just read.
 
@@ -34,7 +34,7 @@ Drafted here per § AC location matrix (cross-cutting infra → handoff).
 
 **OAuth flow:**
 - [ ] `OAuthFlow` in `intently-extras.jsx` is replaced (or rewired) to invoke a real Supabase Edge Function endpoint that initiates Google's OAuth dance and persists the refresh token server-side.
-- [ ] Refresh token is stored in Supabase Vault (encrypted) or BWS, *never* in the browser, *never* committed to git, *never* logged to console.
+- [ ] Refresh token is stored in **Supabase Vault** (encrypted), *never* in the browser, *never* committed to git, *never* logged to console.
 - [ ] OAuth scopes are minimum-necessary: `calendar.readonly` for calendar, `gmail.readonly` (or `gmail.metadata` if it suffices) for email. No write scopes.
 - [ ] Connection state is reflected on the Profile sheet: ⚪ disconnected / 🟢 connected with last-sync timestamp.
 
@@ -64,7 +64,7 @@ Drafted here per § AC location matrix (cross-cutting infra → handoff).
 
 ## Open questions for grooming
 
-1. **Where does the refresh token live?** Supabase Vault (newer feature, requires verifying availability on our project tier) vs. BWS (existing pattern but per ADR 0005 deferred until multi-user/scale). *Lean: Supabase Vault for the speed-to-ship, with an ADR documenting the choice.*
+1. ~~**Where does the refresh token live?**~~ **DECIDED 2026-04-25: Supabase Vault.** ADR will document the choice. BWS deferred until the multi-user/scale trigger from ADR 0005 lands.
 2. **Edge function vs. background sync?** Pull-on-demand from inside the daily-brief invocation is simplest (no scheduling needed). Background pull (cron'd) gives faster first-byte at brief-time. *Lean: pull-on-demand for V1, add background later when scheduled-agent-dispatch lands.*
 3. **What counts as a flagged email?** Starred-only is too narrow; full-inbox-scan-with-AI is too expensive. *Suggested heuristic: starred + sender-in-VIP-list (extracted from prior interactions) + unanswered-where-user-was-direct-recipient + last 7 days. Revisit with real signal.*
 4. **OAuth consent UX.** Google's consent screen is jarring in a calm app. *Mitigation: explain what we're asking for and why in 1 short sentence on the Profile sheet before the redirect.*

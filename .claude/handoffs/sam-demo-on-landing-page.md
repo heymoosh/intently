@@ -67,8 +67,8 @@ Drafted here per § AC location matrix (cross-cutting product → handoff).
 
 **Demo-mode behavior:**
 - [ ] In demo mode, all writes either no-op or scope to ephemeral per-session state that resets on reload. No real DB writes happen on Sam's user_id from the embedded demo.
-- [ ] Agent calls (`callMaProxy`) in demo mode are either disabled OR rate-limited heavily (cost discipline) — visitors should see something happen on tap, but firing a real Opus 4.7 brief on every page load doesn't scale.
-- [ ] Decision needed during execution: do we pre-record agent outputs for the demo (cheap, deterministic, fast) OR run live (expensive, varied, slow)? *Lean: pre-record canned outputs for demo mode; live agent only on the real-user side.*
+- [ ] **Agent calls in demo mode are completely disabled** (locked 2026-04-25). All "agent thinking" / "agent output" beats in the demo are pre-recorded sequences played as typewriter animations, not live network calls. Zero Anthropic API spend from demo traffic; perfectly reproducible; no rate-limit / cold-start failures on the landing page.
+- [ ] Pre-recorded clips authored as part of the Sam-data-completeness pass (see § AC). Each demo-relevant interaction (brief, review, weekly, monthly, voice→reminder, chat reply) has a corresponding canned output sequence stored alongside Sam's seed data.
 
 **Real-app entry:**
 - [ ] CTA leads to a route where Sam's seed does NOT load. Visitor lands on empty-state → setup (per `new-user-ux-and-auth` handoff).
@@ -86,7 +86,7 @@ Drafted here per § AC location matrix (cross-cutting product → handoff).
 ## Open questions for grooming
 
 1. **Domain of the real app.** Same Vercel project under `/app`, or a sub-domain? *Lean: `/app` route in the same project.*
-2. **Pre-recorded vs. live agent in demo mode.** Cost + variability tradeoff above.
+2. ~~**Pre-recorded vs. live agent in demo mode.**~~ **DECIDED 2026-04-25: pre-recorded only.** Demo mode never fires `callMaProxy`. All agent beats are canned typewriter playback against Sam's seeded state. Authoring the canned sequences is part of the Sam-data-completeness pass.
 3. **Marketing copy authorship.** Out of scope for this handoff (a copy task, not a wiring task), but a placeholder needs to land. *Lean: ship with placeholder copy, iterate.*
 4. **Visual treatment of the embed.** iPhone frame as-is, or a smaller "preview window" frame on the landing page that expands on click? *Lean: iPhone frame embedded in a styled container, no expand-to-fullscreen for V1.*
 5. **What happens to the current home of `intently-eta.vercel.app`?** It IS the prototype today. Migrating to the new layout is a route-rewrite. *Decide: migrate the existing route in place, or stand up a new route and switch DNS.*
