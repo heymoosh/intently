@@ -46,6 +46,7 @@ const PROTOTYPE_GLOBALS = {
   TrackerCard: 'readonly', PlanCard: 'readonly', JournalCard: 'readonly',
   ConfirmationCard: 'readonly', FeatureCard: 'readonly', RingProgress: 'readonly',
   InputTrace: 'readonly', ConfidenceDot: 'readonly', Avatar: 'readonly',
+  ScreenHeader: 'readonly',
   // intently-hero.jsx
   HeroAffordance: 'readonly', HeroListening: 'readonly', HeroChat: 'readonly',
   VoiceWaveform: 'readonly', ProcessingArc: 'readonly',
@@ -56,9 +57,6 @@ const PROTOTYPE_GLOBALS = {
   // intently-projects.jsx
   PROJECT_DATA: 'readonly', ProjectCard: 'readonly', ProjectDetail: 'readonly',
   ProjectsBand: 'readonly',
-  // intently-screens.jsx
-  PastScreen: 'readonly', PresentScreen: 'readonly', FutureScreen: 'readonly',
-  ScreenHeader: 'readonly',
   // intently-shell.jsx
   SwipeShell: 'readonly', SwipeDots: 'readonly',
   // intently-manual-add.jsx

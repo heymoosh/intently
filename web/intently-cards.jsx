@@ -436,4 +436,31 @@ function Avatar({ variant = 'button', size, onClick, ariaLabel, style }) {
   return <span style={baseStyle}>{initial}</span>;
 }
 
-Object.assign(window, { TrackerCard, PlanCard, JournalCard, ConfirmationCard, FeatureCard, RingProgress, InputTrace, ConfidenceDot, Avatar });
+// ScreenHeader — small typographic header used by Future screen (and historically
+// by the v1 Past/Present screens that have since been retired). Extracted from
+// intently-screens.jsx during the PR #166 follow-up cleanup so the rest of that
+// file (all dead) could be deleted. Kept here because it's conceptually a
+// card-shaped header and intently-cards.jsx already houses similar utility
+// components. Used at web/index.html line ~647 (Future screen).
+function ScreenHeader({ tense, title, caption }) {
+  return (
+    <div style={{ padding: '14px 24px 16px' }}>
+      <div style={{
+        fontFamily: T.font.UI, fontSize: 11, fontWeight: 700, letterSpacing: 1.4,
+        textTransform: 'uppercase', color: T.color.SupportingText, marginBottom: 4,
+      }}>{tense}</div>
+      <div style={{
+        fontFamily: T.font.Display, fontSize: 32, fontWeight: 500, lineHeight: '38px',
+        color: T.color.PrimaryText, letterSpacing: -0.6, fontStyle: 'italic',
+      }}>{title}</div>
+      {caption && (
+        <div style={{
+          fontFamily: T.font.Reading, fontSize: 15, lineHeight: '22px',
+          color: T.color.SupportingText, marginTop: 8, maxWidth: 320,
+        }}>{caption}</div>
+      )}
+    </div>
+  );
+}
+
+Object.assign(window, { TrackerCard, PlanCard, JournalCard, ConfirmationCard, FeatureCard, RingProgress, InputTrace, ConfidenceDot, Avatar, ScreenHeader });
