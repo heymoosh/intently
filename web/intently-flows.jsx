@@ -1583,7 +1583,7 @@ function PresentEmpty({ onStartBrief }) {
 }
 
 // ─── END-OF-DAY (post-review) — simple closed-state ─────────────────
-function PresentClosed({ onReopenReview, review }) {
+function PresentClosed({ review }) {
   // Review shape (from ReviewFlow → onComplete): { journalText, friction[], tomorrow[], calendar[] }
   // Falls back to seeded copy when no live review has landed yet.
   const oneLine = (review && (review.journalText || review.journal)) || 'The dry run actually went well. I walked in present.';

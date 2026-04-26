@@ -79,4 +79,21 @@ async function getCurrentUserId() {
   return user.id;
 }
 
-Object.assign(window, { getSupabaseClient, getCurrentUserId, ensureAuthSession });
+// Sign out + reset the cached _authPromise so the next ensureAuthSession()
+// call kicks off a fresh anonymous sign-in. Without this, the cached promise
+// resolves to a now-stale user and subsequent queries fail RLS.
+async function signOutAndReset() {
+  const client = getSupabaseClient();
+  try {
+    await client.auth.signOut();
+  } finally {
+    _authPromise = null;
+  }
+}
+
+Object.assign(window, {
+  getSupabaseClient,
+  getCurrentUserId,
+  ensureAuthSession,
+  signOutAndReset,
+});
