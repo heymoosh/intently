@@ -298,8 +298,19 @@ function SelectRow({ label, sub, prefKey, options, defaultValue, last }) {
   );
 }
 
-function ToggleRow({ label, sub, defaultOn = false, last }) {
-  const [on, setOn] = React.useState(defaultOn);
+// ToggleRow — same persistence pattern as SelectRow (getPref/setPref against
+// localStorage `intently:prefs`). Each instance MUST pass a stable `prefKey`
+// string (declared at call sites, not derived from labels) so that copy edits
+// to `label` don't orphan saved values. See Pref keys block above PreferencesPage.
+function ToggleRow({ label, sub, prefKey, defaultOn = false, last }) {
+  const [on, setOn] = React.useState(() => getPref(prefKey, defaultOn));
+  const toggle = () => {
+    setOn(prev => {
+      const next = !prev;
+      setPref(prefKey, next);
+      return next;
+    });
+  };
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 12,
@@ -311,7 +322,7 @@ function ToggleRow({ label, sub, defaultOn = false, last }) {
         <span style={{ display: 'block', fontFamily: T.font.UI, fontSize: 14, fontWeight: 500, color: T.color.PrimaryText }}>{label}</span>
         {sub && <span style={{ display: 'block', marginTop: 2, fontFamily: T.font.Reading, fontSize: 12, color: T.color.SupportingText }}>{sub}</span>}
       </span>
-      <button onClick={() => setOn(o => !o)} aria-pressed={on} style={{
+      <button onClick={toggle} aria-pressed={on} style={{
         width: 44, height: 26, borderRadius: 999,
         background: on ? T.color.PrimaryText : T.color.Stone300,
         border: 'none', cursor: 'pointer', flexShrink: 0,
@@ -377,9 +388,9 @@ function PreferencesPage({ onBack }) {
         border: `1px solid ${T.color.EdgeLine}`,
         borderRadius: 14, overflow: 'hidden', marginBottom: 22,
       }}>
-        <ToggleRow label="Always confirm before saving" sub="Show the confirmation card after every voice utterance" defaultOn />
-        <ToggleRow label="Hold to talk" sub="Press and hold the mic instead of tap-to-toggle" />
-        <ToggleRow label="Read replies aloud" sub="Agent speaks its responses back to you" last />
+        <ToggleRow prefKey="alwaysConfirm" label="Always confirm before saving" sub="Show the confirmation card after every voice utterance" defaultOn />
+        <ToggleRow prefKey="holdToTalk" label="Hold to talk" sub="Press and hold the mic instead of tap-to-toggle" />
+        <ToggleRow prefKey="readAloud" label="Read replies aloud" sub="Agent speaks its responses back to you" last />
       </div>
 
       <div style={{
@@ -408,8 +419,8 @@ function PreferencesPage({ onBack }) {
         border: `1px solid ${T.color.EdgeLine}`,
         borderRadius: 14, overflow: 'hidden',
       }}>
-        <ToggleRow label="Brief reminder" defaultOn />
-        <ToggleRow label="Review nudge" sub="If you haven't logged a review by 10pm" defaultOn last />
+        <ToggleRow prefKey="briefReminder" label="Brief reminder" defaultOn />
+        <ToggleRow prefKey="reviewNudge" label="Review nudge" sub="If you haven't logged a review by 10pm" defaultOn last />
       </div>
     </SettingsSubPage>
   );
