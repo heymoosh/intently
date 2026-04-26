@@ -22,11 +22,11 @@
 
 ## Status
 
-**Phase:** Post-cognition. The deployed app satisfies the original UX vision end-to-end.
-**Status:** 🟢 `intently-eta.vercel.app` live with voice→chat, brief/review wired to live agent reading goals/projects/journal/calendar/email/reminders/yesterday's-review, weekly+monthly review UI, setup flow for new users, AddZones persisting, read-on-mount hydration, input traces, Undo on writes. Cross-day continuity verified.
-**Last:** 13 PRs (#136–#152) closed the real-app shell + the 11-item cognition backlog from `.claude/handoffs/real-app-cognition.md` (10 shipped, #24 declined with documented math).
-**Next:** Post-launch backlog (no urgent work in flight). See § Post-launch backlog below.
-**Last updated:** 2026-04-26 (post-cognition session close).
+**Phase:** Post-cognition + functional-quality pass.
+**Status:** 🟢 live. Empirical 20-story coverage walk (this session) caught and fixed: review-confirm crash, JSON-tail leak in chat bubbles, brief plan never persisted, missing brief/weekly-review seeds, 6-goals-vs-3 cap, tense-arrows inside phone, canned chat replies, scripted-only mid-flow turns, broken project-todo toggle, broken DB-goal/project detail, journal entries not tappable on Present.
+**Last:** PR #157 (7 commits, awaiting merge) — see Log 2026-04-25 below.
+**Next:** Build a dedicated `chat` skill agent (currently chat falls back to daily-brief). Author rich goal content (intention prose + milestones) for SAM_GOALS. Stand up Playwright regression suite. Reconcile post-launch critical items 1-3 below.
+**Last updated:** 2026-04-25.
 
 ## Active handoffs
 
@@ -60,6 +60,9 @@ These were deferred during the cognition push and remain valid:
 
 ## Follow-ups (manual or flight-test)
 
+- **Build dedicated `chat` skill agent.** HeroChat + per-turn flow acks currently piggyback on `daily-brief` because it has user context. A purpose-built chat agent with its own system prompt would respond more naturally and not get pulled toward planning behavior. Spec: agents/chat/SKILL.md + ma-agent-config.json + add `chat` to SKILL_ENV in `supabase/functions/ma-proxy/index.ts` + provision via script + set `MA_AGENT_ID_CHAT` secret.
+- **Author rich goal content for `SAM_GOALS`** — intention prose, milestones, reflections. GoalDetail now hides empty sections with placeholder copy ("not written yet — tap the mic"); demo would land harder with real content.
+- **Stand up Playwright regression suite.** Empirical walk caught the review-confirm crash (P0) that all prior smoke missed. No automated E2E exists; every change can silently break a story.
 - **(Optional)** Re-provision live `weekly-review` agent so its system prompt includes the Output contract durably (currently the assembler inlines it per call): `cd app && bws run -- npx tsx ../scripts/provision-ma-agents.ts --skill weekly-review --update-existing`.
 - **Apply pg_cron migration** (`supabase/migrations/0002_schedules.sql`). Needs `supabase db push` — user-only.
 - **Stewards leave working-tree mods uncommitted.** Release-readiness + spec-conformance stewards edit tracked files overnight without committing. Design fix: auto-commit to `auto/steward/*` branches + draft PR.
@@ -96,6 +99,7 @@ Read in order: `launch-plan.md`, this file, `CLAUDE.md`. If Critical items has e
 
 ## Log
 
+- **2026-04-25 — functional-quality pass.** PR #157 (7 commits, in flight): (1) review-confirm crash fix (objects-as-React-children when agent emits structured `friction:[{text,tag}]`) + JSON-tail leak in chat bubbles; (2) brief plan now persists to `plan_items` table on accept + adds SAM_TODAY_BRIEF + SAM_WEEKLY_REVIEW seeds for cross-day cognition on first load; (3) goals capped to top 3 by max(projects.updated_at) + dedupe Just-added vs DB-hydrated + expand toggle; (4) tense step-arrows lifted out of phone frame to `.tense-nav-outside` slot; (5) Weekly review CTA gated on a configurable Profile pref (Sunday default) + dropped Weekly summary email toggle; (6) DB-aware GoalDetail/ProjectDetail (defensive defaults, projectIds resolved from DB) + JSONB-todo toggle persistence (toggleProjectTodo, markAdminReminderDone); (7) per-turn LLM ack across BriefFlow/ReviewFlow/WeeklyReviewFlow + HeroChat routes non-reminder text to live LLM (was canned). Method: empirical 20-story Playwright walk on production caught the bugs; previous smoke missed them.
 - **2026-04-26 — cognition layer + real-app shell.** 13 PRs (#136–#152). Closed the 11-item cognition backlog from `.claude/handoffs/real-app-cognition.md` plus the 9-item real-app shell backlog. Live deployed prototype now satisfies the original UX vision end-to-end (voice/brief/review/weekly/monthly/setup/persistence/hydration/traces/undo, all with cross-day cognition).
 - **2026-04-25 evening — web/ live-wiring sprint.** 5 PRs (#111–#115) wired voice + brief/review against the inherited prototype.
 - **2026-04-25 — MA agents complete + editing-workflow revision.** All 6 agents provisioned. Anthropic key consolidated/rotated twice.
