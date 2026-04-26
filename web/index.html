@@ -252,6 +252,19 @@
 <script type="text/babel" src="lib/seed-sam.js"></script>
 <script type="text/babel" src="lib/context-assembler.js"></script>
 
+<script>
+  // PLAN_DATA — empty fallback. The real plan comes from BriefFlow's agent-driven output.
+  // This default ensures components that reference `PLAN_DATA` as a fallback prop don't crash
+  // when no plan has been generated yet (e.g. fresh user, before brief).
+  // Was previously defined as Sam's fixture in intently-screens.jsx (deleted PR #171).
+  window.PLAN_DATA = {
+    pacing: { title: '', body: '' },
+    flags: [],
+    bands: [],
+    parked: [],
+  };
+</script>
+
 <script type="text/babel" src="intently-tokens.jsx"></script>
 <script type="text/babel" src="ios-frame.jsx"></script>
 <script type="text/babel" src="intently-imagery.jsx"></script>
