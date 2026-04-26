@@ -135,3 +135,37 @@ Ideas surfaced during strategy session reviewing Mike Brown's demo. Not yet wove
 - Opus orchestrator / dynamic subagents
 - Multi-destination hero button routing
 - Topic clustering / auto-project creation
+
+---
+
+## Session Notes — 2026-04-26 (technical VO + script structure)
+
+### Frame shift on the technical section
+The original tech beat described the architecture without answering why it matters to the user. The real argument: the apps you have today wait for you, work in isolation, and capture without carrying. Intently's architecture answers that — it runs on a schedule whether you open it or not, and it's watching for specific things.
+
+### The two-part Opus argument (these are one story, not two)
+Initially had two disconnected angles — "structured attention" vs "data complexity." They're actually the same argument: Opus needs to hold a large and growing body of context (data volume) AND apply judgment about which signals within that context are worth surfacing (structured attention). Neither alone is the real story. Together they are.
+
+### The signal taxonomy — the biggest insight from this session
+The unlock isn't that the AI knows a lot about you. It's that Intently encodes which signals actually matter for living well — energy patterns, automatic negative thoughts, brags/wins, decisions and bets. This comes from real frameworks: Designing Your Life (Good Time Journal), career coaching practices, behavioral design. Most people don't track these things not because they don't care, but because nobody told them they should. Intently knows to look for them.
+
+### Script structure locked (from founder cameo onward)
+1. Founder cameo — Muxin on camera, personal story
+2. Apps bridge — SaaS-era isolation problem
+3. App demo VO — functional register over screen recordings: brief, voice capture, review, weekly synthesis
+4. Technical VO — Remotion animation: six agents on schedule, signal taxonomy, data complexity visual, Opus judgment
+5. Act 3 VO — emotional close (original, untouched)
+6. Tagline
+
+### Drafts not yet written to doc (ready to apply)
+- **App demo VO:** "Every morning, your brief is already there — what you're focused on today, what's coming, what matters most right now. When something comes up mid-day — a win, a thought, a decision — you just say it. Voice capture. It goes straight in. Every evening, a review. What actually happened. How your energy went. The moments worth noting. And week by week, the agents synthesize across all of it — not just what you did, but what it means."
+- **Revised technical VO:** Full draft in chat from 2026-04-26 session. Closing line under consideration: *"You've been living those days from the inside. Intently's been watching across them."* — not yet signed off.
+
+### Timing gut check (all sections)
+- Act 1 VO: ~30 sec
+- Founder cameo: ~45 sec
+- Apps bridge: ~10 sec
+- App demo VO: ~20 sec
+- Technical VO: ~30 sec
+- Act 3 VO + tagline: ~25 sec
+- Total: ~2:40 — leaves ~20 sec for transitions
