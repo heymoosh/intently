@@ -119,6 +119,10 @@ const PROTOTYPE_GLOBALS = {
   // lib/reminders.js
   fetchDueReminders: 'readonly', formatRemindersForInput: 'readonly',
   classifyTranscript: 'readonly',
+  // lib/update-tracker.js
+  looksLikeTrackerUpdate: 'readonly', assembleUpdateTrackerInput: 'readonly',
+  parseUpdateTrackerOutput: 'readonly', applyUpdateTrackerUpdates: 'readonly',
+  tryUpdateTracker: 'readonly',
   // lib/seed-sam-data.js
   SAM_GOALS: 'readonly', SAM_PROJECTS: 'readonly', SAM_JOURNAL: 'readonly',
   SAM_YESTERDAY_REVIEW: 'readonly', SAM_TODAY_BRIEF: 'readonly',

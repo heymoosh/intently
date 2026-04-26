@@ -1,100 +1,173 @@
 ---
 name: update-tracker
-description: "Universal project tracker updater. Invoked whenever the user finishes a work session and wants to log what happened, or says things like 'update tracker', 'log this', 'I just worked on X', 'mark that done', 'here's where I landed', 'oh I finished [anything]'. One skill for updating any tracker — the user never has to remember which project it belongs to."
+description: "Universal project tracker updater. Invoked whenever the user finishes a work session and wants to log what happened, or says things like 'update tracker', 'log this', 'I just worked on X', 'mark that done', 'here's where I landed', 'oh I finished [anything]'. One skill for updating any project — the user never has to remember which project something belongs to."
 status: hackathon-mvp
 ---
 
-> **⚠️ Superseded by `ma-agent-config.json`.** The deployed agent (`intently-update-tracker`) runs the `system` prompt embedded in `ma-agent-config.json`, not this file. This SKILL.md is the human-authored source-of-truth for behavior intent; edits here do **not** propagate until re-provisioned via `scripts/provision-ma-agents.ts`.
+> **⚠️ Superseded by `ma-agent-config.json`.** The deployed agent (`intently-update-tracker`) runs the `system` prompt embedded in `ma-agent-config.json`, not this file. This SKILL.md is the human-authored source-of-truth for behavior intent; edits here do **not** propagate until re-provisioned via `scripts/provision-ma-agents.ts --skill update-tracker --update-existing`.
 
-# Update Tracker — Universal Project Progress Logger
+# Update Tracker — Universal Project Progress Logger (Supabase-backed)
 
-Your job: figure out which project was worked on, update the right tracker, and sync the change into the Command Center dashboard. The user should never need to remember which tracker to open — this skill does that mapping.
+Your job: figure out which project was worked on, propose the right Supabase row writes, and confirm conversationally. The user should never need to remember which project something belongs to — this skill does that mapping.
 
-## 1. Read the Command Center
+**Architectural note.** This skill is post-cognition (ADR 0001): state-of-truth lives in Supabase tables (`projects` with `todos` JSONB, `goals`, `entries`, `plan_items`), not Markdown files. There is no `Ops Plan.md` / `Tracker.md` / `Strategy.md` to read or write. The agent's job is to emit a structured intent that the UI applies to the right rows.
 
-Read `Ops Plan.md`. This is the master dashboard. Every active project has a row with status, next action, and its Tracker Path column. Read `life-ops-config.md` Projects section for the definitive project-name → tracker + strategy path mapping (that's the lookup table; Ops Plan shows state).
+## Input contract
 
-## 2. Figure out what was worked on
+The web client calls this skill via `callMaProxy({ skill: 'update-tracker', input })`. The `input` is a markdown-flavored payload assembled browser-side and contains:
 
-Look at what the user said. They might:
+- **User utterance** — what the user just said ("I finished the auth migration", "shipped the polish PR", etc.).
+- **Active projects** — the user's `projects` rows where `status='active'`. Each project includes `id`, `title`, `body_markdown`, and `todos[]` (each todo has `id`, `text`, `done`).
+- **Active goals** — the user's `goals` rows where `archived_at is null`. Each goal includes `id`, `title`.
+- **Today** — the user's local-today as `YYYY-MM-DD`.
 
-- Name the project explicitly ("I worked on the website today").
-- Describe what they did without naming it ("I finished the positioning decision").
-- Reference an artifact that maps to a project ("the working doc is done").
-- Mention multiple projects ("I did positioning in the morning and content in the afternoon").
+Treat the input as ground truth. Never invent project ids or todo ids that aren't listed.
 
-Match their description to the Projects listed in `life-ops-config.md`. If ambiguous, ask:
+## 1. Match the utterance to a project
 
-> "Sounds like that might be [project A] or [project B] — which one?"
+Read the user's words. They might:
 
-Most of the time context makes it obvious. Don't over-ask.
+- Name the project explicitly ("worked on the website today").
+- Describe what they did without naming it ("finished the positioning decision").
+- Reference a todo's text directly ("the font-family translation is done").
+- Mention multiple projects ("did positioning in the morning and content in the afternoon").
 
-## 3. Sort before writing — taxonomy check
+Match against the project titles and todo texts in the input. Most of the time context makes it obvious.
 
-Before writing anything, apply the rule from `docs/architecture/document-taxonomy.md`:
+If genuinely ambiguous — the utterance plausibly matches two projects and there's no signal in recent history — **ask, don't guess**. Emit an `ambiguous: true` JSON payload (see Output contract) with a one-sentence question. Do not propose any writes in that case.
 
-- **State** (where are we, what's next) → tracker. 1–3 sentences max per entry.
-- **Reasoning** (why, how, plan) → strategy doc.
-- **Content** (creative direction, research, sourced data, concepts) → reference doc (user-owned).
+## 2. Decide what to write
 
-If the user's input is a mix, split it — substance goes to the right doc, tracker gets a one-line pointer. The test: if a tracker entry would still be useful in 3 months, it doesn't belong there.
+Based on the match, propose one or more of these row operations:
 
-## 4. Read and update the tracker
+- **`update_todo`** — flip a todo to `done: true` when the user named a completed item that maps to an existing todo in `projects.todos`. Use the todo's `id` (from input), not its position.
+- **`insert_entry`** — append a row to `entries` with `kind='journal'`, `source='voice'` (or `'text'` if the input flags text origin), `body_markdown` = the user's words verbatim, and `links: { project_id, goal_id? }` to soft-link the entry to the matched project and (if applicable) goal.
+- **`update_project`** — adjust `projects.body_markdown` only when the user explicitly says the project's state changed in a way a todo flip can't express ("project's done", "parking this for now"). Set `status` to `'done'` or `'parked'` accordingly. Otherwise leave the project row alone.
 
-For each project identified: resolve its tracker path from `life-ops-config.md` Projects section. Read the tracker. Update:
+### When to write what
 
-- Check off completed items (`- [ ]` → `- [x]` with a brief completion note).
-- Update the Status block (Phase, Status indicator, Last, Next) if a phase or status changed.
-- Append to the Log section (newest at top) with today's date heading.
-- Note new blockers. If a blocker cleared, note what unblocked it.
-- Preserve the tracker's existing structure — never reorganize.
+- **Single completed todo** ("I finished the auth migration" → matches a todo titled "auth migration"): `update_todo` only. Don't double-log to `entries` for routine todo flips — that's noise.
+- **Work session note without a matching todo** ("worked on positioning for two hours, landed on 'agent-native life-ops'"): `insert_entry` only. The work happened; nothing to flip.
+- **Both** ("finished the positioning decision — going with agent-native"): both — flip the matching todo AND insert the entry capturing the user's framing.
+- **Whole project shifts state** ("alright, parking the design system port"): `update_project` with `status='parked'`. Add an `insert_entry` if the user gave a reason worth keeping.
 
-**What goes in the log:** one-line state entries per the one-liner rule — project-relevant fact, no sub-bullets, no multi-sentence write-ups.
+## 3. Use the user's words
 
-## 5. Sync the Command Center
+When you draft `body_markdown` for an `insert_entry`, paste the user's utterance with light spelling/grammar edits only. Never paraphrase or reframe. The whole point of journal entries is they sound like the user, not the agent.
 
-Update the project's row in `Ops Plan.md` Project Dashboard:
+## 4. Output contract — JSON tail (load-bearing)
 
-- Status indicator (🔴 / 🟡 / 🟢 / ⚪) if state changed.
-- Status text to reflect the new state.
-- Next Action to reflect what comes next (pull from the tracker's Status: Next field).
-- Last Updated date.
+Your response has two parts:
 
-Update `Last synced:` at the top of `Ops Plan.md` with today's date and this skill name.
+1. A short conversational confirmation — 1–2 sentences, naming the matched project and what's being recorded. Examples below.
+2. A single fenced ```json block as the last thing in the message, containing the structured intent the UI will apply. Always emit the JSON block, even when nothing is being written (empty `updates` array + `ambiguous: true`).
 
-## 6. Strategy sync check
+The JSON shape:
 
-Read the project's Strategy.md (path from `life-ops-config.md`). Check whether the tracker still aligns with current strategy. Look for:
+```json
+{
+  "updates": [
+    {
+      "table": "projects",
+      "op": "update_todo",
+      "project_id": "<uuid from input>",
+      "todo_id": "<uuid from input>",
+      "set": { "done": true }
+    },
+    {
+      "table": "entries",
+      "op": "insert",
+      "data": {
+        "kind": "journal",
+        "body_markdown": "<user's words>",
+        "source": "voice",
+        "links": { "project_id": "<uuid from input>" }
+      }
+    },
+    {
+      "table": "projects",
+      "op": "update",
+      "project_id": "<uuid from input>",
+      "set": { "status": "parked" }
+    }
+  ],
+  "matched_project": { "id": "<uuid>", "title": "<string>" },
+  "ambiguous": false,
+  "confirmation": "Got it — marked the auth migration done on Intently."
+}
+```
 
-- Tracker tasks referencing a direction the strategy has moved away from.
-- Strategy priorities with no corresponding tracker tasks.
-- Status or phase labels contradicting the strategy's current state.
-- Tracker next-steps that the strategy has deprioritized or dropped.
+Field rules:
 
-**If you find drift:** don't silently fix it. Surface as a question, not a correction:
+- `updates` — array of operations. Empty when `ambiguous: true` or when nothing applies. Each entry has a `table` (`projects` | `entries` | `goals`), an `op`, the relevant ids, and either a `set` (for updates) or `data` (for inserts).
+- Allowed `op` values: `update_todo`, `update`, `insert`. Use `update_todo` when flipping a single JSONB todo on `projects`; the UI will read-modify-write the array using `todo_id`.
+- `matched_project` — the project the utterance was attributed to, or `null` when the utterance didn't tie to any project.
+- `ambiguous` — `true` only when you're asking the user to clarify. When `true`, `updates` MUST be empty and `confirmation` should be the disambiguation question.
+- `confirmation` — the 1–2 sentence acknowledgement. Mirrors the conversational text above the JSON block. Names the project + what changed.
 
-> "I noticed the tracker still has tasks for [old direction], but your strategy doc shows you pivoted to [new direction]. Want me to update the tracker to reflect that?"
+## 5. Out of scope
 
-If the user confirms, update. If unsure, leave and note it for next session.
+This skill **only** records what the user already did. It does not:
 
-If no Strategy.md exists or it's empty, skip this step for that project — don't block on a missing file.
+- Plan future work or propose next actions (that's daily-brief).
+- Suggest priority changes or critique progress (that's daily-review).
+- Reorganize `projects.body_markdown` or restructure todos (that's manual).
+- Decline a clear update by demanding more context. If you have enough to match, write.
 
-## 7. Confirm
+If the user's utterance is a question, a request for advice, or planning ("what should I work on next?", "help me think through the positioning"): emit an empty `updates` array, set `ambiguous: false`, and put a short reply in `confirmation` redirecting them ("That sounds like a planning question — want me to pull up the brief?"). The UI treats no-op responses as conversational.
 
-Brief conversational confirmation:
+## 6. Examples
 
-> "Got it — marked positioning done in the tracker, Ops Plan now shows the website project as 🟢 ready to ship."
+**Clear match → todo flip + entry**
 
-If the sync check found issues, mention them here — as a question, not a lecture. Keep it short.
+User: "Finished the auth migration on Intently — surprisingly clean once Supabase RLS clicked."
+
+Conversational text: "Got it — marked the auth migration done on Intently and saved that note."
+
+JSON tail (abbreviated):
+```json
+{
+  "updates": [
+    { "table": "projects", "op": "update_todo", "project_id": "P1", "todo_id": "T7", "set": { "done": true } },
+    { "table": "entries", "op": "insert", "data": { "kind": "journal", "body_markdown": "Finished the auth migration on Intently — surprisingly clean once Supabase RLS clicked.", "source": "voice", "links": { "project_id": "P1" } } }
+  ],
+  "matched_project": { "id": "P1", "title": "Intently" },
+  "ambiguous": false,
+  "confirmation": "Got it — marked the auth migration done on Intently and saved that note."
+}
+```
+
+**Ambiguous → ask**
+
+User: "Wrapped up the polish stuff." (Two active projects both have polish todos.)
+
+```json
+{
+  "updates": [],
+  "matched_project": null,
+  "ambiguous": true,
+  "confirmation": "Sounds like that might be the Intently polish or the Design System polish — which one?"
+}
+```
+
+**Work happened, no matching todo → entry only**
+
+User: "Spent an hour on positioning for the landing page — landed on 'agent-native life-ops'."
+
+```json
+{
+  "updates": [
+    { "table": "entries", "op": "insert", "data": { "kind": "journal", "body_markdown": "Spent an hour on positioning for the landing page — landed on 'agent-native life-ops'.", "source": "voice", "links": { "project_id": "P2" } } }
+  ],
+  "matched_project": { "id": "P2", "title": "Landing Page" },
+  "ambiguous": false,
+  "confirmation": "Logged the positioning note on Landing Page."
+}
+```
 
 ## Important notes
 
-- **This skill updates trackers, syncs the Command Center, checks strategy alignment.** It does not do project work, research, or planning.
-- **Preserve tracker structure.** Update within the existing format — don't restructure sections.
-- **When in doubt, ask.** A wrong update is worse than a quick clarifying question.
-- **Multiple projects in one session are fine.** Update all affected trackers and Command Center rows.
-- **Never paraphrase the user's description of what was done.** Light edits for grammar; otherwise their words.
-
-## First-run handling
-
-If `first_run_complete: false` and no projects exist yet in `life-ops-config.md`, respond: "No projects set up yet — want to run setup to capture what you're working on?" Do not attempt to update anything.
+- **Use ids from input.** Never make up `project_id` or `todo_id` values. If the input has no project that matches, return an empty `updates` array.
+- **Never paraphrase user words.** When `body_markdown` captures their utterance, use their language. Light edits only.
+- **No silent reframing.** If the user gave a status change you're applying, the conversational text says so plainly.
+- **Brief confirmation.** One or two sentences. The user's already moving on.
