@@ -1,184 +1,99 @@
-# Launch Plan — Built with Opus 4.7 Hackathon
+# Launch Plan — Intently (post-hackathon)
 
-**Submission deadline:** 2026-04-26, 8:00 PM EDT.
-**Days remaining as of creation:** 3 (Thu → Sun).
+**Status:** post-submission. Hackathon shipped 2026-04-26 with the "1 flow done well" demo bar. This doc is now re-targeted at the **real working app** bar, not the demo-video bar.
 
-**What this doc is:** the **durable sanity check** for "what does shipped mean." Slow-changing. Reviewed when scope feels off. TRACKER.md is the hot queue (what to do next); this is the slow doc (what done looks like).
+**What this doc is:** the **durable sanity check** for "what does shipped mean." Slow-changing. Reviewed when scope feels off. `TRACKER.md` is the hot queue (what to do next); this is the slow doc (what done looks like). When this doc and TRACKER drift, fix this first, then re-order TRACKER.
 
-**Source material:**
-- `docs/hackathon/` — the rules and restrictions (submission deliverables, asset policy, judging criteria)
-- `docs/product/vision.md` — why we're building
-- `docs/design/app-experience.md` — UX direction
-- `docs/architecture/managed-agents-event-topology.md` + `managed-agents-tool-use-scheduling.md` — MA integration facts from 2026-04-23 Michael Cohen session
+**Doc hierarchy:** `launch-plan.md` (strategy, slow) → `TRACKER.md` (queue, hot) → `.claude/inbox/` (un-groomed captures) → `.claude/handoffs/<slug>.md` (project depth, persistent) → `docs/product/acceptance-criteria/` (done-definition).
 
 ---
 
-## The 3 mandatory deliverables (hackathon rule)
+## The current bar — "real working app," not "1 flow"
 
-All due 2026-04-26, 8:00 PM EDT:
+**Done means:** every interactive element in the deployed prototype design is logically wired through to data, every visible state implies a model + a binding + a reuse story, and a stranger can open the app, set themselves up, and use it day-over-day without finding stub handlers, hardcoded literals, or dead-end interactions.
 
-1. **3-minute demo video.** Hard cap. YouTube/Loom/similar.
-2. **Public GitHub repo link.** With `README.md`, `LICENSE`, `THIRD_PARTY_LICENSES.md`.
-3. **Written summary.** 100–200 words.
+This supersedes the hackathon demo bar (*"one flow done well beats three half-working"*). That framing was correct for a 3-day sprint. It is now actively misleading and should not be cited as scope cover for shipping incomplete surfaces post-hackathon.
 
-Submit via: https://cerebralvalley.ai/e/built-with-4-7-hackathon/hackathon/submit
+### What that means in practice
 
-Nothing beyond these three is required. Everything else is optional polish.
+1. **Every interaction in the prototype is wired or explicitly deferred with a TRACKER row.** No `onClick={() => {}}` shipped silently; no "Continue this conversation" buttons with no handler; no edit affordances that don't edit. The wiring-audit handoff (`/groom`-pending) catalogs and decides per-element. Any new interactive element added to the codebase ships with its wiring or a documented stub-with-TODO referencing TRACKER.
+2. **Every visible state has a single source of truth.** No three-implementations-of-an-avatar with three different hardcoded letters. Identity components read from a shared user context. Goal cards, project cards, journal entries reuse the same presentation primitive across surfaces. Tokens already work this way; presentation components and identity bindings catch up.
+3. **A real user can become a real user.** Anon-first onboarding (Supabase anon auth → setup → use the app), with optional account upgrade via `linkIdentity()`. Setup intakes enough state for day-1 brief to be useful, not just 3 goal titles.
+4. **Sam lives embedded on the landing page itself.** The deployed URL becomes a marketing-style landing page (hero copy, "what this is," "what it does for you") with the prototype **embedded directly into the page** — a clickable interactive Sam-driven demo running inline, the way some product sites embed a working prototype right on `/`. The "try it for yourself" CTA on that page leads into the real anon-auth → setup → use flow. One URL, two surfaces (marketing + real app), shared bundle, with the demo as a scoped component or iframe inside the marketing page.
+5. **The agent loop is genuinely agentic.** Scheduled fires (daily-brief at the user's time, daily-review, weekly, monthly) actually invoke the agent, not just log to `cron_log`. Auto-collect (real Google OAuth for calendar + email) and auto-sort (the noticing layer) make ambient capture work.
+6. **Cognition is verified, not just hand-tested.** A spawn-fresh-anon-user + time-travel-clock harness asserts day-N brief references day-(N-1) review and runs in CI. The cognition layer's value compounds; its guarantees should compound too.
 
----
+### What "real working app" does NOT mean (still scope-cut)
 
-## Judging weights (for prioritization)
-
-- **Impact 30%** — real-world potential, problem-statement fit
-- **Demo 25%** — does it hold up, cool to watch
-- **Opus 4.7 creative use 25%** — beyond basic integration, surprising use
-- **Depth & execution 20%** — past first idea, sound engineering
-
-Problem statement we're fitting: **"Build From What You Know."** Muxin's personal Life Ops system → mobile app for non-technical users.
-
-Separate **Managed Agents $5K prize** — worth targeting via natural fit (scheduled daily/weekly agents). Judging angle: *"hand off meaningful, long-running tasks — not just a demo."*
+- **Multi-user team features** — single-user dogfood per ADR 0002 still holds. Account upgrade gives a user durable identity; it does not introduce sharing, teams, or cross-account features.
+- **Mobile-native app** — web-only per ADR 0004 (supersedes 0003). PWA / home-screen-add is fine; native shells deferred.
+- **Web push notifications** — explicitly deferred per Muxin 2026-04-25 evening. Scheduled agents fire and write to DB; user sees on next open.
+- **All originally-deferred skills** (daily-triage, project-continue, session-digest, vault-drift-check, notes-action-sync) — locked-cut per the hackathon ADRs unless re-promoted via grooming. monthly-review is in scope (un-deferred 2026-04-25).
 
 ---
 
-## MVP Demo Bar (minimum for the video)
+## The handoff map — what done looks like in pieces
 
-The 3-minute demo must convincingly show these four things. Anything beyond is stretch, not required.
+The current bar above is realized through the following multi-session handoffs. Each one is in `.claude/handoffs/<slug>.md` and registered (or pending registration) in TRACKER § Active handoffs. **Recommended execution order:**
 
-### 1. One demo flow working end-to-end
+1. **`wiring-audit`** — first. Enumerates every interactive element in the prototype, decides per-element (wire / defer / reject), folds rows into the other handoffs. Without this, the rest ships piecemeal.
+2. **`cognition-verification-harness`** — second, in parallel with audit if capacity allows. Spawn-fresh-anon-user + time-travel + assert. Once this exists, every other change is verified end-to-end.
+3. **`new-user-ux-and-auth`** — third. Anon-first onboarding, real setup expansion (re-scope from 3-goals-only to full intake), `linkIdentity()` upgrade, shared `<Avatar>` component, `display_name` parameterization. The "make it usable for a stranger" thread.
+4. **`sam-demo-on-landing-page`** — fourth (or in parallel with #3, since Sam's data layer is the same Supabase tables). Build a marketing-style landing page that **embeds Sam's interactive prototype inline on the page itself** (not a separate URL). Populate Sam's database to cover every interactive surface comprehensively. Wire a "try it for yourself" CTA that leads into the real anon-auth experience. The "the front door is a landing page that lets visitors play with Intently before signing up" thread.
+5. **`oauth-calendar-email`** — fifth. Real Google OAuth replacing the `setTimeout` mock; pulls into `calendar_events` + `email_flags`. Makes brief content concrete instead of abstract.
+6. **`scheduled-agent-dispatch`** — sixth. Apply `0002_schedules.sql` and extend `tick_skills()` to actually invoke the agent. Makes the agentic value prop real.
+7. **`agent-noticing-layer`** — seventh (V1.1). Pulls signal from chat/voice as the user uses the app; auto-routes to the right table. Promoted from V1.1-deferred this session.
 
-At least ONE of daily-brief / daily-review / weekly-review running a real Managed Agent against seed data and rendering output in the mobile UI. One done well beats three half-working.
-
-**Priority order:**
-- **Daily-brief** first (most compelling "wake up and see your morning" moment)
-- **Daily-review** second (back-to-back with brief shows the time arc)
-- **Weekly-review** stretch
-
-### 2. Real Managed Agents usage
-
-Not simulated. An actual `POST /v1/sessions` → `session.status_idle` event loop. Must be visible in demo as "the agent is thinking" → "here's what it produced." (Per MA event topology doc.)
-
-### 3. One "synthesis" moment that reads as memory
-
-Something that feels like the model noticed context — e.g., "based on yesterday's journal mention of fatigue, the brief opens with a check-in question." Opus 4.7 doing something surprising. Not just API calls — a **beat that lands on camera**.
-
-### 4. Mobile UI showing agent work
-
-The three-screen swipe shell (Past / Present / Future) rendering at least ONE agent-produced card. Visible on screen during video. Polish optional; presence mandatory.
-
-### Explicit non-requirements for MVP
-
-These are stretch, not bar. Skip if time-pressed:
-- All three demo flows end-to-end
-- Voice input (text input fine)
-- Perfect visual polish
-- Multi-user (V1 is single-user per ADR 0002)
-- Calendar / Gmail OAuth (seed data is enough for demo)
-- Full Hindsight self-host on Fly
+Other parked-or-archived handoffs at `.claude/handoffs/` — `entries-architecture` (deferred), `critical-flow-check` (gated on cognition-verification-harness), `overnight-build-loops` (active infrastructure), `capture-groom-execute` (workflow infra, shipped), `real-app-cognition` (10/11 shipped + #24 declined; pattern preserved), `steward-redesign` / `ma-agents-complete` / `decision-drift-check` (shipped, kept for pattern).
 
 ---
 
-## Milestones (3-day critical path)
+## Locked decisions — don't re-litigate
 
-Hot work tracked in TRACKER.md. This section is the rollup. When milestones drift, re-read this doc first.
+These remain locked from the hackathon ADRs:
 
-### Thursday 2026-04-23 — Managed Agents path cleared ✅
+- **Stack:** plain React 18 + Babel-standalone + Supabase + Managed Agents · Bitwarden Secrets Manager when scale demands it. Web-only. (ADR 0004, supersedes 0003.)
+- **Managed Agents = runtime, not state.** State of truth = Supabase rows post-cognition. (ADR 0001.)
+- **Single-user V1.** Anonymous Supabase auth with optional account upgrade (anon-first per the new-user-ux-and-auth handoff). Multi-user team features deferred. (ADR 0002.)
+- **Secrets:** Supabase env / Vault. BWS deferred until multi-user / scale. (ADR 0005.)
+- **Autonomy default — act, don't ask.** (CLAUDE.md, PR #71.)
+- **Three-screen swipe shell semantics.** Past = completed reviews. Present = today's brief + plan. Future = goals + monthly slice.
+- **Cognition input cap ~3.4K tokens at our scale; below Opus 4.7's 4K cache minimum.** Prompt caching declined per ADR rationale (real-app-cognition handoff #24).
 
-- [x] Michael Cohen MA session attended
-- [x] MA architecture docs written (`docs/architecture/managed-agents-*.md`)
-- [x] Agent-runner base, seed data, design tokens, judge scorer, app README, npm audit CI all merged
-- [x] Parallel-tracks workflow operational (tracks now auto-merge on green CI)
-- [x] Branch-first enforcement + launch plan + doc-map check landed
+New decisions made post-hackathon (will be ADR'd as they execute):
 
-### Friday 2026-04-24 — Agent → UI wiring (daily-brief live) ✅
-
-- [x] Web pivot: Expo Web target shipped; PagerView swap; Vercel deploy at https://intently-eta.vercel.app
-- [x] ma-proxy deployed with correct MA API schema (3 empirical fixes)
-- [x] daily-brief MA agent created in console; live Opus 4.7 synthesis confirmed on-camera
-- [x] Infinite swipe rotation (21-slot repeat pattern)
-- [x] All 5 MA agent configs shipped as JSON (PR #69)
-- [x] First eval dataset for daily-brief authored (`evals/datasets/daily-brief/`)
-
-### BUILD DAY — wire all remaining skills end-to-end
-
-Scope change: no "polish Saturday." Today is pure build. Functionality first, polish only if layered on without blocking record.
-
-- [ ] **Design-folder classification** (~20 min) — `docs/design/Intently - App/` structural vs cosmetic; bake structural in, defer cosmetic
-- [ ] **daily-review** wired — MA agent created, secret set, fetch pattern matches daily-brief
-- [ ] **weekly-review** wired — second synthesis beat, Sunday-reflection pattern
-- [ ] **update-tracker** wired — demonstrates state-mutation loop
-- [ ] **setup** wired (or verified seed-data-only path is demo-sufficient)
-- [ ] Video narrative bullets captured (user is drafting script in parallel in a separate section)
-- [ ] Smoke-test every wired flow end-to-end once against seed data
-
-### RECORD DAY — demo takes + submission prep
-
-- [ ] Test full demo flow on browser with seed data, any-device
-- [ ] 2–3 practice cuts of the 3-min demo
-- [ ] `THIRD_PARTY_LICENSES.md` generated + committed (`npx license-checker --production --csv > third-party.csv`)
-- [ ] README rewrite with demo narrative + MA story
-- [ ] Draft the 100–200 word submission summary
-
-### Sunday 2026-04-26 — Submit
-
-- [ ] Final demo video recording (3-min hard cap) if not finalized on record day
-- [ ] Written summary finalized (100–200 words)
-- [ ] Public repo verified: README, LICENSE, THIRD_PARTY_LICENSES present
-- [ ] Submit via Cerebral Valley platform
-- [ ] **Submit by 8:00 PM EDT (7:00 PM CDT)**
-
-Post-hackathon: repo can be made private after judging completes (Apr 28), per hackathon rules.
+- **Sam-as-embedded-demo on the landing page.** The deployed URL is a marketing-style landing page; Sam's interactive prototype runs **embedded inline** on that page. Visitors play with Sam's fully-populated state directly on `/`; a CTA on the same page leads them into the real anon-auth → setup → use flow.
+- **Anon-first auth with `linkIdentity()` upgrade.** Real users start anonymous; account upgrade preserves uid + data without migration.
+- **Wiring inventory is the source of truth.** Every interactive element catalogued; stub handlers caught by lint.
 
 ---
 
-## How TRACKER.md rolls up here
+## What shipped in the hackathon (historical)
 
-TRACKER stays the hot queue (what to do today, what's blocked, what just merged). This file is the slow sanity check (is TRACKER aimed at the right horizon). If TRACKER's "Next" order stops matching the milestone labels above, fix launch-plan first, then re-order TRACKER.
+For reference. The hackathon submission cleared the original demo bar:
 
----
+- **2026-04-26:** 13 PRs (#136–#152) closed the cognition backlog (10 of 11 shipped; #24 declined with documented math) + the real-app shell. `intently-eta.vercel.app` live with voice→chat, brief/review wired to live agent reading goals/projects/journal/calendar/email/reminders/yesterday's-review, weekly+monthly review UI, setup flow, AddZones persisting, hydration on mount, input traces, Undo on writes. Cross-day continuity verified.
+- **2026-04-25 evening:** 5 PRs (#111–#115) wired voice + brief/review against the inherited prototype.
+- **2026-04-25:** All 6 MA agents provisioned. Anthropic key consolidated/rotated.
+- **2026-04-24:** Web pivot + first live Opus 4.7 brief.
+- **2026-04-23:** Parallel-tracks workflow + agent-runner base + evals + design tokens + seed data.
+- **2026-04-22:** Supabase schema + Expo scaffold + ADRs 0001/0002/0003.
 
-## Locked cuts — don't re-litigate
-
-All of these have been decided. Don't redebate in-scope during the next 3 days.
-
-- 5 deferred skills (daily-triage, project-continue, session-digest, vault-drift-check, notes-action-sync) — per ADR and `docs/backlog/deferred-features.md`. **monthly-review is back in scope** (un-deferred 2026-04-25): MA agent provisioned, demo arc now covers it alongside daily/weekly review.
-- Hindsight self-hosted on Fly — no bandwidth; skip entirely
-- Multi-user isolation — single-user dogfood per ADR 0002
-- Full preferences conversation in setup — defaults-only per SKILL.md V1 cut (5 items annotated)
-- Kanban / Gantt / gamification / somatic exercises / game reskinning — all backlog
-- MA **Outcomes** rubric (research preview, not public) — use `docs/process/definition-of-done.md` as prompt-based substitute
-- MA **multi-agent coordination** (research preview) — build skills, not sub-agents, per MA session guidance
+The 3 mandatory hackathon deliverables (3-min demo video, public GitHub repo, written summary) were submitted by the deadline. Repo can be made private after Apr 28 per hackathon rules; current decision is to keep it public.
 
 ---
 
-## Opus 4.7 creative-use angles (for demo + 25% of judging)
+## Asset policy — durable
 
-From hackathon notes (`docs/hackathon/Hackathon Kickoff and Rules.md`):
+All assets must be OSS or owned-by-us:
 
-- **Synthesis moments** — morning briefing that ties yesterday's journal + today's calendar + project state into a coherent narrative. Not summary; insight.
-- **Model-tiered architecture** — Opus for reasoning-heavy synthesis (brief, review, pattern recognition); Sonnet for extraction / tagging / routing; Haiku for tiny classifiers. Demonstrates thoughtful use of the model lineup.
-- **Memory moment** — agent connects two things across time: "based on how the Zane call went last week, open with X today." That's the demo beat that lands.
-
----
-
-## Asset policy (hackathon rule)
-
-All demo assets must be OSS or owned-by-us:
-
-- **Icons:** Lucide (ISC) — already bundled via `lucide-react-native`
-- **Fonts:** Fraunces, Source Serif 4, Inter, JetBrains Mono — all Google Fonts (OFL), already wired via `@expo-google-fonts/*` in PR #26
-- **Images/illustrations:** any in `docs/design/references/` are fine (stored with per-folder notes); user-generated + Claude/Midjourney generated are acceptable for demo
-- **Sound/voice:** if voice input shown, use owned/generated audio — no licensed music
-
-No Figma/Notion exports carrying proprietary design assets.
+- **Icons:** Lucide (ISC).
+- **Fonts:** Fraunces, Source Serif 4, Inter, JetBrains Mono — all Google Fonts (OFL).
+- **Images/illustrations:** owned, generated, or OSS-licensed only. No proprietary design assets in committed paths.
+- **Sound/voice:** owned/generated audio only.
 
 ---
 
-## Visibility plays (Anthropic office hours, not required)
+## How TRACKER rolls up here
 
-Claude Code team judges. Presence = recall. Not critical path but worth showing up for:
-
-- Attend remaining AMAs (Fri, Sun sessions listed in hackathon schedule)
-- Drop into office hours 5–6 PM EDT daily
-- Post thoughtful questions in `#office-hours` channel
-
-Do these while things are building on parallel tracks — no context-switch cost.
+TRACKER is the hot queue (what's in flight today, what just merged, what's blocked). This file is the slow sanity check (is the queue aimed at the right horizon). If TRACKER's "Next" order stops matching the handoff execution order above, fix this doc first, then re-order TRACKER.
