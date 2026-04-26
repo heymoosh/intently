@@ -67,6 +67,41 @@
 
 **Does NOT auto-edit `CLAUDE.md`.** Trim is a decision; this pass is advisory.
 
+## Pass 3 — workflow integrity invariants (capture/groom/execute)
+
+**Why:** Pass 1 catches missed decisions; Pass 2 catches CLAUDE.md bloat; this pass catches drift in the capture/groom/execute workflow's cross-skill invariants from `.claude/handoffs/capture-groom-execute.md` § Integrity invariants. Skill internals enforce per-action; this pass catches drift between actions.
+
+**Inputs:**
+- `.claude/inbox/*.md` (current inbox state)
+- `TRACKER.md` § Active handoffs rows
+- `.claude/handoffs/*.md` files
+- `docs/product/acceptance-criteria/*.md` files
+- `docs/decisions/*.md` files
+- `git log` for recently shipped items
+
+**Invariants to verify:**
+
+1. **Handoff ↔ TRACKER row consistency.** Every TRACKER § Active handoffs row points at a real `.claude/handoffs/<slug>.md` file (and vice versa: every handoff doc has a TRACKER row, unless explicitly archived/shipped per its own status).
+
+2. **AC for shipped non-trivial items.** Every shipped non-trivial task (per recent merged PRs) has AC at an appropriate location per the AC location matrix:
+   - Skill task → `docs/product/acceptance-criteria/<skill>.md` has an entry
+   - Multi-session handoff → handoff has an "Acceptance criteria" section
+   - Standalone task → AC was inline in TRACKER row at execution time (look at the PR description's `## Acceptance criteria` checklist)
+   - Cross-cutting infra → AC in handoff or `docs/product/acceptance-criteria/<topic>.md`
+
+3. **Active decisions ↔ ADR consistency.** Every TRACKER "Active decisions" row points at a non-superseded ADR in `docs/decisions/`. Superseded ADRs should have a banner; the TRACKER row should point at the newest non-superseded.
+
+4. **Stale inbox files.** Any `.claude/inbox/*.md` file with mtime older than N days (default N=7) is flagged as stale. Rotting captures = grooming debt; the user should be prompted to /groom or reject.
+
+**Failure modes the loop should report (do NOT auto-fix):**
+- Orphan handoff (file exists, no TRACKER row)
+- Dangling TRACKER row (row points at missing handoff file)
+- Shipped item without AC entry
+- Stale ADR ref (TRACKER row points at superseded ADR)
+- Stale inbox file (>N days old)
+
+**Append findings** to the same `routine-output/decision-drift-<YYYY-MM-DD>.md` under a `## Workflow integrity — drift candidates` heading. Same advisory posture: this pass is "review this," not auto-corrective.
+
 ## What this loop does NOT do
 
 - Does not block sessions or hooks.

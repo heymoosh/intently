@@ -37,3 +37,5 @@ Intently is an agent-native life-ops tool: scheduled managed agents do recurring
 **Propose `/handoff` at kickoff** when (a) goal stated, (b) at least one non-trivial decision with rationale, AND (c) work is plausibly multi-session or multi-file. Skip for quick fixes / single-PR work / exploratory chats. **Update inline** as decisions land mid-session; **re-distill** via `/handoff` at session-end. **Continue, don't duplicate** — if a slug already exists in `.claude/handoffs/`, update it.
 
 **Branch + PR standards:** see `CONTRIBUTING.md`.
+
+**Capture / groom / execute workflow.** `/capture` writes `.claude/inbox/<slug>.md` (or auto-drop during discussion); `/groom` walks the inbox into TRACKER + AC + handoffs; `/work-next` executes top of § Next, refusing ungroomed items. Spec: `.claude/handoffs/capture-groom-execute.md`.
