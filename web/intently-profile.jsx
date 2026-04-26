@@ -361,15 +361,134 @@ function ToggleRow({ label, sub, prefKey, defaultOn = false, last }) {
   );
 }
 
+// ─── SAVE ACCOUNT CTA + MODAL ────────────────────────────────────────
+function SaveAccountCta({ onClick }) {
+  return (
+    <button onClick={onClick} style={{
+      width: '100%', padding: '14px 18px',
+      background: T.color.AccentSurface || '#1A1A1A',
+      border: `1.5px solid ${T.color.AccentLine || '#333'}`,
+      borderRadius: 14, cursor: 'pointer',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      marginBottom: 18,
+    }}>
+      <div style={{ textAlign: 'left' }}>
+        <div style={{
+          fontFamily: T.font.UI, fontSize: 14, fontWeight: 700,
+          color: T.color.PrimaryText,
+        }}>Save your account</div>
+        <div style={{
+          fontFamily: T.font.Reading, fontSize: 12, color: T.color.SupportingText,
+          marginTop: 2,
+        }}>Add an email so you don't lose your data</div>
+      </div>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={T.color.PrimaryText} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="m9 18 6-6-6-6"/>
+      </svg>
+    </button>
+  );
+}
+
+function SaveAccountModal({ onClose }) {
+  const [email, setEmail] = React.useState('');
+  const [message, setMessage] = React.useState('');
+  const [sending, setSending] = React.useState(false);
+
+  const handleSave = async () => {
+    if (!email.trim()) { setMessage('Please enter an email address.'); return; }
+    setSending(true);
+    setMessage('');
+    try {
+      const { error } = await window.getSupabaseClient().auth.linkIdentity({
+        provider: 'email',
+        email: email.trim(),
+        options: { emailRedirectTo: window.location.origin },
+      });
+      if (error) { setMessage('Could not save: ' + error.message); }
+      else { setMessage('Check your email — we sent a magic link to claim this account.'); }
+    } catch (e) {
+      setMessage('Could not save: ' + e.message);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 9999,
+      background: 'rgba(0,0,0,0.55)',
+      display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+    }} onClick={onClose}>
+      <div style={{
+        width: '100%', maxWidth: 480,
+        background: T.color.PrimarySurface,
+        borderRadius: '20px 20px 0 0',
+        padding: '28px 24px 36px',
+        boxShadow: '0 -4px 24px rgba(0,0,0,0.18)',
+      }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+          <div style={{ fontFamily: T.font.UI, fontSize: 17, fontWeight: 700, color: T.color.PrimaryText }}>
+            Save your account
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.color.SupportingText, padding: 4 }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 6 6 18M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+        <div style={{ fontFamily: T.font.Reading, fontSize: 14, color: T.color.SupportingText, marginBottom: 20 }}>
+          Enter your email and we'll send a magic link. Click it to claim this account permanently — your data stays intact.
+        </div>
+        <input
+          type="email"
+          placeholder="you@example.com"
+          value={email}
+          onChange={e => setEmail(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleSave()}
+          style={{
+            width: '100%', boxSizing: 'border-box',
+            padding: '12px 14px', borderRadius: 10,
+            border: `1.5px solid ${T.color.EdgeLine}`,
+            background: T.color.SecondarySurface,
+            fontFamily: T.font.Reading, fontSize: 15, color: T.color.PrimaryText,
+            outline: 'none', marginBottom: 12,
+          }}
+        />
+        {message && (
+          <div style={{
+            fontFamily: T.font.Reading, fontSize: 13,
+            color: message.startsWith('Check') ? '#2A7A2A' : '#A8421C',
+            marginBottom: 12, lineHeight: '18px',
+          }}>{message}</div>
+        )}
+        <button onClick={handleSave} disabled={sending} style={{
+          width: '100%', padding: '13px 0',
+          background: sending ? T.color.SecondarySurface : T.color.PrimaryText,
+          color: sending ? T.color.SupportingText : T.color.PrimarySurface,
+          border: 'none', borderRadius: 10, cursor: sending ? 'default' : 'pointer',
+          fontFamily: T.font.UI, fontSize: 15, fontWeight: 700,
+        }}>
+          {sending ? 'Sending…' : 'Send magic link'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function AccountPage({ onBack }) {
   // Same profile context as ProfileSheet — name/email come from the
   // single source. Anonymous users see '—' until setup/account-upgrade
   // populate them.
-  const profile = window.useUserProfile ? window.useUserProfile() : { displayName: null, email: null };
+  const profile = window.useUserProfile ? window.useUserProfile() : { displayName: null, email: null, isAnonymous: true };
+  const [saveModalOpen, setSaveModalOpen] = React.useState(false);
   const nameLabel = profile.displayName || '—';
   const emailLabel = profile.email || '—';
   return (
     <SettingsSubPage title="Account." eyebrow="Profile · Account" onBack={onBack}>
+      {saveModalOpen && <SaveAccountModal onClose={() => setSaveModalOpen(false)} />}
+      {profile.isAnonymous && (
+        <SaveAccountCta onClick={() => setSaveModalOpen(true)} />
+      )}
       <div style={{
         background: T.color.SecondarySurface,
         border: `1px solid ${T.color.EdgeLine}`,
