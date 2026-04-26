@@ -358,6 +358,61 @@ async function listRecentObservations({ sinceHours } = {}) {
   return data || [];
 }
 
+// ─── Life Areas ─────────────────────────────────────────────────────────────
+
+async function insertLifeArea({ name, description, glyph, palette, goal_id, slug } = {}) {
+  const row = { user_id: (await _userId()), name };
+  if (description != null) row.description = description;
+  if (glyph != null) row.glyph = glyph;
+  if (palette != null) row.palette = palette;
+  if (goal_id != null) row.goal_id = goal_id;
+  if (slug != null) row.slug = slug;
+  const { data, error } = await _client()
+    .from('life_areas')
+    .insert(row)
+    .select()
+    .single();
+  if (error) _throw('insertLifeArea', error);
+  return data;
+}
+
+async function listLifeAreas({ archived = false } = {}) {
+  let q = _client()
+    .from('life_areas')
+    .select('*')
+    .eq('user_id', (await _userId()))
+    .order('position', { ascending: true, nullsFirst: false });
+  if (!archived) {
+    q = q.is('archived_at', null);
+  }
+  const { data, error } = await q;
+  if (error) _throw('listLifeAreas', error);
+  return data || [];
+}
+
+async function archiveLifeArea(id) {
+  const { data, error } = await _client()
+    .from('life_areas')
+    .update({ archived_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('user_id', (await _userId()))
+    .select()
+    .single();
+  if (error) _throw('archiveLifeArea', error);
+  return data;
+}
+
+async function getLifeArea(id) {
+  const { data, error } = await _client()
+    .from('life_areas')
+    .select('*')
+    .eq('id', id)
+    .eq('user_id', (await _userId()))
+    .single();
+  if (error) _throw('getLifeArea', error);
+  return data;
+}
+
 Object.assign(window, {
   insertGoal,
   listGoals,
@@ -379,4 +434,9 @@ Object.assign(window, {
   insertObservation,
   incrementObservation,
   listRecentObservations,
+  // life areas
+  insertLifeArea,
+  listLifeAreas,
+  archiveLifeArea,
+  getLifeArea,
 });
