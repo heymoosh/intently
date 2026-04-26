@@ -578,12 +578,39 @@ function BriefFlow({ onClose, onComplete }) {
   const showConfirm = s && s.confirm && !agentTyping && liveBriefReady;
   const showBriefThinking = s && s.confirm && !agentTyping && briefLoading;
 
-  const submit = (text) => {
+  // Per-turn ack — mirror of the ReviewFlow pattern. Lets the morning brief
+  // agent react to what the user actually said before queuing the next
+  // scripted prompt. ~3-6s latency is hidden behind the agent-typing dots.
+  const ackUserTurn = React.useCallback(async (userText) => {
+    if (!window.callMaProxy) return;
+    setAgentTyping(true);
+    try {
+      const ackInput = [
+        "You are partway through the user's morning brief. They just answered the previous prompt.",
+        `User said: "${userText}"`,
+        "",
+        "Reply with ONE short sentence (max 18 words) that shows you actually heard them — reflect a specific word or beat from what they said. Do NOT summarize, do NOT give advice, do NOT propose a plan, do NOT ask the next brief question (that's pre-scripted and will follow). If their answer was off-topic / a test / a meta comment, gently acknowledge that and invite them to say more.",
+        "Do not emit a JSON tail.",
+      ].join('\n');
+      const r = await window.callMaProxy({ skill: 'daily-brief', input: ackInput });
+      let reply = (r && r.finalText) || '';
+      reply = reply.replace(/```json[\s\S]*?```\s*$/, '').trim();
+      if (reply) setMessages(m => [...m, { role: 'agent', text: reply }]);
+    } catch (e) { /* fail silently */ }
+    setAgentTyping(false);
+  }, []);
+
+  const submit = async (text) => {
     const t = (text && text.trim()) || (s.userDefault || '');
     if (!t) return;
     setMessages(m => [...m, { role: 'user', text: t }]);
     setDraft('');
-    setTimeout(() => setStep(step + 1), 260);
+    const nextStep = step + 1;
+    const nextS = BRIEF_SCRIPT[nextStep];
+    if (nextS && !nextS.confirm) {
+      await ackUserTurn(t);
+    }
+    setStep(nextStep);
   };
 
   return (
@@ -1111,12 +1138,43 @@ function ReviewFlow({ onClose, onComplete }) {
   const showConfirm = s && s.confirm && !agentTyping && liveReviewReady;
   const showReviewThinking = s && s.confirm && !agentTyping && reviewLoading;
 
-  const submit = (text) => {
+  // Per-turn acknowledgement: the agent responds to what the user just said
+  // before the script advances to the next prompt. Without this beat the flow
+  // feels like a form (collect answer → next question) instead of a
+  // conversation (hear answer → react → ask next thing). Latency cost is real
+  // (~3-6s) — the agent-typing indicator covers it.
+  const ackUserTurn = React.useCallback(async (userText) => {
+    if (!window.callMaProxy) return;
+    setAgentTyping(true);
+    try {
+      const ackInput = [
+        "You are partway through the user's daily review. They just answered the previous prompt.",
+        `User said: "${userText}"`,
+        "",
+        "Reply with ONE short sentence (max 18 words) that shows you actually heard them — reflect a specific word or beat from what they said. Do NOT summarize, do NOT give advice, do NOT ask the next review question (that's pre-scripted and will follow). If their answer was off-topic / a test / a meta comment, gently acknowledge that and invite them to say more.",
+        "Do not emit a JSON tail.",
+      ].join('\n');
+      const r = await window.callMaProxy({ skill: 'daily-review', input: ackInput });
+      let reply = (r && r.finalText) || '';
+      reply = reply.replace(/```json[\s\S]*?```\s*$/, '').trim();
+      if (reply) setMessages(m => [...m, { role: 'agent', text: reply }]);
+    } catch (e) { /* fail silently — keep the flow moving */ }
+    setAgentTyping(false);
+  }, []);
+
+  const submit = async (text) => {
     const t = (text && text.trim()) || (s.userDefault || '');
     if (!t) return;
     setMessages(m => [...m, { role: 'user', text: t }]);
     setDraft('');
-    setTimeout(() => setStep(step + 1), 260);
+    // Per-turn LLM ack BEFORE advancing the script. We don't ack the final
+    // confirm step — the review summary card itself is the agent's response.
+    const nextStep = step + 1;
+    const nextS = REVIEW_SCRIPT[nextStep];
+    if (nextS && !nextS.confirm) {
+      await ackUserTurn(t);
+    }
+    setStep(nextStep);
   };
 
   return (
@@ -1673,12 +1731,37 @@ function WeeklyReviewFlow({ onClose, onComplete }) {
   const showConfirm = s && s.confirm && !agentTyping && liveReviewReady;
   const showThinking = s && s.confirm && !agentTyping && reviewLoading;
 
-  const submit = (text) => {
+  // Per-turn ack — same pattern as ReviewFlow / BriefFlow.
+  const ackUserTurn = React.useCallback(async (userText) => {
+    if (!window.callMaProxy) return;
+    setAgentTyping(true);
+    try {
+      const ackInput = [
+        "You are partway through the user's weekly review. They just answered the previous prompt.",
+        `User said: "${userText}"`,
+        "",
+        "Reply with ONE short sentence (max 18 words) that shows you actually heard them — reflect a specific word or beat from what they said. Do NOT summarize the week, do NOT give advice, do NOT ask the next weekly question (that's pre-scripted and will follow). If their answer was off-topic / a test / a meta comment, gently acknowledge that and invite them to say more.",
+        "Do not emit a JSON tail.",
+      ].join('\n');
+      const r = await window.callMaProxy({ skill: 'weekly-review', input: ackInput });
+      let reply = (r && r.finalText) || '';
+      reply = reply.replace(/```json[\s\S]*?```\s*$/, '').trim();
+      if (reply) setMessages(m => [...m, { role: 'agent', text: reply }]);
+    } catch (e) { /* fail silently */ }
+    setAgentTyping(false);
+  }, []);
+
+  const submit = async (text) => {
     const t = (text && text.trim()) || (s.userDefault || '');
     if (!t) return;
     setMessages(m => [...m, { role: 'user', text: t }]);
     setDraft('');
-    setTimeout(() => setStep(step + 1), 260);
+    const nextStep = step + 1;
+    const nextS = WEEKLY_REVIEW_SCRIPT[nextStep];
+    if (nextS && !nextS.confirm) {
+      await ackUserTurn(t);
+    }
+    setStep(nextStep);
   };
 
   // Persist weekly review entry on accept. Insert into `entries` with
