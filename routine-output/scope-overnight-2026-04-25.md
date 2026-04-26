@@ -1,87 +1,102 @@
-# Overnight Scope Proposal — 2026-04-25 (Web-Only Pivot, Saturday Prep)
+# Overnight Scope Proposal — 2026-04-25
 
-**Generated:** 2026-04-25 ~late-evening (manual override; replaces earlier fidelity-translation scope which is now obsolete per ADR 0004).
-**Source:** Hand-authored after the architectural pivot decision.
-**Tonight's iteration cap:** 3.
-**Replaces:** the earlier "fidelity scaffolding" version of this same file (drift analysis + RN-Web translation + Playwright baseline). All three of those iterations are throwaway given the inherit-the-prototype pivot.
+**Generated:** 2026-04-25 ~21:00 local (Scope Overnight Steward, launchd).
+**Source:** Scope Overnight Steward (this run replaces the earlier hand-authored "web-only pivot, Saturday prep" scope on the same date — that scope is now superseded; the pivot, all 13 cognition+shell PRs (#136–#152), and the post-cognition workflow PRs (#153–#156) all landed.)
+**Tonight's iteration cap:** 4 (deliberately under the 6 max — see Notes).
+**Replaces:** the earlier "fidelity scaffolding / wiring-port reference docs" version of this same file. Those analysis docs were never written, and the work they were prepping for (Saturday wiring port) was instead completed live during the cognition push. All three previous-version iterations are now obsolete.
 
-> ✅ **Pre-loop blockers cleared.** PR #95 committed the design folder reference; the pivot PR (this branch's PR) commits the `web/` skeleton + ADR 0004 + updated CLAUDE.md/TRACKER. Loop branches off main once the pivot PR merges.
+> ⚠️ **Submission-eve context.** The hackathon submission deadline is Sunday 2026-04-26 8:00 PM EDT — i.e. ~22 hours from this scope's generation. The deployed demo path on `intently-eta.vercel.app` is **green and feature-complete** per TRACKER (Phase: Post-cognition; Status 🟢). The honest call: tonight's overnight scope should NOT touch any code path the demo recording could hit. All four iterations below are infra/docs polish on tooling that does not affect the live app or the recording flow.
 >
-> ⚠️ **Do not start the loop until the pivot PR is merged.** Iter 1 reads `web/` and `app/lib/**`. If `web/` doesn't exist on main yet, iter 1 fails immediately.
+> ✅ **No iter dependencies on un-merged work.** Open PRs: empty. All recent PRs (#132–#156) merged. Loop branches off main cleanly.
 
 ## Conceptual approach
 
-The architectural decision is locked: `web/` (plain React 18 + Babel-standalone, inherited from prototype) replaces `app/` (Expo + RN-Web) as the deployable. Per ADR 0004, the wiring port (Supabase calls, MA client, voice, reminders) happens **Saturday in a focused live session**, not autonomously overnight — the wiring is judgment-heavy (which prototype hook to attach each surface to, how to reconcile state shape, how to handle errors), and an autonomous loop touching that mid-night risks corrupting the demo path.
+TRACKER explicitly says "no urgent work in flight." The remaining `Follow-ups` are all small infra/tooling/doc items that have piled up during the launch sprint and are good fits for an autonomous loop: each is bounded, single-domain, has a clear done-criterion, and **does not touch `web/`, `agents/`, `supabase/`, or anything in the demo path**.
 
-So tonight's loop is **analysis only** — produce three reference documents Saturday's session uses as its checklist. The loop reads `app/lib/**`, the prototype JSX in `web/`, and produces structured docs. **No code changes, no wiring, no deploy.**
+Order is by domain separation + value-per-LOC. Chain is sequential, but no iteration's correctness depends on a prior iteration's PR landing — they are independent in the dependency sense, just sequenced for the loop.
 
 ## State summary
 
-- PRs merged tonight: #87, #90, #91, #86, #93 (rebased bundle of #88 + #92), #95 (design folder commit), and **the web-only pivot PR** (this branch — needs to merge before loop starts).
-- Open PR awaiting your attention: #94 (`feat/track-ma-provisioning` — TRACKER admin/cleanup, no app/web collision).
-- Stack pivot per ADR 0004: `app/` (Expo + RN-Web) → `web/` (plain React + Babel-standalone, inherited from prototype). Wiring port deferred to Saturday.
-- `web/` skeleton on main (after pivot PR merge): prototype HTML + JSX components, README documenting the structure.
+- **Open PRs:** none.
+- **Recent merges (last 24h):** PRs #132–#156 (smoke-test gaps, cognition batches 1–5, capture/groom/execute Phase 2, post-cognition TRACKER rewrite, hackathon docs). All clean.
+- **Phase:** Post-cognition (per TRACKER). Demo path verified end-to-end.
+- **Tomorrow:** RECORD DAY → submit by 2026-04-26 20:00 EDT.
 
-## Iteration chain (sequential, all docs-only)
+## Iteration chain (sequential, all infra/docs polish)
 
-### Iteration 1 — `app/lib/` functional inventory
+### Iteration 1 — `session-handoff.md` reference sweep
 
-- **Scope:** Read every file under `app/lib/` (and `app/utils/`, `app/hooks/` if they exist). For each function/module, document:
-  - Function/module name + file location
-  - Public API (signature, parameters, return)
-  - What it does in plain English (1 sentence)
-  - External dependencies it relies on (Supabase client, fetch, browser APIs, RN-specific surfaces, third-party packages)
-  - **Web-portability rating:** `mechanical` (pure JS, ports as-is), `light-touch` (drop a few RN imports, otherwise straight), `judgment` (needs rewrite, behavior may change)
-  - Whether it's currently called from `app/App.tsx` or another caller — note the caller path
-- **Output:** `web/PORTING.md` with one section per `app/lib/` file, table-format inventory inside each.
-- **Why this matters Saturday:** the wiring port executes against this inventory. Each row becomes one port task. Without it, the port session opens with "what do we need to bring over?" — wasted hour.
-- **Allowed writes:** ONLY `web/PORTING.md` (new file).
-- **Model + effort:** Opus 4.7 high — moderate reading, structured analysis.
-- **LOC estimate:** Markdown ~200-400 lines depending on app/lib/ size.
+- **TRACKER ref:** Follow-ups → "Stale `session-handoff.md` reference sweep."
+- **Scope:** Find every reference to the retired `docs/process/session-handoff.md` flow and update to the current `.claude/handoffs/<slug>.md` per-project handoff model. Per TRACKER, stale pointers exist in:
+  - `docs/Claude Code Repo-Ready Blueprint.md` (4 spots)
+  - `docs/design/claude-code-implementation.md`
+  - `docs/process/acceptance-criteria.md`
+  - `docs/process/session-prompt-seed-data-v1.md` (note: this file appears not to exist in current `docs/process/` listing — verify; if absent, drop from sweep)
+  - Anywhere else `grep -rn "session-handoff" docs/` surfaces
+- **Key files:** docs only — see above.
+- **Model + effort:** Sonnet 4.6 medium — mechanical doc sweep, bounded grep+edit. No architectural judgment.
+- **LOC estimate:** ~30–80 lines edited across ~5 files.
+- **Depends on:** independent.
+- **Session-prompt:** will derive from TRACKER + a quick `grep -rn "session-handoff" docs/` at iter start.
 
-### Iteration 2 — RN-specific surfaces + their plain-React equivalents
+### Iteration 2 — `intently-track.sh` `--clean` squash-merge false-positive fix
 
-- **Scope:** Audit `app/components/**`, `app/screens/**` (if exists), and `app/App.tsx` for React Native-specific surfaces that DO NOT port to plain React DOM. Catalog each with:
-  - The RN-only construct (e.g., `<View>`, `StyleSheet.create`, `<TouchableOpacity>`, `react-native-reanimated`, `<FlatList>`, `Animated.Value`, `Dimensions.get('window')`)
-  - Where it appears (file + line range)
-  - The plain-React-DOM equivalent the prototype's JSX uses (e.g., `<div>` + `style` object, CSS keyframe animations, `<button>` with onClick, plain `array.map`, CSS Grid/Flex)
-  - **Whether the prototype already covers it.** If the prototype's JSX already implements the same UX with the equivalent construct, the RN code is THROWAWAY — note it. If not, flag as a Saturday port task.
-- **Output:** `web/RN-PORTING-OBSTACLES.md` — section per RN-only construct, with throwaway-vs-port-task verdict.
-- **Why this matters Saturday:** the prototype already implements most screens visually. The wiring port needs to identify what FUNCTIONAL behavior in app/ is not yet represented in web/, vs what's redundant. This document is that delta.
-- **Allowed writes:** ONLY `web/RN-PORTING-OBSTACLES.md` (new file).
-- **Model + effort:** Opus 4.7 high — heavy reading across two codebases, judgment on equivalence.
-- **LOC estimate:** Markdown ~150-300 lines.
-- **Depends on:** iter 1.
+- **TRACKER ref:** Follow-ups → "Fix `--clean` squash-merge false-positive in `scripts/intently-track.sh`. Replace `git cherry` with `git diff --quiet main HEAD`."
+- **Scope:** Single-file bug fix in `scripts/intently-track.sh`. The `--clean` mode currently uses `git cherry` to detect "this branch was squash-merged" but produces false positives for branches whose commits don't share authorship with main. Replace with `git diff --quiet main HEAD` (exit 0 = no diff = effectively merged). Add a one-line comment explaining the why so future readers understand the swap.
+- **Key files:** `scripts/intently-track.sh` (one function, likely <30 lines diff). Add a short note in the file's top-of-file usage comment if the change shifts user-visible behavior.
+- **Model + effort:** Sonnet 4.6 medium — single-file bash bug fix on a clear spec.
+- **LOC estimate:** ~5–15 LOC + a comment.
+- **Depends on:** independent.
+- **Session-prompt:** will derive from TRACKER bullet + reading the current `--clean` block.
 
-### Iteration 3 — prototype JSX wiring-point map
+### Iteration 3 — post-merge / pre-commit hook refusing commits on `main`
 
-- **Scope:** Read every JSX file in `web/` (`intently-shell.jsx`, `intently-screens.jsx`, `intently-screens-prototype.jsx`, `intently-cards.jsx`, `intently-hero.jsx`, `intently-journal.jsx`, `intently-projects.jsx`, etc.). For each component that owns user-interactive behavior, identify:
-  - Which onClick / onChange / form submit / voice-affordance event needs functional wiring
-  - The current implementation (likely a placeholder log, mock data, or no-op)
-  - The corresponding `app/lib/` function (per iter 1's inventory) that should be invoked
-  - The proposed wiring shape (inline `<script>` block in `index.html`, or sibling `.js` file loaded by it)
-  - **Special focus on the hero affordance** — per BUILD-RULES.md it's THE single interaction surface; voice, chat, brief, review all funnel through it. The wiring map for hero is the highest-priority section.
-- **Output:** `web/WIRING-POINTS.md` — section per JSX file, table or list of (event, current placeholder, target lib function, port shape).
-- **Why this matters Saturday:** turns the abstract "port the wiring" task into a concrete checklist. Saturday's session opens, walks the document top to bottom, ports each row. Estimate: 5-10 wiring points total.
-- **Allowed writes:** ONLY `web/WIRING-POINTS.md` (new file).
-- **Model + effort:** Opus 4.7 high — heavy reading of prototype JSX + cross-reference against iter 1's inventory.
-- **LOC estimate:** Markdown ~200-400 lines.
-- **Depends on:** iter 1 + iter 2.
+- **TRACKER ref:** Follow-ups → "Post-merge hook refusing commits on `main` — prevent recurrence of the accidental direct-to-main commit pattern."
+- **Scope:** Add a `pre-commit` (not `post-merge` — TRACKER's wording is slightly off; the right hook for *preventing* a direct-to-main commit is `pre-commit` checking `git rev-parse --abbrev-ref HEAD`) hook that refuses `git commit` if the current branch is `main`, with an override env var (`INTENTLY_ALLOW_MAIN_COMMIT=1`) for the rare legitimate cases (TRACKER updates, version bumps). Wire via `.githooks/` + a one-line install instruction in CONTRIBUTING.md if the repo already uses `core.hooksPath = .githooks`. If it doesn't, **flag and stop** — don't bootstrap a hooks directory autonomously.
+- **Key files:**
+  - `.githooks/pre-commit` (new file, ~20 lines bash)
+  - `CONTRIBUTING.md` § Editing workflow — append one bullet documenting the hook + override
+- **Model + effort:** Sonnet 4.6 medium — small new hook file + a doc bullet. Only judgment is the override env var name + hook install path discovery.
+- **LOC estimate:** ~25 LOC + 3 doc lines.
+- **Depends on:** independent.
+- **Session-prompt:** will derive from TRACKER bullet. Iter must verify `git config core.hooksPath` before writing — if unset, document the install command instead of trying to globally configure.
 
-## Hard-stops (loop must enforce)
+### Iteration 4 — wire `decision-drift-check` to launchd
 
-Standard overnight-build-loop hard-stops apply, plus:
+- **TRACKER ref:** Follow-ups → "Wire `decision-drift-check` to launchd. Spec at `.claude/loops/decision-drift-check.md`. Add `com.intently.decision-drift.plist` matching the existing pack, daily evening."
+- **Scope:** Add `com.intently.decision-drift.plist` to the launchd pack matching the pattern of existing plists (e.g., `com.intently.scope-overnight.plist` — this routine itself). Read the existing plist as the template, swap in the decision-drift-check command + a daily-evening (e.g., 22:00 local) `StartCalendarInterval`. Wire stdout/stderr to a log path matching the existing convention. Include any install/load step in the plist's sibling README or in `CONTRIBUTING.md` if that's where launchd setup is documented.
+- **Key files:**
+  - `<launchd plist directory>/com.intently.decision-drift.plist` (new — directory will be wherever the existing scope-overnight plist lives; iter must locate first)
+  - launchd README or CONTRIBUTING.md install instructions (one bullet)
+- **Model + effort:** Sonnet 4.6 medium — mechanical clone of an existing plist, time swap, log-path swap. Spec is clear; the existing plist is the template.
+- **LOC estimate:** ~40 LOC plist + a doc bullet.
+- **Depends on:** independent.
+- **Session-prompt:** will derive from `.claude/loops/decision-drift-check.md` (the spec) + the existing scope-overnight plist as template.
 
-- **NO writes outside `web/PORTING.md`, `web/RN-PORTING-OBSTACLES.md`, `web/WIRING-POINTS.md`.** No code edits anywhere — including no edits to existing `web/*.jsx`, `web/index.html`, `app/**`, `agents/**`, `supabase/**`, `scripts/**`.
-- **NO edits to `TRACKER.md`, `CLAUDE.md`, `.claude/handoffs/**`, ADRs.**
-- **NO commits to main.** All PRs `--draft`. Standard `auto/build-loop/2026-04-25-NN-<slug>` branch naming.
-- **NO npm install, no playwright install, no Supabase calls, no Vercel calls.** Pure read-and-write of Markdown.
-- **NO TypeScript / build / test / lint commands.** This loop produces docs; no code is touched, so no build verification needed. Skip the standard `npx tsc --noEmit` step from the build-loop brief — irrelevant.
+## Blocked (not tonight)
+
+- **Real OAuth (Google calendar / email / Slack)** — multi-day, requires user-only OAuth registration. Hard-stop.
+- **Multi-user auth (replace anonymous sign-in)** — multi-day, ADR 0002 pins V1 single-user; out of scope until post-hackathon.
+- **Visual polish (PainterlyBlock variants, Collage backdrops, gradient CTAs)** — aesthetic judgment + touches the live demo path on submission eve. Out of scope.
+- **Apply `pg_cron` migration (`supabase/migrations/0002_schedules.sql`)** — needs `supabase db push` against remote; user-only per loop hard-stops.
+- **Re-provision live `weekly-review` agent** — needs `bws run` (Bitwarden secret access); user-only.
+- **Post-first-live-run baseline floor** — needs running the daily-brief agent live (Anthropic-key burn + judgment on observed scores); user-supervised.
+- **Stewards leave working-tree mods uncommitted (auto-commit to `auto/steward/*`)** — this would touch the steward wrapper scripts that orchestrate routines including this one. Modifying the steward layer mid-run is high-blast-radius on submission eve. Defer.
+- **Toggle persistence for `done` flags (wire `toggleAdminReminder` / `toggleProjectTodo`)** — touches `web/` (live demo path). Excluded on submission-eve principle.
+- **Phase out `app/` (Expo + RN-Web) directory** — large delete; safe in principle but unnecessary to do tonight, and an accidental misorder could disrupt git history shape used by the demo repo presentation. Defer.
+- **Design folder reconciliation / Reminders intent reconciliation / entries-architecture worktree** — all judgment-heavy spec calls (the routine brief explicitly hard-stops "no spec edits").
+- **Demo video recovery (Disk Drill / PhotoRec)** — user-only, needs disk write halt + console action.
 
 ## Notes for Muxin
 
-- **Why analysis-only tonight:** wiring port is judgment-heavy. Per ADR 0004 it's Saturday's focused-session work. Tonight's loop produces the reference docs that make Saturday's port a 2-hour deterministic walk instead of a 4-hour exploration.
-- **What you wake up to:** three Markdown docs in `web/` + three draft PRs (one per iter). Read them with coffee Saturday morning, walk the wiring port from there.
-- **If a docs iteration finds something surprising** (e.g., `app/lib/` has 20 files instead of the 5 I estimated, or there's a wiring concern that needs your judgment): the iteration writes a `## OPEN QUESTIONS` section at the end of the doc and continues. Saturday's session resolves those questions before walking the port.
-- **What's NOT here that you might expect:** any `app/` code changes (deferred per ADR 0004), any wiring port (Saturday), any vercel.json (Saturday — depends on cut-over strategy decision). Tonight is reference-doc generation, that's it.
-- **EV vs. previous scope versions:** the original steward scope (scripts/.githooks/docs sweep) is low-EV polish; the earlier "fidelity scaffolding" version of this file was throwaway given pivot. This version produces the artifacts Saturday's port session actually needs.
+- **Why only 4 iterations (not 6).** This is submission-eve. The five next-best READY items all either (a) touch the live demo path (`web/`, agent prompts) or (b) modify the routine/steward layer that orchestrates the loop itself. Both are high-risk for low-leverage tonight. Better to keep the loop's blast radius inside docs/scripts/.githooks/launchd and save your token budget for record-day editing tomorrow morning.
+- **Domain separation across iterations:**
+  - Iter 1 → `docs/`
+  - Iter 2 → `scripts/`
+  - Iter 3 → `.githooks/` + `CONTRIBUTING.md`
+  - Iter 4 → launchd plist + (probably) CONTRIBUTING.md
+  - All four are independent. A failure in one doesn't poison the others; the loop's domain-separation guidance is honored.
+- **Iter 3 caveat — verify `core.hooksPath` first.** If the repo doesn't already have `core.hooksPath = .githooks` set, the iter should produce the hook file + a CONTRIBUTING.md install instruction and stop, NOT attempt to set the global config autonomously (that's a per-clone user action). I've baked this into the iter scope above; don't let the agent overreach.
+- **Iter 4 caveat — locate the existing plist first.** The plist directory is presumably `~/Library/LaunchAgents/` (per macOS convention) or a checked-in `.claude/launchd/` subdirectory. The iter must locate the existing `com.intently.scope-overnight` plist as a template before writing. If it can't find the template, **stop and write a TRACKER follow-up bullet** rather than guess.
+- **What you wake up to:** four draft PRs (one per iter), each on `auto/build-loop/2026-04-25-NN-<slug>` per the standard branch-naming. Review before record-day work; merge what's clean, defer what isn't. None of these touch the demo path, so you can ignore them entirely until post-submission if you'd rather focus.
+- **EV check:** if you'd rather skip the loop and save the token budget for tomorrow's submission editing (README rewrite + 100–200 word summary draft + THIRD_PARTY_LICENSES gen), that's a reasonable call. None of these four iterations is critical-path. The honest framing: this scope is "useful nightly housekeeping that piles up between launches," not "things we need before submitting."
