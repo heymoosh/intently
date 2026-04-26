@@ -228,6 +228,33 @@
       params.delete('oauth_error');
       var clean = window.location.pathname + (params.toString() ? '?' + params.toString() : '') + window.location.hash;
       window.history.replaceState({}, document.title, clean);
+      // Kick the sync function for this provider — the popup path does this
+      // inside OAuthFlow, but the top-level-redirect path needs it here.
+      (function kickSyncAfterRedirect(provider) {
+        var cfg = window.INTENTLY_CONFIG || {};
+        var supabaseUrl = cfg.supabaseUrl;
+        if (!supabaseUrl || !provider) return;
+        var syncFn = provider === 'google_calendar' ? 'sync-calendar'
+                   : provider === 'google_gmail'    ? 'sync-email'
+                   : null;
+        if (!syncFn) return;
+        var sb = window.getSupabaseClient && window.getSupabaseClient();
+        if (!sb) return;
+        sb.auth.getSession().then(function (result) {
+          var accessToken = result && result.data && result.data.session && result.data.session.access_token;
+          if (!accessToken) return;
+          fetch(supabaseUrl + '/functions/v1/' + syncFn, {
+            method: 'POST',
+            headers: {
+              Authorization: 'Bearer ' + accessToken,
+              'Content-Type': 'application/json',
+            },
+            body: '{}',
+          }).catch(function (err) {
+            console.warn('[oauth-return] ' + syncFn + ' backfill failed:', err && err.message);
+          });
+        }).catch(function () {});
+      })(connected);
       setTimeout(function () {
         window.dispatchEvent(new CustomEvent('intently:oauth-connected', {
           detail: { provider: connected, error: oauthError },
@@ -692,6 +719,8 @@ function FutureScreenProtoTappable({ adds, onOpenProject, onOpenGoal, onAddGoal,
           _position: g.position,
           _updated_at: g.updated_at || g.created_at || null,
         })));
+        // Stash for ProjectDetailV2 goal-chip lookup (runs outside this subtree).
+        try { window._dbGoals = gs; } catch (e) {}
       }
       if (ps.length > 0) {
         // Stash the raw DB rows so GoalDetail can resolve projectIds without
@@ -1490,6 +1519,7 @@ function PrototypePhone({ dayState, setDayState, idx, setIdx }) {
           onClose={() => { setShowConnections(false); setProfileView('sheet'); }}
           onConnect={(it) => setOauthIntegration(it)}
           onDisconnect={(id) => conn.disconnect(id)}
+          onSync={() => conn.refresh()}
         />
       )}
 
