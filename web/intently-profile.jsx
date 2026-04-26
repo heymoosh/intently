@@ -143,25 +143,18 @@ function ProfileSheet({ connectedCount, onClose, onOpenConnections, onOpenAccoun
             label="Preferences"
             sub="Voice, notifications, day rhythm"
             onClick={onOpenPreferences}
-          />
-          <SettingRow
-            icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={T.color.PrimaryText} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>}
-            label="Agent activity"
-            sub="When the agent ran while you were away"
-            onClick={onOpenAgentActivity}
             last
           />
         </SettingGroup>
 
-        <SettingGroup>
-          <SettingRow
-            icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={T.color.PrimaryText} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>}
-            label="Help & support"
-            sub="Guides, contact, what's new"
-            onClick={onOpenHelp}
-            last
-          />
-        </SettingGroup>
+        {/* Support contact inline — no nav link to Help & support */}
+        <div style={{
+          padding: '12px 4px 6px',
+          fontFamily: T.font.UI, fontSize: 12, color: T.color.SupportingText,
+          textAlign: 'center',
+        }}>
+          Support: <a href="mailto:muxin.li.pro@gmail.com" style={{ color: T.color.SupportingText, textDecoration: 'underline' }}>muxin.li.pro@gmail.com</a>
+        </div>
 
         {onStartSetup && (
           <SettingGroup>
@@ -291,76 +284,6 @@ Object.assign(window, { getPref, setPref, getAllPrefs });
 
 const _DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-// SelectRow — tap to cycle through options. For the small option sets here
-// (week-day pickers) cycling is faster than opening a sheet/select.
-function SelectRow({ label, sub, prefKey, options, defaultValue, last }) {
-  const [value, setValue] = React.useState(() => getPref(prefKey, defaultValue));
-  const cycle = () => {
-    const i = options.indexOf(value);
-    const next = options[(i + 1) % options.length];
-    setValue(next);
-    setPref(prefKey, next);
-  };
-  return (
-    <button onClick={cycle} style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      width: '100%', padding: '14px 16px',
-      borderBottom: last ? 'none' : `1px solid ${T.color.EdgeLine}`,
-      minHeight: 52, gap: 12,
-      background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left',
-    }}>
-      <span style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ display: 'block', fontFamily: T.font.UI, fontSize: 14, fontWeight: 500, color: T.color.PrimaryText }}>{label}</span>
-        {sub && <span style={{ display: 'block', marginTop: 2, fontFamily: T.font.Reading, fontSize: 12, color: T.color.SupportingText }}>{sub}</span>}
-      </span>
-      <span style={{ fontFamily: T.font.UI, fontSize: 13, color: T.color.SupportingText, textAlign: 'right' }}>{value}</span>
-    </button>
-  );
-}
-
-// ToggleRow — same persistence pattern as SelectRow (getPref/setPref against
-// localStorage `intently:prefs`). Each instance MUST pass a stable `prefKey`
-// string (declared at call sites, not derived from labels) so that copy edits
-// to `label` don't orphan saved values. See Pref keys block above PreferencesPage.
-function ToggleRow({ label, sub, prefKey, defaultOn = false, last }) {
-  const [on, setOn] = React.useState(() => getPref(prefKey, defaultOn));
-  const toggle = () => {
-    setOn(prev => {
-      const next = !prev;
-      setPref(prefKey, next);
-      return next;
-    });
-  };
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 12,
-      padding: '14px 16px',
-      borderBottom: last ? 'none' : `1px solid ${T.color.EdgeLine}`,
-      minHeight: 52,
-    }}>
-      <span style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ display: 'block', fontFamily: T.font.UI, fontSize: 14, fontWeight: 500, color: T.color.PrimaryText }}>{label}</span>
-        {sub && <span style={{ display: 'block', marginTop: 2, fontFamily: T.font.Reading, fontSize: 12, color: T.color.SupportingText }}>{sub}</span>}
-      </span>
-      <button onClick={toggle} aria-pressed={on} style={{
-        width: 44, height: 26, borderRadius: 999,
-        background: on ? T.color.PrimaryText : T.color.Stone300,
-        border: 'none', cursor: 'pointer', flexShrink: 0,
-        position: 'relative', padding: 0,
-        transition: 'background 180ms ease',
-      }}>
-        <span style={{
-          position: 'absolute', top: 3, left: on ? 21 : 3,
-          width: 20, height: 20, borderRadius: 999,
-          background: '#FBF6EA',
-          boxShadow: '0 2px 4px rgba(31,27,21,0.2)',
-          transition: 'left 180ms ease',
-        }} />
-      </button>
-    </div>
-  );
-}
-
 // ─── SAVE ACCOUNT CTA + MODAL ────────────────────────────────────────
 function SaveAccountCta({ onClick }) {
   return (
@@ -475,14 +398,272 @@ function SaveAccountModal({ onClose }) {
   );
 }
 
+// EditableRow — inline editable field. Tapping "Edit" reveals an input;
+// save calls onSave(value) and shows a brief success/error message.
+function EditableRow({ label, currentValue, onSave, inputType = 'text', placeholder, last }) {
+  const [editing, setEditing] = React.useState(false);
+  const [draft, setDraft] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
+  const [msg, setMsg] = React.useState(null); // { text, ok }
+
+  const startEdit = () => { setDraft(currentValue || ''); setMsg(null); setEditing(true); };
+  const cancel = () => { setEditing(false); setMsg(null); };
+
+  const save = async () => {
+    if (!draft.trim()) { setMsg({ text: 'Cannot be empty.', ok: false }); return; }
+    setSaving(true);
+    try {
+      await onSave(draft.trim());
+      setMsg({ text: 'Saved.', ok: true });
+      setEditing(false);
+    } catch (e) {
+      setMsg({ text: e.message || 'Save failed.', ok: false });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{
+      padding: '12px 16px',
+      borderBottom: last ? 'none' : `1px solid ${T.color.EdgeLine}`,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: 28 }}>
+        <span style={{ fontFamily: T.font.UI, fontSize: 14, fontWeight: 500, color: T.color.PrimaryText }}>{label}</span>
+        {!editing ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontFamily: T.font.UI, fontSize: 13, color: T.color.SupportingText, textAlign: 'right' }}>
+              {currentValue || '—'}
+            </span>
+            <button onClick={startEdit} style={{
+              background: T.color.SecondarySurface, border: `1px solid ${T.color.EdgeLine}`,
+              borderRadius: 6, padding: '3px 10px', cursor: 'pointer',
+              fontFamily: T.font.UI, fontSize: 12, fontWeight: 600, color: T.color.PrimaryText,
+            }}>Edit</button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, justifyContent: 'flex-end' }}>
+            <input
+              type={inputType}
+              value={draft}
+              placeholder={placeholder}
+              autoFocus
+              onChange={e => setDraft(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') cancel(); }}
+              style={{
+                flex: 1, maxWidth: 180, padding: '5px 10px', borderRadius: 8,
+                border: `1.5px solid ${T.color.EdgeLine}`,
+                background: T.color.PrimarySurface,
+                fontFamily: T.font.Reading, fontSize: 14, color: T.color.PrimaryText,
+                outline: 'none',
+              }}
+            />
+            <button onClick={cancel} style={{
+              background: 'none', border: 'none', cursor: 'pointer', padding: '4px 6px',
+              fontFamily: T.font.UI, fontSize: 12, color: T.color.SupportingText,
+            }}>Cancel</button>
+            <button onClick={save} disabled={saving} style={{
+              background: T.color.PrimaryText, border: 'none', borderRadius: 6,
+              padding: '4px 12px', cursor: saving ? 'default' : 'pointer',
+              fontFamily: T.font.UI, fontSize: 12, fontWeight: 700,
+              color: T.color.PrimarySurface, opacity: saving ? 0.5 : 1,
+            }}>{saving ? '…' : 'Save'}</button>
+          </div>
+        )}
+      </div>
+      {msg && (
+        <div style={{
+          marginTop: 4,
+          fontFamily: T.font.Reading, fontSize: 12,
+          color: msg.ok ? '#2A7A2A' : '#A8421C',
+        }}>{msg.text}</div>
+      )}
+    </div>
+  );
+}
+
+// PasswordChangeRow — tap "Change" to reveal old+new password inputs.
+function PasswordChangeRow({ last }) {
+  const [open, setOpen] = React.useState(false);
+  const [newPw, setNewPw] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
+  const [msg, setMsg] = React.useState(null);
+
+  const save = async () => {
+    if (newPw.length < 8) { setMsg({ text: 'Password must be at least 8 characters.', ok: false }); return; }
+    setSaving(true);
+    try {
+      const sb = window.getSupabaseClient();
+      const { error } = await sb.auth.updateUser({ password: newPw });
+      if (error) throw error;
+      setMsg({ text: 'Password updated.', ok: true });
+      setOpen(false);
+      setNewPw('');
+    } catch (e) {
+      setMsg({ text: e.message || 'Failed to update password.', ok: false });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{
+      padding: '12px 16px',
+      borderBottom: last ? 'none' : `1px solid ${T.color.EdgeLine}`,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: 28 }}>
+        <span style={{ fontFamily: T.font.UI, fontSize: 14, fontWeight: 500, color: T.color.PrimaryText }}>Password</span>
+        {!open ? (
+          <button onClick={() => { setOpen(true); setMsg(null); }} style={{
+            background: T.color.SecondarySurface, border: `1px solid ${T.color.EdgeLine}`,
+            borderRadius: 6, padding: '3px 10px', cursor: 'pointer',
+            fontFamily: T.font.UI, fontSize: 12, fontWeight: 600, color: T.color.PrimaryText,
+          }}>Change</button>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, justifyContent: 'flex-end' }}>
+            <input
+              type="password"
+              value={newPw}
+              placeholder="New password"
+              autoFocus
+              onChange={e => setNewPw(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') { setOpen(false); setMsg(null); } }}
+              style={{
+                flex: 1, maxWidth: 160, padding: '5px 10px', borderRadius: 8,
+                border: `1.5px solid ${T.color.EdgeLine}`,
+                background: T.color.PrimarySurface,
+                fontFamily: T.font.Reading, fontSize: 14, color: T.color.PrimaryText,
+                outline: 'none',
+              }}
+            />
+            <button onClick={() => { setOpen(false); setMsg(null); }} style={{
+              background: 'none', border: 'none', cursor: 'pointer', padding: '4px 6px',
+              fontFamily: T.font.UI, fontSize: 12, color: T.color.SupportingText,
+            }}>Cancel</button>
+            <button onClick={save} disabled={saving} style={{
+              background: T.color.PrimaryText, border: 'none', borderRadius: 6,
+              padding: '4px 12px', cursor: saving ? 'default' : 'pointer',
+              fontFamily: T.font.UI, fontSize: 12, fontWeight: 700,
+              color: T.color.PrimarySurface, opacity: saving ? 0.5 : 1,
+            }}>{saving ? '…' : 'Save'}</button>
+          </div>
+        )}
+      </div>
+      {msg && (
+        <div style={{
+          marginTop: 4,
+          fontFamily: T.font.Reading, fontSize: 12,
+          color: msg.ok ? '#2A7A2A' : '#A8421C',
+        }}>{msg.text}</div>
+      )}
+    </div>
+  );
+}
+
+// DeleteAccountRow — confirm dialog → wipe user data + sign out.
+// V1 simplification: clears user data rows and signs out; auth.users row
+// is left intact (Supabase requires service-role to delete it, which we'd
+// wire via an Edge Function in V2). The session becomes a fresh anon session.
+function DeleteAccountRow() {
+  const [confirming, setConfirming] = React.useState(false);
+  const [working, setWorking] = React.useState(false);
+  const [msg, setMsg] = React.useState(null);
+
+  const doDelete = async () => {
+    setWorking(true);
+    try {
+      // Wipe all user-owned data rows
+      if (window.clearAllUserData) await window.clearAllUserData();
+      // Sign out — will redirect to fresh anon session
+      const sb = window.getSupabaseClient();
+      await sb.auth.signOut();
+    } catch (e) {
+      setMsg('Error: ' + (e.message || String(e)));
+      setWorking(false);
+      setConfirming(false);
+    }
+  };
+
+  if (confirming) {
+    return (
+      <div style={{ padding: '14px 16px' }}>
+        <div style={{
+          fontFamily: T.font.UI, fontSize: 13, fontWeight: 600,
+          color: '#A8421C', marginBottom: 10,
+        }}>Delete your account?</div>
+        <div style={{
+          fontFamily: T.font.Reading, fontSize: 13, lineHeight: '18px',
+          color: T.color.SupportingText, marginBottom: 14,
+        }}>
+          This will delete all your data and sign you out. This cannot be undone.
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={() => setConfirming(false)} disabled={working} style={{
+            flex: 1, padding: '10px 0', borderRadius: 10,
+            background: T.color.SecondarySurface, border: `1px solid ${T.color.EdgeLine}`,
+            cursor: 'pointer', fontFamily: T.font.UI, fontSize: 13, fontWeight: 600,
+            color: T.color.PrimaryText,
+          }}>Cancel</button>
+          <button onClick={doDelete} disabled={working} style={{
+            flex: 1, padding: '10px 0', borderRadius: 10,
+            background: '#A8421C', border: 'none',
+            cursor: working ? 'default' : 'pointer',
+            fontFamily: T.font.UI, fontSize: 13, fontWeight: 700,
+            color: '#FBF6EA', opacity: working ? 0.6 : 1,
+          }}>{working ? 'Deleting…' : 'Delete'}</button>
+        </div>
+        {msg && <div style={{ marginTop: 8, fontFamily: T.font.Reading, fontSize: 12, color: '#A8421C' }}>{msg}</div>}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: 52 }}>
+      <span style={{ fontFamily: T.font.UI, fontSize: 14, fontWeight: 500, color: '#A8421C' }}>Delete account</span>
+      <button onClick={() => setConfirming(true)} style={{
+        background: '#F2D7CB', border: `1px solid #DDB29C`,
+        borderRadius: 6, padding: '3px 10px', cursor: 'pointer',
+        fontFamily: T.font.UI, fontSize: 12, fontWeight: 600, color: '#A8421C',
+      }}>Delete</button>
+    </div>
+  );
+}
+
 function AccountPage({ onBack }) {
   // Same profile context as ProfileSheet — name/email come from the
   // single source. Anonymous users see '—' until setup/account-upgrade
   // populate them.
   const profile = window.useUserProfile ? window.useUserProfile() : { displayName: null, email: null, isAnonymous: true };
   const [saveModalOpen, setSaveModalOpen] = React.useState(false);
-  const nameLabel = profile.displayName || '—';
-  const emailLabel = profile.email || '—';
+
+  const saveName = async (name) => {
+    const sb = window.getSupabaseClient();
+    const userId = await window.getCurrentUserId();
+    const { error } = await sb.from('profiles').upsert({ id: userId, display_name: name }, { onConflict: 'id' });
+    if (error) throw new Error(error.message);
+    // Refresh profile in context if possible
+    if (window.refreshUserProfile) window.refreshUserProfile();
+  };
+
+  const saveEmail = async (email) => {
+    const sb = window.getSupabaseClient();
+    if (profile.isAnonymous) {
+      // Link email identity to anonymous account
+      const { error } = await sb.auth.linkIdentity({
+        provider: 'email',
+        email,
+        options: { emailRedirectTo: window.location.origin },
+      });
+      if (error) throw new Error(error.message);
+      throw new Error('Check your email — we sent a magic link to claim this account.');
+    } else {
+      // Update email for existing account
+      const { error } = await sb.auth.updateUser({ email });
+      if (error) throw new Error(error.message);
+      throw new Error('Confirmation sent to ' + email + '. Check your inbox.');
+    }
+  };
+
   return (
     <SettingsSubPage title="Account." eyebrow="Profile · Account" onBack={onBack}>
       {saveModalOpen && <SaveAccountModal onClose={() => setSaveModalOpen(false)} />}
@@ -494,9 +675,20 @@ function AccountPage({ onBack }) {
         border: `1px solid ${T.color.EdgeLine}`,
         borderRadius: 14, overflow: 'hidden', marginBottom: 18,
       }}>
-        <StaticRow label="Name" value={nameLabel} />
-        <StaticRow label="Email" value={emailLabel} />
-        <StaticRow label="Password" value="Change" />
+        <EditableRow
+          label="Name"
+          currentValue={profile.displayName}
+          onSave={saveName}
+          placeholder="Your name"
+        />
+        <EditableRow
+          label="Email"
+          currentValue={profile.email}
+          onSave={saveEmail}
+          inputType="email"
+          placeholder="you@example.com"
+        />
+        <PasswordChangeRow />
         <StaticRow label="Plan" value="Quiet · monthly" last />
       </div>
 
@@ -505,8 +697,7 @@ function AccountPage({ onBack }) {
         border: `1px solid ${T.color.EdgeLine}`,
         borderRadius: 14, overflow: 'hidden', marginBottom: 18,
       }}>
-        <StaticRow label="Export your journal" value="Download" />
-        <StaticRow label="Delete account" value="·" last />
+        <DeleteAccountRow />
       </div>
 
       <div style={{
@@ -514,30 +705,91 @@ function AccountPage({ onBack }) {
         color: T.color.SupportingText, fontStyle: 'italic',
         textAlign: 'center', padding: '0 20px',
       }}>
-        Your journal belongs to you. Export anytime, in markdown.
+        Your data is yours.
       </div>
     </SettingsSubPage>
   );
 }
 
+// TimeRow — label + <input type="time"> that persists to life_ops_config.config.
+// Overlays an invisible time input over a formatted display value so the native
+// picker appears on click without exposing an ugly input chrome.
+function TimeRow({ label, sub, configKey, defaultValue, last, rhythmConfig, setRhythmConfig }) {
+  const fromDB = rhythmConfig && rhythmConfig[configKey];
+  const [val, setVal] = React.useState(fromDB || defaultValue);
+  React.useEffect(() => { if (fromDB) setVal(fromDB); }, [fromDB]);
+  const save = async (v) => {
+    setRhythmConfig(prev => Object.assign({}, prev, { [configKey]: v }));
+    try { await window.updateLifeOpsConfig({ [configKey]: v }); } catch (e) { /* silent */ }
+  };
+  const display = (() => {
+    if (!val) return '—';
+    const [h, m] = val.split(':').map(Number);
+    const ampm = h < 12 ? 'AM' : 'PM';
+    const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+    return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
+  })();
+  return (
+    <label style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '14px 16px', minHeight: 52, gap: 12, cursor: 'pointer',
+      borderBottom: last ? 'none' : `1px solid ${T.color.EdgeLine}`,
+    }}>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: 'block', fontFamily: T.font.UI, fontSize: 14, fontWeight: 500, color: T.color.PrimaryText }}>{label}</span>
+        {sub && <span style={{ display: 'block', marginTop: 2, fontFamily: T.font.Reading, fontSize: 12, color: T.color.SupportingText }}>{sub}</span>}
+      </span>
+      <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+        <span style={{ fontFamily: T.font.UI, fontSize: 13, color: T.color.SupportingText }}>{display}</span>
+        <input type="time" value={val} onChange={e => setVal(e.target.value)}
+          onBlur={e => save(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
+          style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }} />
+      </span>
+    </label>
+  );
+}
+
+// DaySelectRow — cycles through _DAYS and persists to both localStorage and
+// life_ops_config.config so agent scheduling reads the canonical value.
+function DaySelectRow({ label, sub, configKey, prefKey, defaultValue, last, rhythmConfig, setRhythmConfig }) {
+  const fromDB = rhythmConfig && rhythmConfig[configKey];
+  const [value, setValue] = React.useState(() => fromDB || getPref(prefKey, defaultValue));
+  React.useEffect(() => { if (fromDB) setValue(fromDB); }, [fromDB]);
+  const cycle = async () => {
+    const i = _DAYS.indexOf(value);
+    const next = _DAYS[(i + 1) % _DAYS.length];
+    setValue(next);
+    setPref(prefKey, next);
+    setRhythmConfig(prev => Object.assign({}, prev, { [configKey]: next }));
+    try { await window.updateLifeOpsConfig({ [configKey]: next }); } catch (e) { /* silent */ }
+  };
+  return (
+    <button onClick={cycle} style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      width: '100%', padding: '14px 16px',
+      borderBottom: last ? 'none' : `1px solid ${T.color.EdgeLine}`,
+      minHeight: 52, gap: 12,
+      background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left',
+    }}>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: 'block', fontFamily: T.font.UI, fontSize: 14, fontWeight: 500, color: T.color.PrimaryText }}>{label}</span>
+        {sub && <span style={{ display: 'block', marginTop: 2, fontFamily: T.font.Reading, fontSize: 12, color: T.color.SupportingText }}>{sub}</span>}
+      </span>
+      <span style={{ fontFamily: T.font.UI, fontSize: 13, color: T.color.SupportingText, textAlign: 'right' }}>{value}</span>
+    </button>
+  );
+}
+
 function PreferencesPage({ onBack }) {
+  const [rhythmConfig, setRhythmConfig] = React.useState({});
+  React.useEffect(() => {
+    if (window.getLifeOpsConfig) {
+      window.getLifeOpsConfig().then(cfg => setRhythmConfig(cfg || {})).catch(_e => setRhythmConfig({}));
+    }
+  }, []);
   return (
     <SettingsSubPage title="Preferences." eyebrow="Profile · Preferences" onBack={onBack}>
-      <div style={{
-        fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2,
-        textTransform: 'uppercase', color: T.color.SupportingText,
-        padding: '0 4px 8px',
-      }}>Voice & chat</div>
-      <div style={{
-        background: T.color.SecondarySurface,
-        border: `1px solid ${T.color.EdgeLine}`,
-        borderRadius: 14, overflow: 'hidden', marginBottom: 22,
-      }}>
-        <ToggleRow prefKey="alwaysConfirm" label="Always confirm before saving" sub="Show the confirmation card after every voice utterance" defaultOn />
-        <ToggleRow prefKey="holdToTalk" label="Hold to talk" sub="Press and hold the mic instead of tap-to-toggle" />
-        <ToggleRow prefKey="readAloud" label="Read replies aloud" sub="Agent speaks its responses back to you" last />
-      </div>
-
       <div style={{
         fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2,
         textTransform: 'uppercase', color: T.color.SupportingText,
@@ -548,24 +800,14 @@ function PreferencesPage({ onBack }) {
         border: `1px solid ${T.color.EdgeLine}`,
         borderRadius: 14, overflow: 'hidden', marginBottom: 22,
       }}>
-        <StaticRow label="Brief time" value="7:00 AM" />
-        <StaticRow label="Review window" value="After 8:00 PM" />
-        <SelectRow label="Week start" prefKey="weekStart" defaultValue="Monday" options={_DAYS} />
-        <SelectRow label="Weekly review day" sub="When the weekly review CTA appears" prefKey="weeklyReviewDay" defaultValue="Sunday" options={_DAYS} last />
-      </div>
-
-      <div style={{
-        fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2,
-        textTransform: 'uppercase', color: T.color.SupportingText,
-        padding: '0 4px 8px',
-      }}>Notifications</div>
-      <div style={{
-        background: T.color.SecondarySurface,
-        border: `1px solid ${T.color.EdgeLine}`,
-        borderRadius: 14, overflow: 'hidden',
-      }}>
-        <ToggleRow prefKey="briefReminder" label="Brief reminder" defaultOn />
-        <ToggleRow prefKey="reviewNudge" label="Review nudge" sub="If you haven't logged a review by 10pm" defaultOn last />
+        <TimeRow label="Brief time" configKey="daily_brief_time" defaultValue="07:00"
+          rhythmConfig={rhythmConfig} setRhythmConfig={setRhythmConfig} />
+        <TimeRow label="Review window" sub="Evening review opens after this time" configKey="daily_review_time" defaultValue="20:00"
+          rhythmConfig={rhythmConfig} setRhythmConfig={setRhythmConfig} />
+        <DaySelectRow label="Week start" configKey="week_start_day" prefKey="weekStart" defaultValue="Monday"
+          rhythmConfig={rhythmConfig} setRhythmConfig={setRhythmConfig} />
+        <DaySelectRow label="Weekly review day" sub="When the weekly review CTA appears" configKey="weekly_review_day" prefKey="weeklyReviewDay" defaultValue="Sunday"
+          rhythmConfig={rhythmConfig} setRhythmConfig={setRhythmConfig} last />
       </div>
     </SettingsSubPage>
   );
@@ -598,8 +840,7 @@ function HelpPage({ onBack }) {
         border: `1px solid ${T.color.EdgeLine}`,
         borderRadius: 14, overflow: 'hidden', marginBottom: 18,
       }}>
-        <StaticRow label="Contact support" value="hi@intently.app" href="mailto:hi@intently.app" />
-        <StaticRow label="What's new" value="Apr 2026" last />
+        <StaticRow label="Contact support" value="muxin.li.pro@gmail.com" href="mailto:muxin.li.pro@gmail.com" last />
       </div>
 
       <div style={{

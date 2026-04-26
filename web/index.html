@@ -246,6 +246,7 @@
 <script src="lib/reminders.js"></script>
 <script type="text/babel" src="lib/supabase.js"></script>
 <script type="text/babel" src="lib/user-profile.js"></script>
+<script src="lib/backfill-profile.js"></script>
 <script type="text/babel" src="lib/entities.js"></script>
 <script type="text/babel" src="lib/update-tracker.js"></script>
 <script type="text/babel" src="lib/seed-sam-data.js"></script>
@@ -1065,6 +1066,13 @@ function PrototypePhone({ dayState, setDayState, idx, setIdx }) {
     preloadDailyReviewPendingRef.current = promise;
   }, [dayState]);
 
+  // On mount: backfill display_name for users who connected Google before
+  // PR #205. Fire-and-forget — never blocks app load.
+  React.useEffect(() => {
+    if (window.backfillProfileFromGoogleIfMissing) {
+      window.backfillProfileFromGoogleIfMissing();
+    }
+  }, []);
 
   // On mount: (1) resume an in-flight setup draft, or (2) force setup for a
   // fresh empty-state user (no goals, no projects, no draft, not demo mode).
