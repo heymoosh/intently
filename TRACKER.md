@@ -18,7 +18,7 @@
 | **Editing + branching workflow** | `CONTRIBUTING.md` § Editing workflow | Never-`git-checkout`-in-primary rule, worktree-when-sibling. |
 | **Parallel-session coordination** | `.claude/commands/start-work.md` § step 7 — per-worktree `.claude/wt-intent.md` (gitignored) | Sibling sessions declare a one-sentence intent + `ref:` pointing at a TRACKER row. |
 
-**Original-intent docs (archived, bannered in-file, not current truth):** `docs/product/vision.md`, `docs/product/requirements/life-ops-plugin-spec.md`, `docs/design/app-experience.md`, `docs/architecture/agent-memory.md`, `docs/architecture/data-model.md`.
+**Superseded UX/design folder (archived, properly relocated):** `docs/design/Superseded by Intently-App/*`. Architecture docs reflect implementation pre-Supabase-cutover (markdown-vault → SQL migrations) but contracts remain load-bearing — see ADR 0011 for scope. Vision and functional spec docs (`docs/product/vision.md`, `docs/product/requirements/life-ops-plugin-spec.md`) are active reference.
 
 ## Status
 

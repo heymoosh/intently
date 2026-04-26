@@ -1,6 +1,4 @@
-> **⚠ ORIGINAL INTENT — not current ground truth.** Captures pre-2026-04-25 framing (markdown-vault-as-source-of-truth, pre-DB-cutover). Current data model derives from `TRACKER.md § Current state pointers` (UX shapes = `docs/design/Intently - App/HANDOFF.md` §2; runtime DB = `supabase/migrations/`; render layer = `app/lib/render/`). Treat this doc as historical reference for original intent — **do not derive current schema from it**.
-
----
+> **⚠ Original intent — implementation moved, contracts did not.** The architectural shape, schema-level contracts, and behavioral intent described here remain load-bearing. The "markdown-files-as-source-of-truth" implementation has been superseded by Supabase migrations (`supabase/migrations/0001-0010_*.sql`); markdown is now a render-on-demand view. **Read this doc for WHAT each entity is and WHY it exists; read the migrations for HOW it is currently stored.** Scope of supersession is locked in `docs/decisions/0011-scope-of-design-folder-supersession.md`.
 
 # Life Ops Plugin — File Schema & Contracts
 
