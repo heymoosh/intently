@@ -49,6 +49,7 @@ const SESSIONS_PATH = '/v1/sessions';
 // TODO: populate these env vars after agent resources are created. Until then,
 // unmapped skills return 400 with a clear error.
 const SKILL_ENV: Record<string, string> = {
+  chat: 'MA_AGENT_ID_CHAT',
   'daily-brief': 'MA_AGENT_ID_DAILY_BRIEF',
   'daily-review': 'MA_AGENT_ID_DAILY_REVIEW',
   'weekly-review': 'MA_AGENT_ID_WEEKLY_REVIEW',

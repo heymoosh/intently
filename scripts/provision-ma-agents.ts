@@ -17,6 +17,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 // ---------- types ----------
 
 export const MVP_SKILLS = [
+  'chat',
   'daily-brief',
   'daily-review',
   'weekly-review',

@@ -431,33 +431,16 @@ function HeroChat({ onDone, onMic, seedTranscript = '', onTranscriptConsumed, on
   const scrollRef = React.useRef(null);
   const seededRef = React.useRef(false);
 
-  // Build a chat-mode input for callMaProxy. Wraps the user's question with a
-  // short instruction so the daily-brief agent (which has full user context)
-  // responds conversationally instead of drafting a plan. Includes a few
-  // recent turns so it feels like a real thread, not single-shot prompts.
-  const buildChatInput = React.useCallback((userText, history) => {
-    const recent = (history || []).slice(-6).map((m) => {
-      const role = m.kind === 'user' ? 'User' : (m.kind === 'agent' ? 'You' : null);
-      return role ? `${role}: ${m.t}` : null;
-    }).filter(Boolean).join('\n');
-    return [
-      "The user is chatting with you outside the brief / review flow — this is an ad-hoc conversation, not a planning session.",
-      "Respond naturally in 1-3 sentences. Speak directly to them. Use what you know about their goals/projects/today's plan when it's relevant; otherwise just answer the question.",
-      "Do not generate a daily plan, do not emit a JSON tail, do not propose a brief. Just talk.",
-      '',
-      recent ? `Recent conversation:\n${recent}\n` : '',
-      `User just said: "${userText}"`,
-    ].filter(Boolean).join('\n');
-  }, []);
-
   // Send a user utterance. Routing order:
   //   1. update-tracker — if the transcript looks like a work-completion log
   //      ("I finished X", "shipped Y"), call the update-tracker agent and
   //      apply its proposed Supabase writes. See web/lib/update-tracker.js.
   //   2. classify-as-reminder — cheap edge-function call; if classified, the
   //      reminder is persisted server-side and we render the confirmation.
-  //   3. chat fallback — fan out to a real LLM turn via daily-brief in chat
-  //      mode for everything else.
+  //   3. chat skill — the top-level MA agent that routes to specialist skills
+  //      (daily-brief, update-tracker, reminders-classifier, etc.) via tool-use.
+  //      TODO: once chat's MA routing handles reminders and tracker natively,
+  //      steps 1 and 2 can be retired — the chat agent will dispatch them.
   // Appends each turn to the thread; falls back to a generic acknowledgement
   // only if every routed path fails.
   const sendUtterance = React.useCallback(async (text, opts) => {
@@ -491,16 +474,13 @@ function HeroChat({ onDone, onMic, seedTranscript = '', onTranscriptConsumed, on
         // hydration only runs once on mount with an empty deps guard.
         if (onReminderCreated) onReminderCreated(cls.reminder);
       } else if (window.callMaProxy) {
-        // Live LLM turn. Single-turn for now — recent-thread history can be
-        // added via a session id once the proxy + agent support persistence.
-        const input = buildChatInput(trimmed, []);
+        // Route through the chat MA agent — the top-level orchestrator. It
+        // reasons natively about intent and dispatches to specialist skills
+        // (daily-brief, update-tracker, reminders-classifier, etc.) via tool-use.
+        // Pass the user's text directly; the chat agent handles context.
         try {
-          const r = await window.callMaProxy({ skill: 'daily-brief', input });
-          let reply = (r && r.finalText) || '';
-          // Strip any JSON tail that the brief agent might still emit (it's
-          // contract-bound to the brief Output shape, even when prompted to chat).
-          reply = reply.replace(/```json[\s\S]*?```\s*$/, '').trim();
-          if (!reply) reply = "I'm here. Say more?";
+          const r = await window.callMaProxy({ skill: 'chat', input: trimmed });
+          const reply = (r && r.finalText && r.finalText.trim()) || "I'm here. Say more?";
           setThread((prev) => [...prev, { kind: 'agent', t: reply }]);
         } catch (e) {
           setThread((prev) => [...prev, { kind: 'agent', t: "I couldn't reach the model just now. Try again in a moment." }]);
@@ -511,7 +491,7 @@ function HeroChat({ onDone, onMic, seedTranscript = '', onTranscriptConsumed, on
     } finally {
       setPending(false);
     }
-  }, [buildChatInput, onReminderCreated]);
+  }, [onReminderCreated]);
 
   // Seed the thread from a voice capture the user just finished, exactly once.
   React.useEffect(() => {
