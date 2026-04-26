@@ -225,7 +225,6 @@ No interactive surfaces requiring wiring — covered by the prototype variants a
 - **`web/intently-tokens.jsx`** — design token constants exported on `window.T`. No interactive surfaces. *(Note: per PORTING.md OPEN Q1, this file may render `app/lib/tokens.ts` throwaway. iter 2 confirms.)*
 - **`web/ios-frame.jsx`** — `IOSDevice`, `IOSStatusBar` chrome. No interactive surfaces.
 - **`web/design-canvas.jsx`** — review canvas (the design system spread). Not part of the prototype's runtime (`index.html` doesn't load it). Pure presentation.
-- **`web/design-system.html`** — review canvas page. Not the production app. Pure presentation.
 
 ---
 

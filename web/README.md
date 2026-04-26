@@ -5,7 +5,6 @@ Per ADR 0004 (web-only, prototype-inherited), this directory is the deployable f
 ## Structure
 
 - `index.html` — entry point. Self-contained HTML loading React 18 + Babel-standalone from unpkg, plus the `intently-*.jsx` files via `<script type="text/babel" src="..."`>` tags.
-- `design-system.html` — the design system canvas. Review surface, not part of the production app.
 - `intently-*.jsx`, `ios-frame.jsx`, `design-canvas.jsx` — components. Loaded by `index.html`. **No build step.**
 - `PORTING.md`, `WIRING-POINTS.md` (forthcoming) — Saturday's wiring-port reference; describes how `app/lib/**` slots into the prototype's hooks.
 
