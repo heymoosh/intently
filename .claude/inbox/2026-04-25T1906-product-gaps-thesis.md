@@ -3,6 +3,7 @@ captured: 2026-04-25T19:06:58-04:00
 session: chat/0425-171303
 source: explicit
 origin: parallel session at chat/0425-182455 (worktree wt/0425-182455)
+resolved: 2026-04-25T19:15 — promoted to handoff at .claude/handoffs/agent-noticing-layer.md
 ---
 
 # Product Gaps — agent-should-do-the-noticing thesis (2026-04-25)
