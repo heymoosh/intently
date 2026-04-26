@@ -42,6 +42,21 @@ This doc is the catch-net for those hypotheses. Whenever a tradeoff conversation
 
 *(Drop new entries at the top — newest first.)*
 
+### 2026-04-26 — Capture-routing classifier accuracy + tier-escalation rate
+
+**Context:** Discussing the agent-noticing-layer's capture-routing model (Haiku binary classifier today). As we add more destinations (reminder / journal / project-update / goal-shift / brief-regen / freeform), Haiku may stop being accurate enough — at which point we'd upgrade to Sonnet or Opus. We need a metric to know WHEN that point arrives instead of guessing.
+
+**Metric idea:**
+- **Routing precision/recall per destination class.** What fraction of utterances we routed to "journal" actually belonged in journal? (And the inverse: what fraction of journal-belonging utterances did we miss?) Per-class precision + recall.
+- **Tier-escalation rate.** Once we have multi-tier routing (e.g., Haiku first-pass with Sonnet/Opus escalation on ambiguity), the % of utterances that escalate is a leading indicator of when to retire the Haiku tier.
+- **Misroute correction rate.** When the user manually moves a row from one bucket to another (e.g., "this isn't a reminder, it's a journal entry"), that's signal we got the routing wrong. Build a "Move to..." affordance + count its taps.
+
+**Hypothesized outcome correlation:** routing accuracy ≥ 90% per class predicts low frustration / continued engagement. Below 80% predicts churn ("the AI doesn't get me"). Threshold for upgrading the model: tier-escalation rate > 30%, OR misroute correction rate > 5% per active user per week.
+
+**Applies to:** agent-noticing-layer workstream 1, chat MA skill (per Muxin's reframing — chat IS the router), reminders Edge Function.
+
+**Notes:** Build this AS we ship multi-destination routing, not after — the misroute correction affordance is itself a product feature, not just a metric instrument. Worth a dedicated dashboard / weekly review surface so trends are visible without explicit query.
+
 ---
 
 ## Synthesis queue
