@@ -70,24 +70,24 @@ Eight signal types. Each has framework provenance, a capture-time prompt (how an
 
 ---
 
-### 3. Lessons to act on
+### 3. Lessons to act on (advice received)
 
 **Tag:** `#grow`
 
-**Framework:** Behavioral design — the deliberate learning loop. Close to the "debrief" practice in high-performance coaching: what did this situation teach me that should change how I operate? Distinct from general self-insight (#self) because the frame is explicitly about extracting *actionable* learning from experience — making a mistake mean something by deciding what to do differently.
+**Framework:** Career coaching practice — the deliberate capture of advice received from others worth acting on. In Muxin's words: *"Grow is things related to advice received from others."* Close to the "debrief" practice in high-performance coaching: what did someone tell you, or what did this interaction teach you, that should change how you operate? Distinct from `#self` (which is internally generated insight) because the frame is explicitly about advice, feedback, or learning received *from outside* — from a mentor, colleague, manager, coach, book, or conversation.
 
-**What to listen for:** Mentions of mistakes, pivots, things that didn't go as expected, course corrections, "I learned that…", "next time I'll…", "I realized I need to…". Also: moments of surprise (positive or negative) that carry a lesson. The difference from `#self` is the orientation — is the user extracting something to *do* differently, or something to *know* about themselves?
+**What to listen for:** Moments where the user received feedback, was told something useful, read something that reframed how they operate, or had a realization prompted by another person's input. "My manager said…", "they pointed out…", "I read that…", "after that conversation I realized I should…". The tell: the catalyst was external, even if the processing is internal.
 
 **Capture-time prompt example:**
-> "What would you do differently — or what do you want to make sure you carry forward?"
+> "That sounds like advice worth keeping — what's the thing you want to carry forward from what they said?"
 
 **Review-time surface (daily):**
-> When a mistake, pivot, or hard lesson surfaces in today's narrative, create space: "That sounds like it taught you something — want to capture it?"
+> When advice or feedback from others surfaces in today's narrative, create space: "That sounds like something worth acting on — want to capture it?"
 
 **Review-time surface (weekly/monthly):**
-> Pull `#grow` entries and name what the user keeps learning. "Third time this month you've noted X" is a pattern that might point to a system change, not just an insight.
+> Pull `#grow` entries and name what the user keeps being told. "Third time this month someone's noted X" is a pattern that might point to a real development edge.
 
-**Why it survived V1 reconciliation:** Present in `daily-review/SKILL.md` as `#grow`. Not in original spec's suggested_tags (closest was `#insight`). Retained as the action-oriented learning signal. The original `#insight` maps more cleanly to `#self` (see below); `#grow` carries the "do differently" orientation.
+**Why it survived V1 reconciliation:** Present in `daily-review/SKILL.md` as `#grow`. Not in original spec's suggested_tags (closest was `#insight`). Retained as the externally-sourced learning signal. Per user clarification (2026-04-26): `#grow` = advice received from others; `#self` = personal insights from your own reflection. That distinction is load-bearing.
 
 ---
 
@@ -95,9 +95,9 @@ Eight signal types. Each has framework provenance, a capture-time prompt (how an
 
 **Tag:** `#self`
 
-**Framework:** Behavioral design and reflective practice — knowing what conditions produce your best work, what drains you, what you need. The Designing Your Life framework (Burnett & Evans) explicitly frames energy awareness as a prerequisite to well-designed work. Close to the "know yourself" pillar of most life-design and coaching lineages.
+**Framework:** Behavioral design and reflective practice — knowing what conditions produce your best work, what drains you, what you need. The Designing Your Life framework (Burnett & Evans) explicitly frames energy awareness as a prerequisite to well-designed work. Close to the "know yourself" pillar of most life-design and coaching lineages. In Muxin's words: *"Self is more like personal insights from your own reflection."*
 
-**What to listen for:** The user naming something about themselves — what energized or drained them (not structured GTJ data, just conversational), what kind of work feels meaningful vs. hollow, what they realized about a preference, pattern, or need. The tell is statements about the user's *nature* rather than a specific event: "I realized I work better when…", "I don't do well in environments like…", "I need…"
+**What to listen for:** The user naming something about themselves that came from their own reflection — what energized or drained them (not structured GTJ data, just conversational), what kind of work feels meaningful vs. hollow, what they realized from within about a preference, pattern, or need. The tell is internally generated statements about the user's *nature* rather than a specific event: "I realized I work better when…", "I don't do well in environments like…", "I need…"
 
 **Capture-time prompt example:**
 > "What did today tell you about yourself — what you need, what drains you, what lights you up?"
@@ -108,7 +108,7 @@ Eight signal types. Each has framework provenance, a capture-time prompt (how an
 **Review-time surface (weekly/monthly):**
 > Pull `#self` entries and look for themes across the window. Are there consistent drainers or energizers? What does the pattern say about how the user should design their work?
 
-**Why it survived V1 reconciliation:** Present in `daily-review/SKILL.md` as `#self`. Original spec's `#insight` maps here — consolidated into `#self` to be more concrete. The distinction from `#grow`: `#self` is about *knowing* yourself; `#grow` is about *changing* something based on what you learned.
+**Why it survived V1 reconciliation:** Present in `daily-review/SKILL.md` as `#self`. Original spec's `#insight` maps here — consolidated into `#self` to be more concrete. The distinction from `#grow` (per user clarification, 2026-04-26): `#self` is about *personal insights from your own reflection*; `#grow` is about *advice received from others*.
 
 ---
 
@@ -227,25 +227,89 @@ Three taxonomy sources existed before this doc. They disagreed. Here is the reco
 
 | Source A | Source B | Source C | V1 canonical | Disposition |
 |---|---|---|---|---|
-| `#brag` | `#brags` | — | `#brag` | Merged. `#brags` deprecated. Singular form wins. |
-| `#self` + `#grow` | `#insight` | — | `#self`, `#grow` | Split maintained. `#insight` is too broad; the distinction between "know yourself" and "do differently" is load-bearing. |
+| `#brag` | `#brags` | — | `#brag` | Merged. Singular form wins; `#brags` is an accepted alias. |
+| `#self` + `#grow` | `#insight` | — | `#self`, `#grow` | Split maintained. `#insight` maps to the personal-reflection sense of `#self`; the distinction between "know yourself" (`#self`) and "advice received from others" (`#grow`) is load-bearing. |
 | `#ant` | — | — | `#ant` | Retained. No equivalent in original spec — added during daily-review authoring. Framework provenance (CBT) is strong. |
 | `#ideas` | — | — | `#ideas` | Retained. No equivalent in original spec. Kept as the generative capture signal. |
-| — | `#pattern` | — | — | Deprecated. `#pattern` was a user-driven freeform label; patterns are now a product of agent synthesis (multi-day recurrence detection in weekly-review § 0 and daily-review § 5a), not a capture tag. |
-| — | `#stuck` | — | — | Deprecated. Friction points are captured in the daily-review `friction` JSON field (Output contract). The `#stuck` tag was never implemented in any agent prompt. |
+| — | `#pattern` | — | Starter custom | Moved to Starter custom signals. Agent synthesis detects patterns structurally; `#pattern` remains valid as a user-custom tag for explicitly noticing recurrences they want to track. |
+| — | `#stuck` | — | Starter custom | Moved to Starter custom signals. `friction` field in daily-review Output contract handles structured capture; `#stuck` survives as a user-custom tag for self-annotated blocker awareness. |
+| — | `#insight` | — | Starter custom | Moved to Starter custom signals. Overlaps heavily with `#self`; retained as a starter custom for users who prefer a single broad reflection tag. |
+| — | `#brags` | — | Starter custom | Alias for `#brag`. Retained as a starter custom for users who prefer plural form. |
 | — | — | GTJ fields | `#gtj` (structured) | Retained as a reserved tag. GTJ energy entries get the full Engagement/Energy/Context structure. Freeform energy language is also tracked but without requiring the tag. |
 | — | — | — | `#bet` | New. Added 2026-04-26 per user. Bets/decisions is a genuinely distinct signal type with no prior coverage. |
 
 ### What changed
 
-- `#brags` → `#brag` (renamed to match current agent prompts)
-- `#pattern` → deprecated (absorbed into agent synthesis logic)
-- `#stuck` → deprecated (absorbed into daily-review Output contract `friction` field)
-- `#insight` → deprecated (absorbed into `#self` / `#grow` split)
+- `#brags` → `#brag` canonical (renamed to match current agent prompts); `#brags` survives as a starter custom alias
+- `#pattern`, `#stuck`, `#insight` → moved to Starter custom signals (see below); not deprecated, not removed — available for user adoption
+- `#self` and `#grow` — clarified per user (2026-04-26): `#self` = personal insights from your own reflection; `#grow` = advice received from others
 - `#gtj` → retained as reserved tag, hoisted into the canonical set
 - `#bet` → added new
 
 The V1 canonical set is: **`#brag`, `#grow`, `#self`, `#ant`, `#ideas`, `#gtj`, `#bet`** (seven tags).
+
+---
+
+---
+
+## Starter custom signals
+
+These tags come from the original `data-model.md § Tags` spec. They are not deprecated — they are the starting point of the user-custom layer (see § User-custom signals below). They are not in the V1 canonical detection set, but the agent knows about them as common patterns. Any user can adopt them as personal custom signals.
+
+| Tag | Description | Why it's here |
+|---|---|---|
+| `#pattern` | A recurring noticing worth tracking explicitly | The agent detects patterns structurally via multi-day synthesis; `#pattern` lets users self-annotate recurrences they're consciously aware of |
+| `#stuck` | A blocker or friction point the user wants to flag | Structural friction lives in the `friction` JSON field; `#stuck` gives users explicit vocabulary for naming what's blocking them |
+| `#insight` | A broad reflection tag — personal learning of any kind | Overlaps with `#self`; kept for users who prefer one catch-all reflection tag over the `#self`/`#grow` split |
+| `#brags` | Plural alias for `#brag` | Some users naturally write `#brags`; treated as equivalent to `#brag` |
+
+Starter custom signals ship as part of the default `user_signals` configuration. Users can remove any that don't fit and add their own.
+
+---
+
+## User-custom signals
+
+Every user can define their own set of signal tags, beyond the canonical set. Custom signals are personal — they reflect the patterns, practices, and frameworks that matter to *that* user's life and work.
+
+### What a custom signal is
+
+A custom signal is a named tag with:
+
+- **Name** — the `#tag` the user (and agent) will use
+- **Description** — what the agent should listen for when detecting this signal type
+- **Framework citation** (optional) — why this matters; what practice or source it comes from
+
+Example:
+
+```
+Tag: #maker
+Description: Moments of flow in creative or technical work — when I'm building something and time disappears.
+Framework: Flow theory (Csikszentmihalyi); my own observation that this is when I'm most satisfied.
+```
+
+### How detection works
+
+Custom signals are detected by the same agent re-read primitive that powers the noticing layer (`.claude/handoffs/agent-noticing-layer.md`). On each detection pass, the agent reads the user's custom signals alongside the canonical set. When a custom tag fires three times within 48 hours, it surfaces the same way a canonical signal would. Adding a custom signal is adding it to the detection pass — no code change required.
+
+This leverages topic clustering: the agent already performs multi-observation recurrence detection. Custom signals extend that same primitive with user-defined vocabulary.
+
+### Schema and storage (V1.1 — pending)
+
+Custom signals are stored per user. The V1.1 schema will introduce a `user_signals` table (or a `signals` key in `life_ops_config`) with:
+
+```
+user_id        — foreign key to auth.users
+tag            — e.g. "#maker"
+description    — what the agent listens for
+framework      — optional provenance note
+created_at
+```
+
+**V1.1 implementation is pending** — schema design and UX surface (how users add/edit custom signals) are to be designed. The architecture is settled; the build is not.
+
+### Starter custom signals
+
+The tags from the original spec (`#pattern`, `#stuck`, `#insight`, `#brags`) ship as default starter customs — pre-populated in `user_signals` for new accounts so the agent detects them out of the box. Users can edit, disable, or delete them. They are not forced canonical because they vary in relevance by user; they are not deprecated because they carry genuine signal value.
 
 ---
 
