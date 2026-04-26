@@ -1,0 +1,44 @@
+name: lint
+
+# ESLint gate for the web prototype (web/*.jsx). Catches stub handlers
+# (`onClick={() => {}}`, `onEdit={() => {}}`), undefined JSX components,
+# and dead destructures before they ship.
+#
+# Pairs with ci.yml (Expo app typecheck + unit tests) and security.yml
+# (gitleaks) as the deterministic gates auto-merge-safe.yml waits on.
+#
+# Config: eslint.config.mjs (flat config) at the repo root.
+# Lint script: root package.json `scripts.lint`.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: lint-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  eslint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit --fund=false
+
+      - name: Lint (web/*.jsx)
+        run: npm run lint

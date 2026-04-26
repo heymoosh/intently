@@ -45,9 +45,31 @@ a failure. Stay scoped to making the build green.
 
 ## Stack-dependent behavior
 
-Until the stack is chosen (post-Thursday Apr 23), this loop has no commands to run. Either:
-- Skip the loop until `ci.yml` and CLAUDE.md required-commands section are wired, or
-- Run with a degenerate brief: "Verify all markdown files in docs/ have valid frontmatter and parse cleanly. Output nothing if all pass."
+The web prototype (`web/*.jsx`, JSX-via-Babel-standalone, no bundler) is the
+deploy surface. ESLint config at `eslint.config.mjs` covers it; `npm run lint`
+runs `eslint web/**/*.jsx --max-warnings=0`. The lint catches stub handlers
+(`onClick={() => {}}`, `onEdit={() => {}}`), undefined JSX components
+(`react/jsx-no-undef`), and dead destructures (`no-unused-vars`).
+
+Out of scope for this loop:
+- `app/` (Expo + RN-Web, historical reference per ADR 0004) — not linted.
+- `supabase/functions/*.ts` (Deno runtime) — not linted; separate effort if needed.
+- TypeScript typecheck of `web/*.jsx` — files are JSX-via-Babel, no `tsc` coverage.
+- Unit tests — `tests/` is README-only; `npm test` is not wired.
+
+When you add new cross-file globals via `Object.assign(window, { … })`, also
+add them to `PROTOTYPE_GLOBALS` in `eslint.config.mjs`, otherwise
+`react/jsx-no-undef` will flag every consumer site.
+
+### Zero-coverage self-check (deferred)
+
+The loop should ideally fail loud (`ZERO-COVERAGE WARNING`) if the lint
+matches zero files — that's the failure mode that put the watchdog to sleep
+in the first place. Implementing this requires modifying the launchd-invoked
+shell wrapper (not just this Markdown spec). **Follow-up:** add a
+`scripts/build-watchdog.sh` that wraps `npm run lint` and asserts ESLint
+reports `>=1` file processed (`eslint --print-config web/intently-reading.jsx`
+exits 0) before declaring "OK shell green".
 
 ## Edge cases
 
