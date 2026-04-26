@@ -575,7 +575,7 @@ function BriefFlow({ onClose, onComplete }) {
           {agentTyping && <AgentTyping />}
           {/* Live daily-brief from ma-proxy — appears before the confirm card */}
           {showBriefThinking && <AgentTyping />}
-          {liveBrief && <ChatBubble role="agent" text={liveBrief} />}
+          {liveBrief && <ChatBubble role="agent" text={(parseAgentPlan(liveBrief, MOCK_PLAN).proseBody) || liveBrief} />}
           {briefError && <ChatBubble role="agent" text="(I couldn't reach the brief generator just now — here's your day shape anyway.)" />}
           {showConfirm && <BriefConfirmCard plan={parseAgentPlan(liveBrief, MOCK_PLAN)} consulted={consulted} onAccept={async () => {
             // Persist the brief response as entries.kind='brief' + fire undo toast.
@@ -1084,7 +1084,7 @@ function ReviewFlow({ onClose, onComplete }) {
           {agentTyping && <AgentTypingDark />}
           {/* Live daily-review from ma-proxy — appears before the confirm card */}
           {showReviewThinking && <AgentTypingDark />}
-          {liveReview && <ChatBubbleDark role="agent" text={liveReview} />}
+          {liveReview && <ChatBubbleDark role="agent" text={(window.parseAgentReview && window.parseAgentReview(liveReview) && window.parseAgentReview(liveReview).proseBody) || liveReview} />}
           {reviewError && <ChatBubbleDark role="agent" text="(I couldn't reach the review generator just now — saving what you said anyway.)" />}
           {showConfirm && (() => {
             const parsed = liveReview ? (window.parseAgentReview && window.parseAgentReview(liveReview)) : null;
@@ -1254,9 +1254,27 @@ function AutoCheckList({ items, checkedIndex }) {
 }
 
 function ReviewConfirmCard({ parsed, onAccept, consulted = [] }) {
-  const journal  = (parsed && parsed.journal)  || 'The dry run actually went well. I walked in present.';
-  const friction = (parsed && parsed.friction) || 'Over-polishing the data slide — twice this week.';
-  const tomorrow = (parsed && parsed.tomorrow) || 'Write the job pitch before opening Slack.';
+  // Normalize across two shapes:
+  //   - JSON-tail (current): { journalText, friction:[{text,tag}], tomorrow:[{text,tier}], calendar:[{text}] }
+  //   - Prose-only fallback: { journal, friction, tomorrow } as strings
+  const _toText = (v) => {
+    if (!v) return '';
+    if (typeof v === 'string') return v;
+    if (Array.isArray(v)) {
+      return v.map((it) => (typeof it === 'string' ? it : (it && it.text) || '')).filter(Boolean).join(' • ');
+    }
+    return '';
+  };
+  const journal  = (parsed && (parsed.journalText || parsed.journal)) || 'The dry run actually went well. I walked in present.';
+  const friction = _toText(parsed && parsed.friction) || 'Over-polishing the data slide — twice this week.';
+  const tomorrow = _toText(parsed && parsed.tomorrow) || 'Write the job pitch before opening Slack.';
+  const calendarItems = (parsed && Array.isArray(parsed.calendar) && parsed.calendar.length > 0)
+    ? parsed.calendar.map((c) => ({ t: c.time || '', body: (typeof c === 'string' ? c : c.text) || '' })).filter(c => c.body)
+    : [
+        { t: '9:30 AM', body: 'Anya — pitch follow-up' },
+        { t: '12:00 PM', body: 'Lunch w/ Jordan (finally)' },
+        { t: '4:00 PM', body: 'Hackathon retro' },
+      ];
   return (
     <div style={{ marginTop: 4 }}>
       <div style={{
@@ -1313,11 +1331,7 @@ function ReviewConfirmCard({ parsed, onAccept, consulted = [] }) {
             marginBottom: 6,
           }}>What's on the calendar</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {[
-              { t: '9:30 AM', body: 'Anya — pitch follow-up' },
-              { t: '12:00 PM', body: 'Lunch w/ Jordan (finally)' },
-              { t: '4:00 PM', body: 'Hackathon retro' },
-            ].map((e, i) => (
+            {calendarItems.map((e, i) => (
               <div key={i} style={{
                 display: 'flex', gap: 10, alignItems: 'baseline',
                 fontFamily: T.font.Reading, fontSize: 13, lineHeight: '18px',
@@ -1663,7 +1677,7 @@ function WeeklyReviewFlow({ onClose, onComplete }) {
           {messages.map((m, i) => <ChatBubbleDark key={i} role={m.role} text={m.text} sub={m.sub} />)}
           {agentTyping && <AgentTypingDark />}
           {showThinking && <AgentTypingDark />}
-          {liveReview && <ChatBubbleDark role="agent" text={liveReview} />}
+          {liveReview && <ChatBubbleDark role="agent" text={(window.parseAgentWeeklyReview && window.parseAgentWeeklyReview(liveReview) && window.parseAgentWeeklyReview(liveReview).proseBody) || liveReview} />}
           {reviewError && <ChatBubbleDark role="agent" text="(I couldn't reach the weekly-review generator just now — saving what you said anyway.)" />}
           {showConfirm && (() => {
             const parsed = liveReview && window.parseAgentWeeklyReview
