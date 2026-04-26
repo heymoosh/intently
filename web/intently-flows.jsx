@@ -468,7 +468,7 @@ function ProjectDetailV2({ p, adds, onBack, onAddProjectTodo, onToggleProjectTod
 // the plan populating band-by-band.
 const BRIEF_SCRIPT = [
   {
-    agent: "Morning, Sam.",
+    agent: "Morning, {NAME}.",
     agentSub: "Yesterday you shipped the slide and walked after dinner. Today is Thursday, week 17 — three things on your weekly board still.",
     typing: 1800,
   },
@@ -502,6 +502,18 @@ function BriefFlow({ onClose, onComplete }) {
   const [consulted, setConsulted] = React.useState([]);     // input traces — what the assembler injected
   const scrollRef = React.useRef(null);
 
+  // Resolve display name for greeting substitution. Read from the module-level
+  // cache (_profileCache) so the hook state is stable at step 0. By the time
+  // the user opens the brief the profile is already cached (fetched on app
+  // load via useUserProfile in the shell). Falls back to null → "Morning."
+  const profile = window.useUserProfile ? window.useUserProfile() : { displayName: null };
+  const briefDisplayName = (profile && profile.displayName) || null;
+  // Keep a ref so the step-0 effect doesn't need briefDisplayName in its deps
+  // (which would re-fire the greeting useEffect each time the async profile
+  // resolves, posting a duplicate first message).
+  const briefDisplayNameRef = React.useRef(briefDisplayName);
+  briefDisplayNameRef.current = briefDisplayName;
+
   // Drive the script — when step changes, post agent turn, reveal input/confirm.
   // Steps that have neither `input` nor `confirm` are passive bubbles (e.g. the
   // opening greeting) and auto-advance after a short reading pause so the user
@@ -510,8 +522,14 @@ function BriefFlow({ onClose, onComplete }) {
     const s = BRIEF_SCRIPT[step];
     if (!s) return;
     setAgentTyping(true);
+    // Substitute {NAME} placeholder with the user's display name at render time.
+    // Falls back to empty string so the result is "Morning." (no dangling comma).
+    const name = briefDisplayNameRef.current;
+    const agentText = typeof s.agent === 'string'
+      ? s.agent.replace('{NAME}', name || '').replace(/,\s*\.$/, '.').trim()
+      : s.agent;
     const typingTimer = setTimeout(() => {
-      setMessages(m => [...m, { role: 'agent', text: s.agent, sub: s.agentSub }]);
+      setMessages(m => [...m, { role: 'agent', text: agentText, sub: s.agentSub }]);
       setAgentTyping(false);
     }, s.typing);
     let advanceTimer;

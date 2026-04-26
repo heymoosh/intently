@@ -26,6 +26,21 @@ async function seedSamIfEmpty() {
   const userId = await window.getCurrentUserId();
   const summary = { inserted: {}, skipped: false };
 
+  // 0. Profile — upsert display_name + timezone for Sam so Avatar, Profile
+  // sheet, and journal byline show "Sam Tanaka" instead of "?" / "—".
+  // The auth trigger already inserted the row with id only; we just UPDATE.
+  // profiles has no email column (migration 0001). Non-fatal: warn + continue.
+  const { error: profileErr } = await sb.from('profiles').upsert({
+    id: userId,
+    display_name: 'Sam Tanaka',
+    timezone: 'America/Chicago',
+  }, { onConflict: 'id' });
+  if (profileErr) {
+    console.warn('[seed-sam] profile upsert skipped:', profileErr.message);
+  } else {
+    summary.inserted.profile = 1;
+  }
+
   // 1. Goals — insert and capture returned ids so projects can FK them.
   const goalRows = window.SAM_GOALS.map((g, i) => ({
     user_id: userId,
