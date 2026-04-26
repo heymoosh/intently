@@ -24,15 +24,18 @@ function VoiceWaveform({ color = '#FBF8F2', amplitude = 1 }) {
 }
 
 // Tap = voice; press-and-hold = menu. Always bottom-right.
-// Press-hold behaviour: hold to open menu, drag up to a button, RELEASE over it to activate.
-// If you release still over the mic → plain tap → listening.
+// Press-hold behaviour (sticky): long-press opens the menu and LEAVES it open after release.
+// Tap an option to select. Tap outside (or press Escape) to dismiss. Short-tap (release before
+// the long-press threshold) starts voice recording, unchanged.
 function HeroAffordance({ state = 'idle', onChange, onPick, seedTranscript = '', onTranscriptConsumed }) {
-  // state: 'idle' | 'listening' | 'processing' | 'expanded'
+  // state: 'idle' | 'listening' | 'processing' | 'expanded' | 'chat'
   const holdTimer = React.useRef(null);
   const openedByHold = React.useRef(false);
-  const activeKey = React.useRef(null);
+  // Stamps the pointerdown that triggered the long-press, so the document-level
+  // dismiss listener can ignore the very same pointerdown that just opened the menu.
+  const openingPointerId = React.useRef(null);
+  const containerRef = React.useRef(null);
   const [hovered, setHovered] = React.useState(false);
-  const [activeHover, setActiveHover] = React.useState(null);
 
   const isListening = state === 'listening';
   const isProcessing = state === 'processing';
@@ -57,29 +60,18 @@ function HeroAffordance({ state = 'idle', onChange, onPick, seedTranscript = '',
     else onChange('idle');
   };
 
-  // Hit-testing during hold: pointermove fires while the mic retains capture.
-  const handlePointerMove = (e) => {
-    if (!isExpanded && !openedByHold.current) return;
-    const el = document.elementFromPoint(e.clientX, e.clientY);
-    const btn = el && el.closest && el.closest('[data-hero-menu-item]');
-    const key = btn ? btn.getAttribute('data-hero-menu-item') : null;
-    if (key !== activeKey.current) {
-      activeKey.current = key;
-      setActiveHover(key);
-    }
-  };
-
   const onMicPointerDown = (e) => {
     if (isProcessing) return;
-    if (e.pointerId != null && e.currentTarget.setPointerCapture) {
-      try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* assistive-tech / synthesized event — no active pointer to capture */ }
-    }
+    // If the menu is already open and the user presses the mic, treat the
+    // press as "dismiss the menu". The pendingTap branch on pointerup still
+    // fires `onChange('listening')` for an in-menu short-tap, which transitions
+    // out of 'expanded' — consistent toggle behavior.
     openedByHold.current = false;
-    activeKey.current = null;
-    setActiveHover(null);
+    openingPointerId.current = null;
     clearTimeout(holdTimer.current);
     holdTimer.current = setTimeout(() => {
       openedByHold.current = true;
+      openingPointerId.current = e.pointerId != null ? e.pointerId : 'synthetic';
       holdTimer.current = null;
       onChange && onChange('expanded');
     }, 320);
@@ -92,17 +84,11 @@ function HeroAffordance({ state = 'idle', onChange, onPick, seedTranscript = '',
     holdTimer.current = null;
 
     if (wasHold) {
-      // Released during hold — activate whichever item the finger is over, if any.
-      const key = activeKey.current;
+      // Sticky open: release does NOT close the menu. The user dismisses by
+      // tapping an option (handled by the menu items' onClick), tapping outside
+      // (handled by the document-level pointerdown effect below), or pressing
+      // Escape (handled by the keydown effect below).
       openedByHold.current = false;
-      activeKey.current = null;
-      setActiveHover(null);
-      if (key) {
-        activate(key);
-      } else {
-        // Released over empty space / over the mic → dismiss menu.
-        onChange && onChange('idle');
-      }
       return;
     }
 
@@ -113,13 +99,47 @@ function HeroAffordance({ state = 'idle', onChange, onPick, seedTranscript = '',
   };
 
   const onMicPointerCancel = () => {
+    // Cancel the pending long-press timer if the gesture was aborted before
+    // the menu opened. Once the menu IS open (sticky), don't auto-dismiss on
+    // cancel — that would defeat the sticky semantics on touch devices that
+    // synthesize a cancel after the system pointer-capture timeout.
     clearTimeout(holdTimer.current);
     holdTimer.current = null;
     openedByHold.current = false;
-    activeKey.current = null;
-    setActiveHover(null);
-    if (isExpanded) onChange && onChange('idle');
   };
+
+  // Sticky-menu dismissal: outside-tap + Escape. Both run only while the
+  // menu is in the 'expanded' state, attaching listeners on enter and
+  // tearing them down on exit. The outside-tap listener has to defer one
+  // tick so the very pointerdown that opened the menu doesn't immediately
+  // close it — we stamp the opening pointer's id and ignore the matching
+  // pointerdown event.
+  React.useEffect(() => {
+    if (!isExpanded) return;
+    const openingId = openingPointerId.current;
+    const onDocPointerDown = (e) => {
+      // Skip the synthetic/duplicate pointerdown that just opened the menu.
+      if (openingId != null && e.pointerId === openingId) {
+        openingPointerId.current = null;
+        return;
+      }
+      const node = containerRef.current;
+      if (node && node.contains(e.target)) return;
+      onChange && onChange('idle');
+    };
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onChange && onChange('idle');
+      }
+    };
+    document.addEventListener('pointerdown', onDocPointerDown, true);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onDocPointerDown, true);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [isExpanded, onChange]);
 
   if (isListening) {
     return <HeroListening onDone={(transcript) => {
@@ -139,54 +159,83 @@ function HeroAffordance({ state = 'idle', onChange, onPick, seedTranscript = '',
   }
 
   return (
-    <div aria-hidden={false} style={{
-      position: 'absolute', right: 20, bottom: 24, zIndex: 40,
-      display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10,
-      pointerEvents: 'auto',
-    }}>
-      {/* Expanded menu stack — buttons are *targets* during the held gesture, not clickable on their own. */}
+    <>
+      {/* Sticky-open scrim — tells the user "this menu is held open, tap anywhere
+          to dismiss". Only visible while expanded. The brief 320ms hold-to-open
+          window has no scrim (the menu isn't visible yet during the hold), which
+          gives the visual distinction CR-07 asks for: held = invisible timer,
+          sticky = scrim + menu. */}
       {isExpanded && (
-        <div style={{
+        <div aria-hidden="true" style={{
+          position: 'absolute', inset: 0, zIndex: 39,
+          background: 'rgba(31,27,21,0.18)',
+          animation: `intentlyScrimIn 160ms ${T.motion.Standard} both`,
+          pointerEvents: 'none',
+        }} />
+      )}
+      <div ref={containerRef} aria-hidden={false} style={{
+        position: 'absolute', right: 20, bottom: 24, zIndex: 40,
+        display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10,
+        pointerEvents: 'auto',
+      }}>
+      {/* Expanded menu stack — sticky open. Each item is a real clickable
+          target; tap selects + dismisses (activate transitions out of 'expanded'). */}
+      {isExpanded && (
+        <div role="menu" aria-label="Hero quick actions" style={{
           display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8,
           }}>
           {items.map((it, i) => {
             const IC = it.icon;
-            const isActive = activeHover === it.key;
             return (
-              <div
+              <button
                 key={it.key}
+                role="menuitem"
                 data-hero-menu-item={it.key}
-                onClick={() => activate(it.key)}  // fallback for mouse users who click
+                onClick={() => activate(it.key)}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 10,
                   height: 44, padding: '0 16px 0 14px',
-                  background: isActive ? T.color.PrimaryText : T.color.SecondarySurface,
-                  border: `1px solid ${isActive ? T.color.PrimaryText : T.color.EdgeLine}`,
+                  background: T.color.SecondarySurface,
+                  border: `1px solid ${T.color.EdgeLine}`,
                   borderRadius: 999,
-                  boxShadow: isActive
-                    ? '0 10px 24px rgba(31,27,21,0.22), 0 0 0 4px rgba(83,122,79,0.18)'
-                    : T.shadow.Raised,
+                  boxShadow: T.shadow.Raised,
                   fontFamily: T.font.UI, fontSize: 15, fontWeight: 500,
-                  color: isActive ? T.color.InverseText : T.color.PrimaryText,
+                  color: T.color.PrimaryText,
                   cursor: 'pointer',
-                  animationDelay: `${i * 40}ms`,
-                  transform: isActive ? 'scale(1.04)' : 'scale(1)',
+                  animation: `intentlyMenuItemIn 160ms ${T.motion.Spring} ${i * 40}ms both`,
                   transition: `background 120ms ${T.motion.Standard}, transform 120ms ${T.motion.Spring}, box-shadow 120ms ${T.motion.Standard}`,
-                  userSelect: 'none', touchAction: 'none',
+                  userSelect: 'none',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = T.color.PrimaryText;
+                  e.currentTarget.style.color = T.color.InverseText;
+                  e.currentTarget.style.borderColor = T.color.PrimaryText;
+                  e.currentTarget.style.transform = 'scale(1.04)';
+                  const ic = e.currentTarget.querySelector('svg');
+                  if (ic) ic.style.color = T.color.InverseText;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = T.color.SecondarySurface;
+                  e.currentTarget.style.color = T.color.PrimaryText;
+                  e.currentTarget.style.borderColor = T.color.EdgeLine;
+                  e.currentTarget.style.transform = 'scale(1)';
+                  const ic = e.currentTarget.querySelector('svg');
+                  if (ic) ic.style.color = T.color.SupportingText;
                 }}
               >
-                <IC size={16} color={isActive ? T.color.InverseText : T.color.SupportingText} />
+                <IC size={16} color={T.color.SupportingText} />
                 {it.label}
-              </div>
+              </button>
             );
           })}
         </div>
       )}
       {/* The disc */}
       <button
-        aria-label={isProcessing ? 'Agent working' : 'Start voice — hold for options'}
+        aria-label={isProcessing ? 'Agent working' : (isExpanded ? 'Close menu' : 'Start voice — hold for options')}
+        aria-expanded={isExpanded}
+        aria-haspopup="menu"
         onPointerDown={onMicPointerDown}
-        onPointerMove={handlePointerMove}
         onPointerUp={onMicPointerUp}
         onPointerCancel={onMicPointerCancel}
         onMouseEnter={() => setHovered(true)}
@@ -200,7 +249,7 @@ function HeroAffordance({ state = 'idle', onChange, onPick, seedTranscript = '',
             : '0 8px 22px rgba(31,27,21,0.22), 0 2px 6px rgba(31,27,21,0.08)',
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
           cursor: 'pointer', position: 'relative', overflow: 'hidden',
-          transition: `transform 160ms ${T.motion.Standard}, background 240ms ${T.motion.Standard}`,
+          transition: `transform 160ms ${T.motion.Standard}, background 240ms ${T.motion.Standard}, box-shadow 200ms ${T.motion.Standard}`,
           transform: hovered ? 'scale(1.04)' : 'scale(1)',
           touchAction: 'none', userSelect: 'none',
         }}
@@ -221,7 +270,8 @@ function HeroAffordance({ state = 'idle', onChange, onPick, seedTranscript = '',
           }} />
         )}
       </button>
-    </div>
+      </div>
+    </>
   );
 }
 
