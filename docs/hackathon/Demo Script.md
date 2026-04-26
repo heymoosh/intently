@@ -41,6 +41,24 @@ The problem with all the apps and tools we have today is that you end up spendin
 
 ---
 
+## Technical VO
+
+*(over Remotion animation, after app demo)*
+
+Under the hood, Intently runs six agents on a schedule — a daily brief every morning, a daily review every evening, weekly and monthly reviews that look across time. They all read from and write to the same place.
+
+But the real story isn't the schedule. It's what they're listening for.
+
+Most productivity tools try to capture everything. Intently is built around a different bet: that only certain signals actually matter for living well. Your energy patterns — what drains you versus what lights you up. The automatic negative thoughts you have about yourself. Your wins, the moments worth remembering. The decisions and bets you're making. These are things career coaches and behavioral designers have known for years are worth tracking. Most of us don't, because nobody told us to.
+
+Intently knows to look for them. That's the job of Opus 4.7 — not just to summarize your day, but to recognize when one of those moments shows up, extract it, and keep it in the record.
+
+*[data complexity visual — signals accumulating over time: energy, automatic negative thoughts, brags, decisions]*
+
+A week in, it's starting to notice. A month in, it can see patterns you'd never catch from inside a single day. That's what turns a journal entry into an insight.
+
+---
+
 Every morning your brief is already there — what you're working toward, what needs your attention today. Before the noise starts.
 
 Every evening, a review captures what actually happened. The journal goes deeper — your patterns, your blind spots, things you'd never catch from inside a single day.
