@@ -97,40 +97,18 @@ Wide open empty space — the heat has drained out of the scene but it isn't cal
 ## Scene 10 — Intently arrives
 
 ```
-@AppHero and a glowing phone/app icon standing side by side, both facing the floating question mark together. The app icon has arrived from the right, now next to her, with a soft sage-green accent glow. A sense of "we've got this." The world has just adopted the app's calm, warm palette. Flat 2D vector illustration style — clean geometric shapes, simplified character with expressive face, smooth rounded forms. Background: solid flat fill of #F5EEE0 (warm linen — Intently's app surface color), the first truly calm and warm note in the sequence.
+@AppHero standing, with a glowing phone/app icon that has just arrived from the right, now beside her. The app icon has a soft sage-green accent glow. @AppHero's posture signals relief — shoulders dropped, head slightly turned toward the icon. The world has just adopted the app's calm, warm palette. Flat 2D vector illustration style — clean geometric shapes, simplified character with expressive face, smooth rounded forms. Background: solid flat fill of #F5EEE0 (warm linen — Intently's app surface color), the first truly calm and warm note in the sequence.
 ```
 
 ---
 
-## Scene 11 — Zoom into the app
+## Scenes 11–14 — Real footage (no Runway prompt)
 
-```
-A close-up of an illustrated phone held upright in the center of the frame, growing larger as if the camera is pushing in. The phone screen begins to render the morning brief: a clean illustrated UI on a warm linen card, a bold heading "Today" at the top, a few short text rows sketched beneath, a single sage-green accent. The phone bezel is simplified and geometric. This is NOT a real screen recording — it's a 2D vector illustrated version of the UI, living inside the same illustrated world as @AppHero. Flat 2D vector illustration style — clean geometric shapes, smooth rounded forms. Background: solid flat fill of #F5EEE0 (warm linen).
-```
-
----
-
-## Scene 12 — Reading the brief
-
-```
-@AppHero holding an illustrated phone in front of her with both hands, looking down at it with a small relieved smile — not amazed, just at ease. The phone screen shows a 2D vector illustrated version of the morning brief: a warm linen card with a bold heading "Today," a few short rows of text, and a sage-green accent. The UI is clearly illustrated, not photographed — it lives inside the same vector world as @AppHero. Flat 2D vector illustration style — clean geometric shapes, simplified character with expressive face, smooth rounded forms. Background: solid flat fill of #F5EEE0 (warm linen).
-```
-
----
-
-## Scene 13 — Evening review
-
-```
-@AppHero seated, head slightly tilted down, holding an illustrated phone in both hands. End-of-day softness in her posture, gently nodding as she reads. The phone screen shows a 2D vector illustrated version of the evening review UI — a warm linen card with a heading like "Today" and a soft list of items, sage-green checkmarks beside them. The UI is a flat vector illustration, not a real screen recording, and lives inside the same illustrated world as @AppHero. Flat 2D vector illustration style — clean geometric shapes, simplified character with expressive face, smooth rounded forms. Background: solid flat fill of #F5EEE0 (warm linen).
-```
-
----
-
-## Scene 14 — Journal / pattern surfacing
-
-```
-A top-down close-up of an open illustrated notebook, two pages spread. Handwritten-style text appearing on the left page. On the right margin, a small soft callout note has appeared: "you've been skipping rest — 3 weeks running." The handwriting feels human but the page is clearly a flat vector illustration — paper texture suggested by simple rounded shapes, no photorealism. A small sage-green accent on the margin note. Flat 2D vector illustration style — clean geometric shapes, smooth rounded forms. Background: solid flat fill of #F5EEE0 (warm linen) framing the notebook.
-```
+> **[Not Runway-generated]** Scenes 11–14 are live footage:
+> - **Scene 11:** Direct-to-camera founder video (Muxin, founder riff — see Demo Script.md § Founder Cameo)
+> - **Scenes 12–14:** Real screen recordings of intently-eta.vercel.app — daily brief, voice capture, daily review, weekly review flows
+>
+> Resume Runway prompts at Scene 15.
 
 ---
 

@@ -1,8 +1,8 @@
-# 0008 — Google OAuth refresh-token storage in Supabase Vault
+# 0009 — Google OAuth refresh-token storage in Supabase Vault
 
 **Status:** Accepted
 **Date:** 2026-04-25
-**Related:** [0005 — Secrets via Supabase env](0005-secrets-via-supabase-env.md), migration `0007_oauth_connections.sql`, handoff `.claude/handoffs/oauth-calendar-email.md`
+**Related:** [0005 — Secrets via Supabase env](0005-secrets-via-supabase-env.md), migration `0008_oauth_connections.sql`, handoff `.claude/handoffs/oauth-calendar-email.md`
 
 ## Context
 
@@ -18,7 +18,7 @@ The handoff locked the choice (*"DECIDED 2026-04-25: Supabase Vault. BWS deferre
 
 **Refresh tokens are stored in Supabase Vault, accessed only via SECURITY DEFINER passthrough RPCs in `public`, granted to `service_role` only.**
 
-Concretely (all in migration `0007_oauth_connections.sql`):
+Concretely (all in migration `0008_oauth_connections.sql`):
 
 - `public.oauth_connections (id, user_id, provider, vault_secret_id uuid, scopes, connected_at, last_synced_at, revoked_at)` — owner-RLS — stores everything *except* the token. The `vault_secret_id` column is the only pointer to the actual secret.
 - `public.create_secret_passthrough(secret, name)` → calls `vault.create_secret(...)`, returns the uuid. SECURITY DEFINER, granted to `service_role`.

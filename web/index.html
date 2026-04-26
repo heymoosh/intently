@@ -111,7 +111,12 @@
 
 <!-- Dev-mode detection: localhost auto-on, ?dev=1 forces on, ?dev=0 forces off.
      Sets html.dev-mode CSS class + window.INTENTLY_DEV / INTENTLY_FORCE_STATE
-     for the React tree to consume. -->
+     for the React tree to consume.
+     INTENTLY_DEMO: ?demo=1 loads Sam's seeded life as a demo persona — same
+     URL pattern the future landing-page demo embed uses. Real-app visitors
+     (no ?demo) get a clean empty state. See
+     `.claude/handoffs/new-user-ux-and-auth.md` (sam-seed gate AC) and
+     `.claude/handoffs/sam-demo-on-landing-page.md` (embed architecture). -->
 <script>
   (function() {
     try {
@@ -124,10 +129,12 @@
       else if (devParam === '0') dev = false;
       else dev = isLocal;
       window.INTENTLY_DEV = dev;
+      window.INTENTLY_DEMO = url.searchParams.get('demo') === '1';
       window.INTENTLY_FORCE_STATE = url.searchParams.get('state') || null;
       if (dev) document.documentElement.classList.add('dev-mode');
     } catch (e) {
       window.INTENTLY_DEV = false;
+      window.INTENTLY_DEMO = false;
       window.INTENTLY_FORCE_STATE = null;
     }
   })();
@@ -201,6 +208,7 @@
 <script src="lib/voice.js"></script>
 <script src="lib/reminders.js"></script>
 <script type="text/babel" src="lib/supabase.js"></script>
+<script type="text/babel" src="lib/user-profile.js"></script>
 <script type="text/babel" src="lib/entities.js"></script>
 <script type="text/babel" src="lib/seed-sam-data.js"></script>
 <script type="text/babel" src="lib/seed-sam.js"></script>
@@ -831,6 +839,10 @@ function PrototypePhone({ dayState, setDayState, idx, setIdx }) {
   const [profileView, setProfileView] = React.useState(null); // null | 'sheet' | 'account' | 'preferences' | 'help'
   const [oauthIntegration, setOauthIntegration] = React.useState(null);
   const [openEntry, setOpenEntry] = React.useState(null); // reading-mode entry id
+  // Edit-mode swap-in for reading: { id, text } when the user taps
+  // the edit affordance on a DB-backed journal entry. Renders
+  // JournalComposer in edit mode; on save we updateJournalEntry(id, text).
+  const [editingEntry, setEditingEntry] = React.useState(null);
   const m = useManualAdds();
   const conn = useConnections();
 
@@ -850,6 +862,7 @@ function PrototypePhone({ dayState, setDayState, idx, setIdx }) {
     setProfileView(null);
     setOauthIntegration(null);
     setOpenEntry(null);
+    setEditingEntry(null);
     setBriefJustAccepted(false);
     if (dayState === 'morning-empty' || dayState === 'brief' || dayState === 'planned' || dayState === 'evening' || dayState === 'review' || dayState === 'closed') {
       setIdx(1); // snap to Present
@@ -977,6 +990,11 @@ function PrototypePhone({ dayState, setDayState, idx, setIdx }) {
         const body = (data.body_markdown || '').replace(/```json[\s\S]*$/, '').trim();
         if (data.kind === 'journal') {
           setDbEntry({
+            // `id` + `bodyMarkdown` are passed through so edit-mode can
+            // open JournalComposer with the existing text and update the
+            // existing row on save (not insert a new one).
+            id: data.id,
+            bodyMarkdown: data.body_markdown || '',
             kind: 'journal',
             mood: data.mood || 'dusk',
             dayLabel, dateLabel,
@@ -1008,6 +1026,10 @@ function PrototypePhone({ dayState, setDayState, idx, setIdx }) {
             messages: [],
           });
         }
+        // 'brief' / unknown kinds intentionally fall through with no
+        // setDbEntry — the journal list already gates the READ affordance
+        // off for non-resolvable kinds (intently-journal.jsx ~line 431).
+        // ReadingMode renders nothing for unknown kinds.
       } catch (err) {
         console.warn('[reading-mode] DB fetch failed:', err && err.message);
       }
@@ -1111,7 +1133,7 @@ function PrototypePhone({ dayState, setDayState, idx, setIdx }) {
       <UndoToast />
 
       {/* Profile button — bottom-left, persistent across all tenses */}
-      {dayState !== 'brief' && dayState !== 'review' && !showWeeklyReview && !showMonthlyRefresh && !showSetup && !openGoal && !openProject && !showJournal && !showConnections && !profileView && !openEntry && (
+      {dayState !== 'brief' && dayState !== 'review' && !showWeeklyReview && !showMonthlyRefresh && !showSetup && !openGoal && !openProject && !showJournal && !showConnections && !profileView && !openEntry && !editingEntry && (
         <ProfileButton onClick={() => setProfileView('sheet')} dim={micDim} />
       )}
 
@@ -1135,6 +1157,7 @@ function PrototypePhone({ dayState, setDayState, idx, setIdx }) {
           onOpenAccount={() => setProfileView('account')}
           onOpenPreferences={() => setProfileView('preferences')}
           onOpenHelp={() => setProfileView('help')}
+          onOpenAgentActivity={() => setProfileView('agent-activity')}
           onSignOut={async () => {
             try {
               if (window.signOutAndReset) await window.signOutAndReset();
@@ -1156,6 +1179,9 @@ function PrototypePhone({ dayState, setDayState, idx, setIdx }) {
       {profileView === 'help' && (
         <HelpPage onBack={() => setProfileView('sheet')} />
       )}
+      {profileView === 'agent-activity' && (
+        <AgentActivityPage onBack={() => setProfileView('sheet')} />
+      )}
 
       {/* Connections page */}
       {showConnections && (
@@ -1167,9 +1193,46 @@ function PrototypePhone({ dayState, setDayState, idx, setIdx }) {
         />
       )}
 
-      {/* Reading-mode overlay — opened from Past → Day entries */}
-      {currentEntry && (
-        <ReadingMode entry={currentEntry} onClose={() => setOpenEntry(null)} />
+      {/* Reading-mode overlay — opened from Past → Day entries.
+          `onEdit` only renders the edit affordance for journal entries
+          that came from the DB (have an `id`). Fixture entries from
+          ENTRY_DATA have no id → onEdit is undefined → JournalReader's
+          ReadingHeader skips the edit button. */}
+      {currentEntry && !editingEntry && (
+        <ReadingMode
+          entry={currentEntry}
+          onClose={() => setOpenEntry(null)}
+          onEdit={
+            currentEntry.kind === 'journal' && currentEntry.id
+              ? () => setEditingEntry({ id: currentEntry.id, text: currentEntry.bodyMarkdown || '' })
+              : undefined
+          }
+        />
+      )}
+
+      {/* Edit-mode JournalComposer — re-uses the composer with the
+          entry's existing body pre-filled. On save, UPDATE the row
+          (no insert) so reading mode + journal list re-fetch the
+          edited content. */}
+      {editingEntry && (
+        <JournalComposer
+          mode="edit"
+          initialText={editingEntry.text}
+          onClose={() => setEditingEntry(null)}
+          onSave={async (text) => {
+            try {
+              if (window.updateJournalEntry) {
+                await window.updateJournalEntry(editingEntry.id, text);
+              }
+            } catch (err) {
+              console.warn('[journal-edit] update failed:', err && err.message);
+            }
+            setEditingEntry(null);
+            // Close reading mode so the user sees the freshly-edited
+            // entry on next open (the resolver re-fetches by id).
+            setOpenEntry(null);
+          }}
+        />
       )}
 
       {/* OAuth flow */}

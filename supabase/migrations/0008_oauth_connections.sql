@@ -1,4 +1,4 @@
--- 0007_oauth_connections.sql — per-user OAuth connection records + idempotency
+-- 0008_oauth_connections.sql — per-user OAuth connection records + idempotency
 -- indexes for calendar_events / email_flags.
 --
 -- Why this exists:

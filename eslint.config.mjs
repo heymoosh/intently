@@ -45,7 +45,7 @@ const PROTOTYPE_GLOBALS = {
   // intently-cards.jsx
   TrackerCard: 'readonly', PlanCard: 'readonly', JournalCard: 'readonly',
   ConfirmationCard: 'readonly', FeatureCard: 'readonly', RingProgress: 'readonly',
-  InputTrace: 'readonly', ConfidenceDot: 'readonly',
+  InputTrace: 'readonly', ConfidenceDot: 'readonly', Avatar: 'readonly',
   // intently-hero.jsx
   HeroAffordance: 'readonly', HeroListening: 'readonly', HeroChat: 'readonly',
   VoiceWaveform: 'readonly', ProcessingArc: 'readonly',
@@ -111,8 +111,11 @@ const PROTOTYPE_GLOBALS = {
   insertProject: 'readonly', listProjects: 'readonly',
   addProjectTodo: 'readonly', toggleProjectTodo: 'readonly',
   insertPlanItem: 'readonly', listPlanItems: 'readonly',
-  insertJournalEntry: 'readonly', listJournalEntries: 'readonly',
+  insertJournalEntry: 'readonly', updateJournalEntry: 'readonly',
+  listJournalEntries: 'readonly',
   insertAdminReminder: 'readonly', listAdminReminders: 'readonly',
+  // lib/user-profile.js
+  getCurrentProfile: 'readonly', useUserProfile: 'readonly',
   // lib/ma-client.js
   callMaProxy: 'readonly', toAgentOutput: 'readonly', MaProxyError: 'readonly',
   // lib/reminders.js
@@ -134,6 +137,7 @@ const PROTOTYPE_GLOBALS = {
   useVoiceInput: 'readonly',
   // index.html runtime config
   INTENTLY_CONFIG: 'readonly', INTENTLY_DEV: 'readonly',
+  INTENTLY_DEMO: 'readonly',
   INTENTLY_FORCE_STATE: 'readonly',
   // CDN-loaded (via <script>)
   React: 'readonly', ReactDOM: 'readonly', supabase: 'readonly', Babel: 'readonly',

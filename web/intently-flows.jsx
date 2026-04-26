@@ -1500,6 +1500,11 @@ function usePopulate(bands, delayStart = 200, perItem = 90) {
 
 // ─── EMPTY-PRESENT (pre-brief, start of day) ────────────────────────
 function PresentEmpty({ onStartBrief }) {
+  // Parameterized greeting — read display_name from shared profile
+  // context. Anonymous users (no name yet) get "Good morning." with
+  // no name attached.
+  const profile = window.useUserProfile ? window.useUserProfile() : { displayName: null };
+  const greeting = profile.displayName ? `Good morning, ${profile.displayName}.` : 'Good morning.';
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
       {/* Lock-screen-style ambient image — centered painterly dawn,
@@ -1531,7 +1536,7 @@ function PresentEmpty({ onStartBrief }) {
         <div style={{
           fontFamily: T.font.Display, fontSize: 32, fontWeight: 500, lineHeight: '38px',
           color: T.color.PrimaryText, letterSpacing: -0.6, fontStyle: 'italic',
-        }}>Good morning, Sam.</div>
+        }}>{greeting}</div>
       </div>
 
       <div style={{ position: 'relative', zIndex: 1, flex: 1, overflowY: 'auto', padding: '20px 24px 240px', display: 'flex', flexDirection: 'column', gap: 28 }}>
