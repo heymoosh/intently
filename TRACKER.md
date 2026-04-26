@@ -103,6 +103,7 @@ End-to-end Playwright smoke against `intently-eta.vercel.app/?dev=1`. ma-proxy f
 
 ## Follow-ups (pending manual or flight-test)
 
+- **(Optional)** Re-provision the live weekly-review agent so its system prompt includes the new Output contract section: `cd app && bws run -- npx tsx ../scripts/provision-ma-agents.ts --skill weekly-review --update-existing`. Verified live the agent emits the right structured tail WITHOUT this — because the assembler inlines the contract in its task instructions. The re-provision just makes it durable across off-assembler calls. ([PR #148](https://github.com/heymoosh/intently/pull/148))
 - **Re-run `supabase db push`** from the primary checkout. The earlier db push apparently didn't pick up `0006_calendar_email.sql` — `calendar_events` + `email_flags` tables still 404 on prod (verified live). Once applied, refresh the app and the backfill seeder fires automatically; brief input then includes calendar + email context. ([PR #147](https://github.com/heymoosh/intently/pull/147))
 - **#24 Anthropic prompt caching in ma-proxy** — deferred from this batch. Requires an Edge Function deploy (`supabase functions deploy ma-proxy`) which is user-only. Will land in its own PR. ([PR #147](https://github.com/heymoosh/intently/pull/147))
 - Drop `docs/product-gaps-2026-04-25.md` content into `.claude/inbox/` once the capture/groom/execute system lands on this branch. (A parallel session shipped it 2026-04-25 per MEMORY.md, but the dir doesn't exist on `chat/0425-182455` yet.) ([PR #146](https://github.com/heymoosh/intently/pull/146))
