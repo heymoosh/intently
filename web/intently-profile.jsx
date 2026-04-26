@@ -71,7 +71,7 @@ function SettingGroup({ children }) {
 }
 
 // ─── PROFILE SHEET ───────────────────────────────────────────────────
-function ProfileSheet({ connectedCount, onClose, onOpenConnections, onOpenAccount, onOpenPreferences, onOpenHelp, onSignOut, onStartSetup }) {
+function ProfileSheet({ connectedCount, onClose, onOpenConnections, onOpenAccount, onOpenPreferences, onOpenHelp, onOpenAgentActivity, onSignOut, onStartSetup }) {
   return (
     <div style={{
       position: 'absolute', inset: 0, zIndex: 70,
@@ -144,6 +144,12 @@ function ProfileSheet({ connectedCount, onClose, onOpenConnections, onOpenAccoun
             label="Preferences"
             sub="Voice, notifications, day rhythm"
             onClick={onOpenPreferences}
+          />
+          <SettingRow
+            icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={T.color.PrimaryText} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>}
+            label="Agent activity"
+            sub="When the agent ran while you were away"
+            onClick={onOpenAgentActivity}
             last
           />
         </SettingGroup>
@@ -483,4 +489,158 @@ function HelpPage({ onBack }) {
   );
 }
 
-Object.assign(window, { ProfileSheet, AccountPage, PreferencesPage, HelpPage });
+// AgentActivityPage — the read-only "the agent ran while you were away" view.
+//
+// Reads the last 20 cron_log rows for the current user (RLS scopes the query
+// by auth.uid() = user_id, see 0002_schedules.sql). Each row shows skill,
+// fired_at relative time, and a small badge: dispatched / failed / queued.
+// Failure rows expand to show metadata.error so the user knows what missed.
+//
+// Why surface this in Profile (not in the daily-brief feed):
+//   • Most fires are silent successes — surfacing them inline is noise.
+//   • The user looks here when something feels off ("did the brief fire?").
+//   • Read-only is the right scope for V1; retry/cancel actions land later.
+function AgentActivityPage({ onBack }) {
+  const [rows, setRows] = React.useState(null); // null = loading, [] = empty
+  const [err, setErr] = React.useState(null);
+
+  React.useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const sb = window.getSupabaseClient ? window.getSupabaseClient() : null;
+        if (!sb) {
+          if (alive) { setRows([]); setErr('Supabase client not available.'); }
+          return;
+        }
+        const userId = await window.getCurrentUserId();
+        const { data, error } = await sb
+          .from('cron_log')
+          .select('id, skill, fired_at, dispatched, metadata')
+          .eq('user_id', userId)
+          .order('fired_at', { ascending: false })
+          .limit(20);
+        if (!alive) return;
+        if (error) { setRows([]); setErr(error.message); return; }
+        setRows(data || []);
+      } catch (e) {
+        if (alive) { setRows([]); setErr(e && e.message ? e.message : String(e)); }
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const fmtRel = (iso) => {
+    const then = new Date(iso).getTime();
+    const now = Date.now();
+    const diff = Math.max(0, now - then);
+    if (diff < 60_000) return 'just now';
+    if (diff < 3600_000) return `${Math.floor(diff / 60_000)}m ago`;
+    if (diff < 86400_000) return `${Math.floor(diff / 3600_000)}h ago`;
+    const d = new Date(iso);
+    return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  };
+
+  const skillLabel = (s) => ({
+    'daily-brief': 'Morning brief',
+    'daily-review': 'Evening review',
+    'weekly-review': 'Weekly review',
+    'monthly-review': 'Monthly review',
+  }[s] || s);
+
+  const StatusBadge = ({ row }) => {
+    const phase = (row.metadata && row.metadata.phase) || (row.dispatched ? 'completed' : 'queued');
+    const isError = phase === 'failed' || phase === 'http_error';
+    const colorMap = {
+      completed: { bg: '#D7E5D2', fg: '#3F6133' },
+      dispatched: { bg: '#E5DFC9', fg: '#6B5E2C' },
+      queued: { bg: '#E5DFC9', fg: '#6B5E2C' },
+      skipped: { bg: '#E5DFC9', fg: '#6B5E2C' },
+      failed: { bg: '#F2D7CB', fg: '#A8421C' },
+      http_error: { bg: '#F2D7CB', fg: '#A8421C' },
+    };
+    const c = colorMap[phase] || colorMap.queued;
+    return (
+      <span style={{
+        fontFamily: T.font.UI, fontSize: 11, fontWeight: 600,
+        color: c.fg, background: c.bg,
+        padding: '3px 8px', borderRadius: 999, letterSpacing: 0.3,
+        textTransform: 'uppercase',
+      }}>
+        {isError ? 'failed' : phase}
+      </span>
+    );
+  };
+
+  return (
+    <SettingsSubPage title="Agent activity." eyebrow="Profile · Agent activity" onBack={onBack}>
+      {rows === null && (
+        <div style={{ padding: '20px 16px', fontFamily: T.font.UI, fontSize: 13, color: T.color.SupportingText }}>
+          Loading…
+        </div>
+      )}
+      {rows && rows.length === 0 && (
+        <div style={{
+          padding: '20px 16px',
+          fontFamily: T.font.Reading, fontSize: 13, lineHeight: '19px',
+          color: T.color.SupportingText, fontStyle: 'italic',
+          textAlign: 'center',
+        }}>
+          {err ? `Couldn't load activity: ${err}` : 'No scheduled fires yet. Set your daily-brief time in Preferences and the agent will start running automatically.'}
+        </div>
+      )}
+      {rows && rows.length > 0 && (
+        <div style={{
+          background: T.color.SecondarySurface,
+          border: `1px solid ${T.color.EdgeLine}`,
+          borderRadius: 14, overflow: 'hidden', marginBottom: 18,
+        }}>
+          {rows.map((r, i) => {
+            const errMsg = r.metadata && (r.metadata.error || r.metadata.reason);
+            const isLast = i === rows.length - 1;
+            return (
+              <div key={r.id} style={{
+                padding: '14px 16px',
+                borderBottom: isLast ? 'none' : `1px solid ${T.color.EdgeLine}`,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                  <span style={{
+                    fontFamily: T.font.UI, fontSize: 14, fontWeight: 600,
+                    color: T.color.PrimaryText,
+                  }}>{skillLabel(r.skill)}</span>
+                  <StatusBadge row={r} />
+                </div>
+                <div style={{
+                  marginTop: 4,
+                  fontFamily: T.font.UI, fontSize: 12,
+                  color: T.color.SupportingText,
+                }}>
+                  {fmtRel(r.fired_at)}
+                </div>
+                {errMsg && (
+                  <div style={{
+                    marginTop: 6,
+                    fontFamily: T.font.Reading, fontSize: 12, lineHeight: '17px',
+                    color: T.color.SupportingText, fontStyle: 'italic',
+                  }}>
+                    {errMsg}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div style={{
+        fontFamily: T.font.Reading, fontSize: 13, lineHeight: '19px',
+        color: T.color.SupportingText, fontStyle: 'italic',
+        textAlign: 'center', padding: '0 20px',
+      }}>
+        The agent fires automatically at the times you set. If something missed, the row above will tell you why.
+      </div>
+    </SettingsSubPage>
+  );
+}
+
+Object.assign(window, { ProfileSheet, AccountPage, PreferencesPage, HelpPage, AgentActivityPage });

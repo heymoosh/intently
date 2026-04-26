@@ -1093,6 +1093,7 @@ function PrototypePhone({ dayState, setDayState, idx, setIdx }) {
           onOpenAccount={() => setProfileView('account')}
           onOpenPreferences={() => setProfileView('preferences')}
           onOpenHelp={() => setProfileView('help')}
+          onOpenAgentActivity={() => setProfileView('agent-activity')}
           onSignOut={async () => {
             try {
               if (window.signOutAndReset) await window.signOutAndReset();
@@ -1113,6 +1114,9 @@ function PrototypePhone({ dayState, setDayState, idx, setIdx }) {
       )}
       {profileView === 'help' && (
         <HelpPage onBack={() => setProfileView('sheet')} />
+      )}
+      {profileView === 'agent-activity' && (
+        <AgentActivityPage onBack={() => setProfileView('sheet')} />
       )}
 
       {/* Connections page */}
