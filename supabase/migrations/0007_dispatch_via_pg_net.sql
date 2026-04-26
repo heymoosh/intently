@@ -1,5 +1,10 @@
 -- 0007_dispatch_via_pg_net.sql — wire pg_cron tick to actually invoke agents.
 --
+-- SUPERSEDED 2026-04-26: the ALTER DATABASE manual followups below DO NOT
+-- WORK on Supabase hosted Postgres (postgres role is not a true superuser
+-- for custom GUCs). Migration 0009 switches tick_skills to read from
+-- Supabase Vault. Apply 0009 + run vault.create_secret per its header.
+--
 -- 0002_schedules.sql scaffolded the dispatcher (cron_log + should_fire +
 -- tick_skills) but stopped at a "would-have-fired" log row. This migration
 -- closes the loop: tick_skills now POSTs to a Supabase Edge Function

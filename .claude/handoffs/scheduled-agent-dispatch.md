@@ -71,6 +71,14 @@ Drafted here per § AC location matrix (cross-cutting infra → handoff).
 
 - `supabase/migrations/0002_schedules.sql` (already exists; needs apply + extend)
 - New migration: `0007_dispatch_via_pg_net.sql` (extends `tick_skills` to do HTTP)
+- Followup migration: `0009_dispatch_via_vault.sql` (0009 supersedes 0007's GUC approach — switches tick_skills to read URL/auth from Supabase Vault instead of `ALTER DATABASE` custom GUCs, which are blocked on hosted Supabase)
+
+  **Vault setup (run once in Supabase SQL Editor after applying 0009):**
+  ```sql
+  select vault.create_secret('https://cjlktjrossrzmswrayfz.supabase.co/functions/v1/dispatch-skill', 'dispatch_skill_url');
+  select vault.create_secret('Bearer <service-role-key>', 'dispatch_skill_auth');
+  ```
+  Do NOT run the `ALTER DATABASE postgres SET app.settings.*` commands from the 0007 header — those fail on hosted Supabase.
 - New: `supabase/functions/dispatch-skill/index.ts` — server-side agent invoker
 - `web/lib/context-assembler.js` — verify works with `(user_id, skill, scheduled-context)` payload identical to user-initiated
 - New: Profile-sheet "agent activity" view
