@@ -9,7 +9,11 @@ The hero button captures a voice transcript from the user. The transcript needs:
 1. Classification — is this actually a reminder, and what's the date? (Claude Haiku 4.5).
 2. A durable home — a Supabase row, not an MA memory blob, because "what surfaces this morning" needs exact date filtering.
 
-The Anthropic API key can't live in the browser bundle, so this function holds the key and also writes the row server-side using the service role. Same shield pattern as `ma-proxy`.
+The Anthropic API key can't live in the browser bundle, so this function holds the key. Writes go through PostgREST as the authenticated user (JWT passthrough) so the `reminders` RLS policy from migration 0003 attributes each row to the actual caller. Same Anthropic-shield pattern as `ma-proxy`; the auth model is owner-scoped (no service-role writes).
+
+## Auth
+
+Both endpoints require `Authorization: Bearer <user-jwt>` (the Supabase session token). Without it the function returns 401. The JWT is forwarded to PostgREST so `auth.uid()` drives RLS — there is no service-role write fallback.
 
 ## Endpoints
 
@@ -17,9 +21,12 @@ The Anthropic API key can't live in the browser bundle, so this function holds t
 
 ```
 Content-Type: application/json
+Authorization: Bearer <supabase-session-jwt>
 
-{ "transcript": "remind me to send Zane a thank-you note tomorrow" }
+{ "transcript": "remind me to send Zane a thank-you note tomorrow", "today": "2026-04-25" }
 ```
+
+`today` is optional — pass the user's local date as `YYYY-MM-DD` so "tomorrow" / "Tuesday" resolve in the user's timezone. Falls back to server UTC date when absent (degraded but functional for non-frontend callers).
 
 Success (classified):
 
@@ -46,7 +53,11 @@ Success (not a reminder):
 
 ### `GET /functions/v1/reminders/due?date=YYYY-MM-DD`
 
-Returns pending reminders where `remind_on <= date`. Omit `date` to default to today (server UTC).
+```
+Authorization: Bearer <supabase-session-jwt>
+```
+
+Returns pending reminders where `remind_on <= date` *for the authenticated user* (RLS scopes the result set automatically). Omit `date` to default to server UTC.
 
 ```json
 {
@@ -59,9 +70,9 @@ Returns pending reminders where `remind_on <= date`. Omit `date` to default to t
 
 ## V1 tradeoffs
 
-- **Service-role write bypass.** Every reminder is attributed to the first user in `auth.users` (matches `supabase/seeds/reminders.sql`). This is a hackathon-only shortcut because the web client isn't passing JWTs yet. The RLS policy on `public.reminders` is already owner-scoped — when multi-user lands, swap to JWT passthrough and drop the service-role write.
-- **Server-UTC "today".** Classification uses the server date, not the user's profile timezone. For a single user dogfooding in one timezone this is fine; post-hackathon we resolve against `profiles.timezone`.
 - **No retry on classification.** If Anthropic returns invalid JSON, we fall back to `{classified: false, reason: "..."}` instead of retrying. Keeps the demo snappy.
+- **`today` optional, server-UTC fallback.** Frontend currently passes `today` from the user's local date so the prompt resolves "tomorrow" correctly. Non-frontend callers that don't pass it get UTC date — fine for a curl smoke test, off-by-one for any user west of UTC during evening hours.
+- **Seed SQL still uses legacy pattern.** `supabase/seeds/reminders.sql` attributes rows to "first user in auth.users" — a vestige of the pre-JWT shortcut. Demo-only fixture data; refresh when seed data gets regenerated.
 
 ## Deploy
 
@@ -87,7 +98,7 @@ Shared-infra writes (Muxin-only per `CLAUDE.md` § Non-functional requirements).
 The function reads:
 
 - `ANTHROPIC_API_KEY` — already set if `ma-proxy` works; reused.
-- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` — auto-injected by Supabase into every Edge Function. No action needed.
+- `SUPABASE_URL`, `SUPABASE_ANON_KEY` — auto-injected by Supabase into every Edge Function. The anon key is used as the `apikey` header for PostgREST; the user's JWT (forwarded from the request) goes in `Authorization: Bearer ...`. **The service-role key is intentionally not used** — that path bypassed RLS and silently filed rows under the wrong owner.
 
 If `ANTHROPIC_API_KEY` isn't set yet:
 
@@ -98,17 +109,31 @@ supabase secrets set ANTHROPIC_API_KEY=<value-from-bitwarden>
 ## Smoke test
 
 ```bash
+# Replace with your session JWT (grab from a logged-in browser via
+# `supabase.auth.getSession()` in the console, or from the network tab).
+JWT="<paste-supabase-session-jwt>"
+
 # Classify + store
 curl -X POST \
   "https://<project-ref>.supabase.co/functions/v1/reminders/classify-and-store" \
   -H "Content-Type: application/json" \
-  -d '{"transcript":"remind me to water the plants on Friday"}'
+  -H "Authorization: Bearer $JWT" \
+  -d '{"transcript":"remind me to water the plants on Friday","today":"2026-04-25"}'
 
 # Due today
-curl "https://<project-ref>.supabase.co/functions/v1/reminders/due"
+curl -H "Authorization: Bearer $JWT" \
+  "https://<project-ref>.supabase.co/functions/v1/reminders/due"
 
 # Due by a specific date
-curl "https://<project-ref>.supabase.co/functions/v1/reminders/due?date=2026-04-30"
+curl -H "Authorization: Bearer $JWT" \
+  "https://<project-ref>.supabase.co/functions/v1/reminders/due?date=2026-04-30"
+
+# Sanity: missing JWT returns 401
+curl -X POST \
+  "https://<project-ref>.supabase.co/functions/v1/reminders/classify-and-store" \
+  -H "Content-Type: application/json" \
+  -d '{"transcript":"remind me on Friday"}'
+# → HTTP/2 401 — { "error": { "message": "missing or malformed Authorization header — ..." } }
 ```
 
 ## CORS
