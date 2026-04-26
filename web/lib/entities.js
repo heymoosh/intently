@@ -645,6 +645,42 @@ async function clearSetupDraft() {
   return data;
 }
 
+// ─── Review deferral helpers ────────────────────────────────────────────────
+// Checks whether the user deferred a weekly or monthly review to today or a
+// future date by scanning for reminders whose text contains "review deferred".
+// Returns { monthly: bool, weekly: bool } — true means the review was deferred
+// and has NOT yet been scheduled to resume today (so skip the override).
+
+function _parseDeferrals(rows) {
+  const today = new Date().toISOString().slice(0, 10);
+  let monthly = false;
+  let weekly = false;
+  for (const r of (rows || [])) {
+    const t = (r.text || '').toLowerCase();
+    // A future deferral means: remind_on > today → still deferred, skip.
+    // A same-day resume means: remind_on === today → open that review.
+    const isFuture = r.remind_on > today;
+    if (isFuture) {
+      if (t.includes('monthly')) monthly = true;
+      if (t.includes('weekly')) weekly = true;
+    }
+  }
+  return { monthly, weekly };
+}
+
+async function checkReviewDeferralToday() {
+  if (_isDemo()) return { monthly: false, weekly: false };
+  const today = new Date().toISOString().slice(0, 10);
+  const { data } = await _client()
+    .from('reminders')
+    .select('text, remind_on')
+    .ilike('text', '%review deferred%')
+    .gte('remind_on', today)
+    .eq('user_id', await _userId())
+    .eq('status', 'pending');
+  return _parseDeferrals(data || []);
+}
+
 // ─── OAuth Connections ──────────────────────────────────────────────────────
 
 async function listOauthConnections() {
@@ -773,4 +809,6 @@ Object.assign(window, {
   getSetupDraft,
   saveSetupDraftPhase,
   clearSetupDraft,
+  // review deferral
+  checkReviewDeferralToday,
 });

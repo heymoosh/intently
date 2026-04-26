@@ -1093,10 +1093,43 @@ function PrototypePhone({ dayState, setDayState, idx, setIdx }) {
 
   const micDim = heroState === 'listening' || heroState === 'expanded';
 
+  // ─── Morning CTA: review-override logic ────────────────────────────────────
+  // Priority: monthly > weekly > daily.
+  // On a monthly_review_day the monthly-review flow opens instead of daily-brief.
+  // On a weekly_review_day the weekly-review flow opens instead.
+  // If the user already deferred that review (a pending "review deferred" reminder
+  // exists for a FUTURE date), the override is skipped for that review type.
+  // If the user deferred to TODAY, the reminder's remind_on === today, which
+  // means deferred===false (not future), so the review CTA correctly re-opens.
+  const handleStartMorningCTA = React.useCallback(async () => {
+    try {
+      const today = new Date();
+      const todayDow = today.toLocaleDateString('en-US', { weekday: 'long' }); // "Sunday" etc.
+      const todayDom = today.getDate();
+
+      const cfg = (window.getLifeOpsConfig && await window.getLifeOpsConfig()) || {};
+      const deferred = (window.checkReviewDeferralToday && await window.checkReviewDeferralToday()) || { monthly: false, weekly: false };
+
+      const isMonthlyDay = cfg.monthly_review_day && parseInt(cfg.monthly_review_day, 10) === todayDom;
+      const isWeeklyDay = cfg.weekly_review_day && cfg.weekly_review_day === todayDow;
+
+      if (isMonthlyDay && !deferred.monthly) {
+        setShowMonthlyRefresh(true);
+      } else if (isWeeklyDay && !deferred.weekly) {
+        setShowWeeklyReview(true);
+      } else {
+        setDayState('brief');
+      }
+    } catch (_) {
+      // Fall back to daily-brief if config is unavailable.
+      setDayState('brief');
+    }
+  }, []);
+
   // Choose the Present view based on day state
   const presentView = (() => {
     if (dayState === 'morning-empty') {
-      return <PresentEmpty onStartBrief={() => setDayState('brief')} onOpenConnections={() => { setShowConnections(true); }} />;
+      return <PresentEmpty onStartBrief={handleStartMorningCTA} onOpenConnections={() => { setShowConnections(true); }} />;
     }
     if (dayState === 'closed') {
       return <PresentClosed review={liveReview} />;
