@@ -489,79 +489,22 @@ function HeroChat({ onDone, onMic, seedTranscript = '', onTranscriptConsumed, on
   const scrollRef = React.useRef(null);
   const seededRef = React.useRef(false);
 
-  // Send a user utterance. Routing order:
-  //   1. update-tracker — if the transcript looks like a work-completion log
-  //      ("I finished X", "shipped Y"), call the update-tracker agent and
-  //      apply its proposed Supabase writes. See web/lib/update-tracker.js.
-  //   2. classify-and-tag — chained edge-function call:
-  //      a. Haiku reminder check — if classified, persist + show confirmation.
-  //      b. If not reminder, Haiku signal classifier (V1 canonical + user-custom).
-  //         ≥0.8 confidence: silent auto-tag (write entry with tags, no prompt).
-  //         <0.8 confidence: inline ConfirmationCard asking user to confirm tag.
-  //   3. chat skill — the top-level MA agent that routes to specialist skills.
-  //      TODO: once chat's MA routing handles all above natively, steps 1–2 retire.
+  // Send a user utterance. Routing:
+  //   All utterances go directly to the chat MA agent. Chat decides whether to
+  //   invoke reminders-classifier (or other skills) via tool-use on the server.
+  //   The browser no longer pre-classifies — the classify-and-tag Edge Function
+  //   path is retired from the front-end; the endpoint stays in-place for
+  //   backward-compat / direct callers.
   // Appends each turn to the thread; falls back to a generic acknowledgement
-  // only if every routed path fails.
+  // if the proxy is unavailable.
   const sendUtterance = React.useCallback(async (text, opts) => {
     const trimmed = (text || '').trim();
     if (!trimmed) return;
-    // 'voice' (default) for transcript seeding; 'text' for typed composer
-    // input. Plumbed into update-tracker so journal-entry rows it inserts
-    // get tagged with the right source.
-    const source = opts && opts.source === 'text' ? 'text' : 'voice';
     setThread((prev) => [...prev, { kind: 'user', t: trimmed }]);
     setPending(true);
     try {
-      // 1. update-tracker branch — work-completion utterances route here.
-      // tryUpdateTracker returns { handled: false } when the regex test
-      // doesn't match, so casual chat falls through to the existing paths.
-      if (window.tryUpdateTracker) {
-        const ut = await window.tryUpdateTracker(trimmed, { source });
-        if (ut && ut.handled) {
-          const reply = ut.reply || "Got it.";
-          setThread((prev) => [...prev, { kind: 'agent', t: reply }]);
-          return;
-        }
-      }
-
-      // 2. Chained classify-and-tag (reminder → signal).
-      const cls = window.classifyAndTag ? await window.classifyAndTag(trimmed) : null;
-
-      if (cls && cls.is_reminder === true && cls.reminder) {
-        // Reminder path — same as before.
-        const when = cls.reminder.remind_on || 'soon';
-        setThread((prev) => [...prev, { kind: 'agent', t: `Got it. I'll surface "${cls.reminder.text}" on ${when}.` }]);
-        if (onReminderCreated) onReminderCreated(cls.reminder);
-        return;
-      }
-
-      if (cls && cls.is_reminder === false && cls.signal_tag) {
-        const tag = cls.signal_tag;
-        const confidence = cls.signal_confidence || 0;
-        const frameworkHint = cls.signal_framework_hint || null;
-
-        if (confidence >= 0.8) {
-          // High confidence — silent auto-tag. Write entry with tags, no prompt.
-          if (window.insertEntryWithTags) {
-            await window.insertEntryWithTags({
-              kind: 'journal',
-              body_markdown: trimmed,
-              tags: [tag],
-              tag_confidence: { [tag]: confidence },
-              source,
-            });
-          }
-          setThread((prev) => [...prev, { kind: 'agent', t: `Got it. Saved as #${tag}.` }]);
-          return;
-        } else {
-          // Lower confidence — inline ConfirmationCard.
-          const pendingEntry = { text: trimmed, tag, confidence, frameworkHint, source };
-          setThread((prev) => [...prev, { kind: 'signal-confirm', pendingEntry }]);
-          return;
-        }
-      }
-
-      // 3. chat skill fallback — the top-level MA agent.
+      // All utterances → chat agent. Chat invokes reminders-classifier,
+      // update-tracker, or any other skill via MA tool-use as needed.
       if (window.callMaProxy) {
         try {
           const r = await window.callMaProxy({ skill: 'chat', input: trimmed });

@@ -70,6 +70,7 @@ const SKILL_ENV: Record<string, string> = {
   'daily-review': 'MA_AGENT_ID_DAILY_REVIEW',
   'weekly-review': 'MA_AGENT_ID_WEEKLY_REVIEW',
   'monthly-review': 'MA_AGENT_ID_MONTHLY_REVIEW',
+  'reminders-classifier': 'MA_AGENT_ID_REMINDERS_CLASSIFIER',
   'update-tracker': 'MA_AGENT_ID_UPDATE_TRACKER',
   setup: 'MA_AGENT_ID_SETUP',
   noticing: 'MA_AGENT_ID_NOTICING',
