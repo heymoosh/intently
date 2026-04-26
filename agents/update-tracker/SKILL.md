@@ -14,15 +14,16 @@ At session start, read `/mnt/memory/project-mentions.md` for projects the user h
 
 Your job: figure out which project was worked on, propose the right Supabase row writes, and confirm conversationally. The user should never need to remember which project something belongs to — this skill does that mapping.
 
-**Architectural note.** This skill is post-cognition (ADR 0001): state-of-truth lives in Supabase tables (`projects` with `todos` JSONB, `goals`, `entries`, `plan_items`), not Markdown files. There is no `Ops Plan.md` / `Tracker.md` / `Strategy.md` to read or write. The agent's job is to emit a structured intent that the UI applies to the right rows.
+**Architectural note.** This skill is post-cognition (ADR 0001): state-of-truth lives in Supabase tables (`projects` with `todos` JSONB, `goals`, `life_areas`, `entries`, `plan_items`), not Markdown files. There is no `Ops Plan.md` / `Tracker.md` / `Strategy.md` to read or write. The agent's job is to emit a structured intent that the UI applies to the right rows.
 
 ## Input contract
 
 The web client calls this skill via `callMaProxy({ skill: 'update-tracker', input })`. The `input` is a markdown-flavored payload assembled browser-side and contains:
 
 - **User utterance** — what the user just said ("I finished the auth migration", "shipped the polish PR", etc.).
-- **Active projects** — the user's `projects` rows where `status='active'`. Each project includes `id`, `title`, `body_markdown`, and `todos[]` (each todo has `id`, `text`, `done`).
+- **Active projects** — the user's `projects` rows where `status='active'`. Each project includes `id`, `title`, `body_markdown`, `area_id?`, and `todos[]` (each todo has `id`, `text`, `done`).
 - **Active goals** — the user's `goals` rows where `archived_at is null`. Each goal includes `id`, `title`.
+- **Active life areas** — the user's `life_areas` rows where `archived_at is null`. Each area includes `id`, `name`, `slug?`, `goal_id?`.
 - **Today** — the user's local-today as `YYYY-MM-DD`.
 
 Treat the input as ground truth. Never invent project ids or todo ids that aren't listed.
@@ -45,8 +46,10 @@ If genuinely ambiguous — the utterance plausibly matches two projects and ther
 Based on the match, propose one or more of these row operations:
 
 - **`update_todo`** — flip a todo to `done: true` when the user named a completed item that maps to an existing todo in `projects.todos`. Use the todo's `id` (from input), not its position.
-- **`insert_entry`** — append a row to `entries` with `kind='journal'`, `source='voice'` (or `'text'` if the input flags text origin), `body_markdown` = the user's words verbatim, and `links: { project_id, goal_id? }` to soft-link the entry to the matched project and (if applicable) goal.
+- **`insert_entry`** — append a row to `entries` with `kind='journal'`, `source='voice'` (or `'text'` if the input flags text origin), `body_markdown` = the user's words verbatim, and `links: { project_id?, goal_id?, area_id? }` to soft-link the entry to the matched entity. When the utterance is clearly about a life area (health, family, etc.) and not a specific project, include `area_id` in `links`.
 - **`update_project`** — adjust `projects.body_markdown` only when the user explicitly says the project's state changed in a way a todo flip can't express ("project's done", "parking this for now"). Set `status` to `'done'` or `'parked'` accordingly. Otherwise leave the project row alone.
+- **`create_life_area`** — create a new `life_areas` row when the user explicitly says "add an area for X" or "create a [health/family/fitness/finances] area". Parameters: `name` (required), `glyph?`, `palette?`, `goal_id?`. Use the `insertLifeArea` entity helper.
+- **`attach_entry_to_area`** — when writing an `insert_entry` for a topic that matches an existing life_area, set `area_id` on the entry row (write-time routing path (c)). This tags the entry so future queries can filter by area.
 
 ### When to write what
 
@@ -104,7 +107,7 @@ The JSON shape:
 Field rules:
 
 - `updates` — array of operations. Empty when `ambiguous: true` or when nothing applies. Each entry has a `table` (`projects` | `entries` | `goals`), an `op`, the relevant ids, and either a `set` (for updates) or `data` (for inserts).
-- Allowed `op` values: `update_todo`, `update`, `insert`. Use `update_todo` when flipping a single JSONB todo on `projects`; the UI will read-modify-write the array using `todo_id`.
+- Allowed `op` values: `update_todo`, `update`, `insert`. Use `update_todo` when flipping a single JSONB todo on `projects`; the UI will read-modify-write the array using `todo_id`. Use `table: "life_areas"` with `op: "insert"` and a `data` object to create a new life area (path from `create_life_area` intent).
 - `matched_project` — the project the utterance was attributed to, or `null` when the utterance didn't tie to any project.
 - `ambiguous` — `true` only when you're asking the user to clarify. When `true`, `updates` MUST be empty and `confirmation` should be the disambiguation question.
 - `confirmation` — the 1–2 sentence acknowledgement. Mirrors the conversational text above the JSON block. Names the project + what changed.

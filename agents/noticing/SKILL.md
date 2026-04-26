@@ -58,6 +58,28 @@ Threshold: **3 mentions / 48h**.
 
 ---
 
+## Life-area promotion (V1.1)
+
+When an observation crosses the promotion threshold, the agent must decide what kind of entity to propose creating. Use the `pattern_text` and the nature of the recurring topic to classify:
+
+**Propose a `life_area`** when the pattern is **ongoing-and-without-a-target**: there is no clear completion state, no deadline, and no measurable target outcome. Canonical examples: health, family, fitness, finances, relationships, personal growth, spirituality. These topics stay active indefinitely — they are not projects.
+
+**Propose a `project`** when the pattern has a **target shape**: there is an implicit or explicit end state, deadline, or deliverable. Examples: "Train for a half-marathon" (has a target event), "Move apartments" (has a deadline), "Launch the side project" (has a deliverable). Projects can spin off from a life_area — e.g., a "Health" area spawning a "Train for half-marathon" project.
+
+**Decision heuristic:**
+```
+does the recurring topic have an end state?
+  → yes: propose project (optionally linked to an existing life_area)
+  → no:  propose life_area
+```
+
+**System prompt instruction (include in agent system prompt):**
+> "When you observe a pattern that is ongoing-and-without-a-target (health, family, finances, fitness, relationships), propose creating a life_area instead of a project. Areas can spin off projects when something within them becomes target-shaped. Use subject_kind='area' on the observation row when the pattern is area-shaped."
+
+When writing the observation row for an area-shaped pattern, set `subject_kind = 'area'`. This signals the promotion pathway to create a `life_areas` row rather than a `projects` row.
+
+---
+
 ## Tools
 
 ### `insertObservation`
@@ -70,7 +92,7 @@ Parameters (all match the DB schema exactly):
 |---|---|---|
 | `user_id` | uuid | the current user |
 | `pattern_text` | text | human-readable summary, e.g. "user mentioned 'apartment move' 3x in 48h" |
-| `subject_kind` | text \| null | one of `'user'` \| `'project'` \| `'goal'` \| `'task'` \| null |
+| `subject_kind` | text \| null | one of `'user'` \| `'project'` \| `'goal'` \| `'task'` \| `'area'` \| null |
 | `subject_id` | uuid \| null | FK to the subject row, if known |
 | `times_observed` | int | count at write time (≥3 on first hard observation) |
 | `metadata` | jsonb | optional context (source utterances, timestamps, etc.) |
@@ -106,7 +128,7 @@ Parameters:
 id                  uuid primary key
 user_id             uuid not null
 pattern_text        text not null
-subject_kind        text  -- 'user' | 'project' | 'goal' | 'task' | null
+subject_kind        text  -- 'user' | 'project' | 'goal' | 'task' | 'area' | null
 subject_id          uuid  -- nullable FK (polymorphic)
 times_observed      int not null default 1
 first_observed_at   timestamptz not null default now()
@@ -144,5 +166,6 @@ The classifier (chained, Haiku) tags entries at write time using `docs/product/s
 ## V2 TODOs
 
 - Scheduled invocation: pg_cron fires noticing agent on each `tick_skills` cycle.
-- User-facing promotion UX: surface observation in UI, let user confirm → create project/goal.
-- First-class promotion: write `projects` or `goals` row from an observation.
+- User-facing promotion UX: surface observation in UI, let user confirm → create project/goal/area.
+- First-class promotion: write `projects`, `goals`, or `life_areas` row from an observation.
+- Promotion threshold tuning: production-grade calibration of the 3/48h threshold for area vs. project proposals (V1.2).

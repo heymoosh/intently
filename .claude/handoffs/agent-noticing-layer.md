@@ -11,9 +11,9 @@ What's missing: the noticing layer underneath. The user is still the router.
 
 This is the core of the pitch missing — not a polish gap.
 
-## What — three workstreams, same architectural pattern
+## What — four workstreams, same architectural pattern
 
-All three are "the agent re-reads recent state at some cadence and proposes structure." Same shape, different scopes.
+All four are "the agent re-reads recent state at some cadence and proposes structure." Same shape, different scopes.
 
 ### 1. Multi-modal hero capture with intelligent routing
 
@@ -37,6 +37,21 @@ Two-tier brain — MA memory (working, soft patterns the agent observes) + Supab
 - **Built:** schema separates the two layers — `public.observations` table is the long-term durable tier (migration `0009_graph_schema.sql`; see ADR `docs/decisions/0010-graph-db-strategy.md` for why Postgres-native was chosen over Apache AGE / Neo4j)
 - **Missing:** `times_observed` counters, promotion logic, agent pass that asks "has this pattern recurred enough to durabilize?"
 - Already noted as V1.1 post-hackathon in TRACKER
+
+### 4. Life-area promotion (V1.1)
+
+Third entity tier alongside goals + projects: an "ongoing-area" for persistent topics that are neither goals (no target outcome) nor projects (no start/end). Health, family, fitness, finances — these stay active indefinitely.
+
+- **Built:** `public.life_areas` table (migration `0011_life_areas.sql`): `id`, `user_id`, `slug`, `name`, `description`, `glyph`, `palette`, `position`, `goal_id` (soft FK), `archived_at`. RLS owner-only. `entries.area_id` and `projects.area_id` FKs for write-time routing (path c) and project→area linkage (path b).
+- **Agent wiring:** `agents/noticing/SKILL.md` updated — area-shaped patterns get `subject_kind='area'`; noticing agent distinguishes area-shaped (no end state) vs project-shaped (has target) observations. `agents/update-tracker/SKILL.md` updated — `create_life_area` and `attach_entry_to_area` tools added to the output contract; input now includes `active_life_areas`.
+- **UI:** Future view (`web/index.html` `FutureScreenProtoTappable`) mixes goals + areas in the same card column. Combined 3-card cap with "Show more (N)" expand. Reuses the goal `PainterlyBlock` + `Glyph` treatment with "Life area" label.
+- **Entity helpers:** `web/lib/entities.js` — `insertLifeArea`, `listLifeAreas`, `archiveLifeArea`, `getLifeArea`.
+- **Evals:** `evals/datasets/life-areas/cases.json` — 5 cases covering health→area promotion, explicit create-area command, project→area lineage, area vs project distinction, and no-areas graceful fallback.
+- **V1 promotion paths implemented (schema + agent spec):**
+  - (a) observation → life-area creation (noticing proposes "Create Health area" when `subject_kind='area'`)
+  - (b) life-area → project spin-off (`projects.area_id` FK, project links back to area)
+  - (c) entries → area write-time routing (`entries.area_id` FK, update-tracker stamps it)
+- **V1.2 deferred:** production-grade promotion threshold tuning (the 3/48h dial for area vs. project proposals).
 
 ## Cross-cutting insight (the load-bearing decision)
 
