@@ -84,6 +84,25 @@ async function listGoals() {
   return data || [];
 }
 
+async function updateGoal(id, updates) {
+  // updates: { title?, monthly_slice?, glyph?, palette? }
+  if (_isDemo()) return { id, ...updates };
+  const allowed = {};
+  if (updates.title !== undefined) allowed.title = updates.title;
+  if (updates.monthly_slice !== undefined) allowed.monthly_slice = updates.monthly_slice;
+  if (updates.glyph !== undefined) allowed.glyph = updates.glyph;
+  if (updates.palette !== undefined) allowed.palette = updates.palette;
+  const { data, error } = await _client()
+    .from('goals')
+    .update(allowed)
+    .eq('id', id)
+    .eq('user_id', (await _userId()))
+    .select()
+    .single();
+  if (error) _throw('updateGoal', error);
+  return data;
+}
+
 // ─── Projects ───────────────────────────────────────────────────────────────
 
 async function insertProject(title, goalId) {
@@ -797,6 +816,7 @@ async function getLifeArea(id) {
 Object.assign(window, {
   insertGoal,
   listGoals,
+  updateGoal,
   insertProject,
   listProjects,
   addProjectTodo,

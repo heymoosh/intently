@@ -116,20 +116,155 @@ const PROJECT_EXTRAS = {
   },
 };
 
+// ─── GOAL EDITOR ─────────────────────────────────────────────────────
+function GoalEditor({ goal, onSave, onCancel }) {
+  const [title, setTitle] = React.useState(goal.title || '');
+  const [slice, setSlice] = React.useState(goal.month || '');
+  const [saving, setSaving] = React.useState(false);
+  const [error, setError] = React.useState(null);
+
+  // Escape → cancel
+  React.useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onCancel && onCancel(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onCancel]);
+
+  const canSave = title.trim().length > 0 && !saving;
+
+  const handleSave = async () => {
+    if (!canSave) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const updates = { title: title.trim(), monthly_slice: slice.trim() || null };
+      if (window.updateGoal) {
+        await window.updateGoal(goal.id, updates);
+      }
+      onSave && onSave(Object.assign({}, goal, { title: updates.title, month: updates.monthly_slice || '' }));
+    } catch (err) {
+      console.warn('[GoalEditor] save failed:', err && err.message);
+      setError('Save failed. Try again.');
+      setSaving(false);
+    }
+  };
+
+  const inputStyle = {
+    width: '100%', boxSizing: 'border-box',
+    fontFamily: T.font.Reading, fontSize: 15, lineHeight: '24px',
+    color: T.color.PrimaryText, background: T.color.SecondarySurface,
+    border: `1px solid ${T.color.EdgeLine}`, borderRadius: 10,
+    padding: '10px 12px', outline: 'none', resize: 'none',
+  };
+
+  return (
+    <div style={{
+      position: 'absolute', inset: 0, zIndex: 92,
+      background: T.color.PrimarySurface,
+      display: 'flex', flexDirection: 'column', overflow: 'hidden',
+      animation: 'reading-up 280ms cubic-bezier(0.2, 0.7, 0.2, 1)',
+    }}>
+      <style>{`
+        @keyframes reading-up {
+          from { transform: translateY(28px); opacity: 0; }
+          to   { transform: translateY(0);    opacity: 1; }
+        }
+      `}</style>
+
+      {/* Hero banner using goal palette */}
+      <div style={{ position: 'relative', flexShrink: 0 }}>
+        <PainterlyBlock palette={goal.pal} seed={11} style={{ padding: '18px 22px 24px', minHeight: 100, position: 'relative', overflow: 'hidden' }}>
+          <div style={{
+            position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          }}>
+            <button onClick={onCancel} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              fontFamily: T.font.UI, fontSize: 12, fontWeight: 600, color: T.color.PrimaryText,
+              background: 'rgba(251,246,234,0.55)', border: 'none', borderRadius: 999,
+              padding: '6px 14px', cursor: 'pointer',
+              boxShadow: '0 2px 6px rgba(31,27,21,0.08)',
+            }}>Cancel</button>
+
+            <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', color: T.color.PrimaryText, opacity: 0.7 }}>Edit Goal</div>
+
+            <button onClick={handleSave} disabled={!canSave} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              fontFamily: T.font.UI, fontSize: 12, fontWeight: 700, color: canSave ? T.color.PrimaryText : T.color.SubtleText,
+              background: canSave ? 'rgba(251,246,234,0.85)' : 'rgba(251,246,234,0.35)', border: 'none', borderRadius: 999,
+              padding: '6px 14px', cursor: canSave ? 'pointer' : 'default',
+              boxShadow: canSave ? '0 2px 6px rgba(31,27,21,0.10)' : 'none',
+              transition: 'all 150ms',
+            }}>{saving ? 'Saving…' : 'Save'}</button>
+          </div>
+        </PainterlyBlock>
+      </div>
+
+      {/* Fields */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '24px 22px 140px' }}>
+        {error && (
+          <div style={{ marginBottom: 16, padding: '10px 14px', background: '#FDE8E8', borderRadius: 10, fontFamily: T.font.UI, fontSize: 13, color: '#C0392B' }}>{error}</div>
+        )}
+
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: T.color.SupportingText, marginBottom: 6 }}>Goal title</div>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleSave(); }}
+            style={{ ...inputStyle, fontFamily: T.font.Display, fontSize: 20, fontStyle: 'italic' }}
+            autoFocus
+          />
+        </div>
+
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: T.color.SupportingText, marginBottom: 6 }}>This month's focus <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, fontSize: 11, opacity: 0.7 }}>(monthly slice)</span></div>
+          <textarea
+            value={slice}
+            onChange={(e) => setSlice(e.target.value)}
+            rows={3}
+            style={inputStyle}
+            placeholder="e.g. April: finish the visa checklist and book the scouting trip."
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── GOAL DETAIL SCREEN ─────────────────────────────────────────────
-function GoalDetail({ goal, onBack, onOpenProject }) {
-  const projects = goal.projectIds
-    .map(id => {
-      const p = (typeof PROJECT_DATA !== 'undefined' && PROJECT_DATA.find(x => x.id === id)) || null;
-      if (p) return p;
-      // Fallback stub for visa/japanese (not in original PROJECT_DATA)
-      const stubs = {
-        visa:      { id: 'visa',     name: 'Visa paperwork',      blurb: 'HSP track. Passport renewal is the open blocker.',        tint: T.color.TintPeachSoft, glyph: 'alarm', count: 8, done: 6, tracker: [], markdown: [] },
-        japanese:  { id: 'japanese', name: 'Japanese — N4 by landing', blurb: '20 min/day. N5 feels close. N4 is the real target.',     tint: T.color.TintButter,    glyph: 'book',  count: 4, done: 1, tracker: [], markdown: [] },
-      };
-      return stubs[id];
-    })
-    .filter(Boolean);
+function GoalDetail({ goal: initialGoal, onBack, onOpenProject, dbProjects }) {
+  const [goal, setGoal] = React.useState(initialGoal);
+  const [editing, setEditing] = React.useState(false);
+
+  // Sync if parent passes a new goal (e.g. navigated from a different goal)
+  React.useEffect(() => { setGoal(initialGoal); setEditing(false); }, [initialGoal && initialGoal.id]);
+
+  if (editing) {
+    return (
+      <GoalEditor
+        goal={goal}
+        onCancel={() => setEditing(false)}
+        onSave={(updated) => { setGoal(updated); setEditing(false); }}
+      />
+    );
+  }
+
+  // Resolve linked projects. Prefer live dbProjects (filtered by goal_id = goal.id),
+  // fall back to resolving goal.projectIds from PROJECT_DATA + stubs for demo mode.
+  const liveProjects = dbProjects && dbProjects.filter(p => p.goal_id === goal.id);
+  const projects = liveProjects && liveProjects.length > 0
+    ? liveProjects
+    : (goal.projectIds || [])
+        .map(id => {
+          const p = (typeof PROJECT_DATA !== 'undefined' && PROJECT_DATA.find(x => x.id === id)) || null;
+          if (p) return p;
+          const stubs = {
+            visa:      { id: 'visa',     name: 'Visa paperwork',      blurb: 'HSP track. Passport renewal is the open blocker.',        tint: T.color.TintPeachSoft, glyph: 'alarm', count: 8, done: 6, tracker: [], markdown: [] },
+            japanese:  { id: 'japanese', name: 'Japanese — N4 by landing', blurb: '20 min/day. N5 feels close. N4 is the real target.',     tint: T.color.TintButter,    glyph: 'book',  count: 4, done: 1, tracker: [], markdown: [] },
+          };
+          return stubs[id];
+        })
+        .filter(Boolean);
 
   return (
     <div style={{ height: '100%', background: T.color.PrimarySurface, display: 'flex', flexDirection: 'column', overflow: 'hidden', }}>
@@ -139,17 +274,26 @@ function GoalDetail({ goal, onBack, onOpenProject }) {
           <div style={{ position: 'absolute', right: -24, bottom: -32, opacity: 0.22, pointerEvents: 'none', lineHeight: 0 }}>
             <Glyph name={goal.glyph} size={200} color={T.color.PrimaryText} stroke={1.3} />
           </div>
-          <button onClick={onBack} aria-label="Back" style={{
-            position: 'relative', zIndex: 2,
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            fontFamily: T.font.UI, fontSize: 12, fontWeight: 600, color: T.color.PrimaryText,
-            background: 'rgba(251,246,234,0.55)', border: 'none', borderRadius: 999,
-            padding: '6px 12px 6px 8px', cursor: 'pointer',
-            boxShadow: '0 2px 6px rgba(31,27,21,0.08)',
-          }}>
-            <Icon.ArrowLeft size={14} color={T.color.PrimaryText} />
-            Future
-          </button>
+          <div style={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <button onClick={onBack} aria-label="Back" style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              fontFamily: T.font.UI, fontSize: 12, fontWeight: 600, color: T.color.PrimaryText,
+              background: 'rgba(251,246,234,0.55)', border: 'none', borderRadius: 999,
+              padding: '6px 12px 6px 8px', cursor: 'pointer',
+              boxShadow: '0 2px 6px rgba(31,27,21,0.08)',
+            }}>
+              <Icon.ArrowLeft size={14} color={T.color.PrimaryText} />
+              Future
+            </button>
+            <button onClick={() => setEditing(true)} aria-label="Edit goal" style={{
+              width: 32, height: 32, borderRadius: 999,
+              background: 'rgba(251,246,234,0.55)', border: 'none', cursor: 'pointer',
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 2px 6px rgba(31,27,21,0.08)',
+            }}>
+              <Icon.Pencil size={14} color={T.color.PrimaryText} />
+            </button>
+          </div>
           <div style={{ position: 'relative', marginTop: 24 }}>
             <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', color: T.color.PrimaryText, opacity: 0.65 }}>Goal · Started {goal.created}</div>
             <div style={{
@@ -279,7 +423,29 @@ const readingP = { fontFamily: T.font.Reading, fontSize: 15, lineHeight: '24px',
 // the hero.
 function ProjectDetailV2({ p, adds, onBack, onAddProjectTodo, onToggleProjectTodo, onOpenGoal }) {
   const extras = PROJECT_EXTRAS[p.id] || { goalId: null, intention: null, impact: null, status: null };
-  const goal = extras.goalId && GOAL_DATA.find(g => g.id === extras.goalId);
+  // For fixture data: look up goal by extras.goalId in GOAL_DATA.
+  // For live DB data: look up goal by p.goal_id in window._dbGoals (set below) or fallback to GOAL_DATA.
+  const [dbGoal, setDbGoal] = React.useState(null);
+  React.useEffect(() => {
+    const goalId = extras.goalId || p.goal_id || null;
+    if (!goalId) return;
+    // Try static fixture first
+    const fixture = GOAL_DATA.find(g => g.id === goalId);
+    if (fixture) { setDbGoal(fixture); return; }
+    // Try window._dbGoals (set by FutureScreenProtoTappable)
+    if (window._dbGoals) {
+      const found = window._dbGoals.find(g => g.id === goalId);
+      if (found) { setDbGoal(found); return; }
+    }
+    // Async fallback: fetch directly
+    if (window.listGoals) {
+      window.listGoals().then((gs) => {
+        const g = gs.find(g => g.id === goalId);
+        if (g) setDbGoal({ id: g.id, title: g.title, pal: g.palette || null, glyph: g.glyph || 'leaf' });
+      }).catch((_err) => { /* goal not found — leave goal null */ });
+    }
+  }, [p.id, p.goal_id, extras.goalId]);
+  const goal = dbGoal;
   const addedTodos = (adds && adds.projectTodos && adds.projectTodos[p.id]) || [];
 
   // Derive a tight status — use the extras.status if present, otherwise fall back to first status-y paragraph from markdown.
