@@ -450,16 +450,33 @@ function HeroChat({ onDone, onMic, seedTranscript = '', onTranscriptConsumed, on
     ].filter(Boolean).join('\n');
   }, []);
 
-  // Send a user utterance: classify-as-reminder first (cheap edge function),
-  // then if not a reminder, fan out to a real LLM turn via daily-brief in
-  // chat mode. Appends both turns to the thread; falls back to a generic
-  // acknowledgement only if BOTH the classify call AND the LLM call fail.
+  // Send a user utterance. Routing order:
+  //   1. update-tracker — if the transcript looks like a work-completion log
+  //      ("I finished X", "shipped Y"), call the update-tracker agent and
+  //      apply its proposed Supabase writes. See web/lib/update-tracker.js.
+  //   2. classify-as-reminder — cheap edge-function call; if classified, the
+  //      reminder is persisted server-side and we render the confirmation.
+  //   3. chat fallback — fan out to a real LLM turn via daily-brief in chat
+  //      mode for everything else.
+  // Appends each turn to the thread; falls back to a generic acknowledgement
+  // only if every routed path fails.
   const sendUtterance = React.useCallback(async (text) => {
     const trimmed = (text || '').trim();
     if (!trimmed) return;
     setThread((prev) => [...prev, { kind: 'user', t: trimmed }]);
     setPending(true);
     try {
+      // 1. update-tracker branch — work-completion utterances route here.
+      // tryUpdateTracker returns { handled: false } when the regex test
+      // doesn't match, so casual chat falls through to the existing paths.
+      if (window.tryUpdateTracker) {
+        const ut = await window.tryUpdateTracker(trimmed, { source: 'voice' });
+        if (ut && ut.handled) {
+          const reply = ut.reply || "Got it.";
+          setThread((prev) => [...prev, { kind: 'agent', t: reply }]);
+          return;
+        }
+      }
       const cls = window.classifyTranscript ? await window.classifyTranscript(trimmed) : null;
       if (cls && cls.classified === true && cls.reminder) {
         const when = cls.reminder.remind_on || 'soon';
