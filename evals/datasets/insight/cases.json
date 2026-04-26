@@ -1,0 +1,77 @@
+{
+  "skill": "insight",
+  "cases": [
+    {
+      "id": "avoidance-pattern-detection",
+      "notes": "User asks for cross-temporal avoidance pattern. Agent should read across journal entries and surface non-obvious themes, not just restate what the user wrote.",
+      "input": {
+        "query": "Look across my journal entries from the past month and tell me what I'm avoiding",
+        "context": "User has 30 days of journal entries covering work, health, relationships. Several entries mention 'I'll deal with X later' or change subjects abruptly."
+      },
+      "expected": {
+        "must_surface": [
+          "Agent reads memory for prior insights-history before responding.",
+          "Agent surfaces 3-5 non-obvious patterns, not a list of topics mentioned.",
+          "Patterns are framed at the right grain — behavioral or emotional themes, not frequency counts.",
+          "Response ends with one specific question that deepens self-knowledge.",
+          "Agent appends a summary to /mnt/memory/insights-history.md after responding.",
+          "Tone is precise and non-moralizing; user's own words are echoed where possible."
+        ],
+        "anti_patterns": [
+          "Agent says 'you mentioned X 12 times' without interpreting what that signals.",
+          "Agent routes to daily-brief or update-tracker instead of responding directly.",
+          "Agent moralizes or gives advice rather than naming patterns.",
+          "Agent fabricates journal content not in the input context.",
+          "Response has more than 5 patterns (overwhelming, loses salience)."
+        ]
+      }
+    },
+    {
+      "id": "unnamed-patterns",
+      "notes": "User wants patterns they haven't consciously named. Tests whether agent can synthesize across signal tags and observations to find recurring but unnamed themes.",
+      "input": {
+        "query": "What patterns am I falling into that I haven't named?",
+        "context": "User has signal-tagged entries: several #ant (antagonist/friction) tags around Monday mornings, several #grow tags around late-night reading, #brag entries cluster around solo work not team work."
+      },
+      "expected": {
+        "must_surface": [
+          "Agent identifies at least one pattern that spans multiple signal types (not just frequency within one tag).",
+          "Pattern naming is specific — 'you frame friction as external on Mondays but take credit for growth in solo contexts' rather than 'you have a pattern with Mondays'.",
+          "Agent checks insights-history for prior pass conclusions before responding.",
+          "Response ends with one self-knowledge question.",
+          "Agent does not list all signal tags mechanically — synthesizes instead."
+        ],
+        "anti_patterns": [
+          "Agent lists tags and their counts without cross-referencing or synthesizing.",
+          "Agent invents patterns not supported by the input context.",
+          "Agent asks clarifying questions instead of synthesizing from available data.",
+          "Response omits the closing self-knowledge question."
+        ]
+      }
+    },
+    {
+      "id": "therapist-framing",
+      "notes": "User uses therapist framing — wants the kind of pattern recognition a therapist would surface. Tests tonal calibration and depth of synthesis.",
+      "input": {
+        "query": "What would my therapist want to know about my last 30 days?",
+        "context": "User's entries mention high productivity followed by energy crashes, difficulty sleeping twice in three weeks, skipping social plans 4 times citing 'too busy', one entry saying 'I just need things to slow down'."
+      },
+      "expected": {
+        "must_surface": [
+          "Agent frames patterns in behavioral/emotional terms a clinician would recognize, not productivity metrics.",
+          "Crash-after-peak pattern is named if present in context.",
+          "Social withdrawal pattern is named with tentative framing ('this may be worth exploring').",
+          "Agent uses the user's own words ('too busy', 'things to slow down') as anchors.",
+          "Response is precise and non-glib — no reassurances or silver linings unless the data supports them.",
+          "Closing question invites honest self-reflection, not problem-solving."
+        ],
+        "anti_patterns": [
+          "Agent gives advice ('you should sleep more').",
+          "Agent reframes user's own language into different words without flagging the reframe.",
+          "Agent says 'it sounds like you're stressed' without naming the specific pattern.",
+          "Agent treats this as a daily-brief or wellness check-in rather than a deep pattern pass."
+        ]
+      }
+    }
+  ]
+}
