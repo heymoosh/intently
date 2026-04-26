@@ -495,19 +495,19 @@ Provisioned per `agents/update-tracker/SKILL.md` and `docs/product/acceptance-cr
 
 ## Dead code (not in deployed tree)
 
-These files declare interactive components that are not mounted by `web/index.html`. Candidates for deletion in a follow-up cleanup pass — they were the original "Phase 1" prototype renderings, superseded by the prototype variants defined directly inside `index.html` and by `intently-flows.jsx`. Each kept around as a reference for the design system canvas (`design-system.html`), which is a *separate* HTML entry point.
+The original audit flagged ~1,800 lines of unmounted JSX from forks left behind during the prototype-into-`index.html` migration. **PR #166** (conservative cleanup) deleted `web/intently-screens-prototype.jsx` (~415 lines) and `web/design-system.html` (~527 lines), and the follow-up to PR #166 deleted `web/intently-screens.jsx` (~461 lines) after extracting its only kept symbol (`ScreenHeader`) into `web/intently-cards.jsx`. What remains in the dead-code surface area:
 
-- **`web/intently-screens.jsx`** (`PastScreen`, `PresentScreen`, `PresentMorning`, `PresentPlan`, `FutureScreen`, `ProjectsBand`) — superseded by `PastJournalProto`, `PresentEmpty`/`PresentPlanProtoAnimated`/`PresentClosed`, `FutureScreenProtoTappable`. Contains: a "Start your daily brief" CTA (no handler), "Name a new goal" ghost button (no handler), `Read` chevron rows in PastScreen archive (no handler). All unreachable.
-- **`web/intently-screens-prototype.jsx`** (`PresentPlanProto`, `FutureScreenProto`, `ProjectDetailProto`) — superseded by `PresentPlanProtoAnimated`, `FutureScreenProtoTappable`, `ProjectDetailV2`. The exports in `Object.assign(window, …)` are still wired, but no parent component imports them.
 - **`web/intently-projects.jsx`** `ProjectDetail` (the v1, distinct from `ProjectDetailV2` in `intently-flows.jsx`) — unmounted; `ProjectDetailV2` replaced it.
-- **`web/intently-cards.jsx`** `TrackerCard`, `PlanCard`, `JournalCard`, `ConfirmationCard`, `FeatureCard` — all design-system-canvas-only cards. Used by `design-system.html` (separate entry point), not the deployed app.
+- **`web/intently-cards.jsx`** `TrackerCard`, `PlanCard`, `JournalCard`, `ConfirmationCard`, `FeatureCard` — design-system-canvas-only cards. The `design-system.html` host they were used by has been deleted; these are orphaned and can come out next pass. (`ScreenHeader`, `RingProgress`, `InputTrace`, `ConfidenceDot`, `Avatar` in this same file ARE live.)
 - **`web/intently-shell.jsx`** `SwipeDots` — declared but only `SwipeShell` is mounted by `index.html`; `SwipeDots` is not.
 - **`web/intently-extras.jsx`** `OnboardingConnectCard` — declared but never rendered in the React tree.
-- **`web/intently-hero.jsx` action-card code path** — `m.kind === 'action'` (with Edit/Send/Undo buttons, all missing handlers) is never emitted by `sendUtterance`. Reachable only via direct state manipulation. Either delete or wire when the agent gains the action-card capability.
-- **`web/design-canvas.jsx`** — entirely separate `DesignCanvas` for the design system; mounted by `design-system.html`, never by `index.html`.
+- **`web/design-canvas.jsx`** — entirely separate `DesignCanvas` for the design system canvas. Its host was deleted in PR #166; this file is now orphaned.
 - **`web/ios-frame.jsx`** — presentational chrome (`IOSDevice`, `IOSStatusBar`); zero interactive handlers; mounted but not interactive.
 
-Recommendation: open a separate cleanup PR after grooming consolidates which prototype variant is canonical, then delete the unmounted variants. **Do not** silently delete in this audit — the design-system canvas may still depend on `intently-cards.jsx`.
+Notes on previously-listed entries:
+- *`web/intently-hero.jsx` action-card code path* (the `m.kind === 'action'` branch with stubbed Edit/Send/Undo) was deleted in PR #167.
+
+Recommendation: a final cleanup pass can retire `web/design-canvas.jsx` and the design-system-canvas-only cards inside `intently-cards.jsx` (since their host `design-system.html` is gone), plus `SwipeDots` and `OnboardingConnectCard`.
 
 ---
 

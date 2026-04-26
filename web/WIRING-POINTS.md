@@ -98,24 +98,9 @@ See **Hero affordance** section. No additional rows here.
 
 ---
 
-### `web/intently-screens-prototype.jsx` — `PrototypePhone`, day-state orchestrator, `FutureScreenProtoTappable`
+### `web/intently-screens-prototype.jsx` (RETIRED — see PR #166)
 
-This is the root component. Most events here are pure UI state (overlay open/close, profile sheet routing, dayState dev-toggle). Only the AddZones and the journal save trigger persistence.
-
-| Event | Element / location | Current implementation | Target lib function | Port shape | Saturday priority |
-|---|---|---|---|---|---|
-| `FutureScreenProtoTappable` add a goal | intently-screens-prototype.jsx:441-446, `<AddZone onCommit={(v) => onAddGoal && onAddGoal(v)} />` | `useManualAdds.addGoal` (in-memory) | **Q2 decision.** `insertGoal(text)` helper or inline `supabase.from('goals').insert({ text })`. | One row per goal write. | P1 |
-| `FutureScreenProtoTappable` add a project | intently-screens-prototype.jsx:468-474 | `useManualAdds.addProject` (in-memory) | **Q2 decision.** `insertProject(text)` or inline `supabase.from('projects').insert({ text })`. | One row. | P1 |
-| `FutureScreenProtoTappable` add admin reminder | intently-screens-prototype.jsx:514-520 | `useManualAdds.addAdminReminder` (in-memory) | **Q2 decision.** Likely inserts into the same `reminders` table that `fetchDueReminders` reads from. Confirm shape with `app/lib/reminders.ts` `DueReminder` type (PORTING.md line 139): `{ id, text, remind_on, status }`. | One row. The `remind_on` field needs a default if user doesn't specify. | P1 |
-| `FutureScreenProtoTappable` toggle admin reminder done | intently-screens-prototype.jsx:494, `onToggleAdminReminder` | In-memory toggle | **Q2 decision.** `supabase.from('reminders').update({ status: 'done' }).eq('id', id)`. | One row. | P1 |
-| `FutureScreenProtoTappable` open goal | intently-screens-prototype.jsx:407, `onClick={() => onOpenGoal && onOpenGoal(g)}` | Local state | None — pure navigation. | n/a | n/a |
-| `FutureScreenProtoTappable` open project | intently-screens-prototype.jsx:454, `onOpen={() => onOpenProject && onOpenProject(p)}` | Local state | None. | n/a | n/a |
-| `PresentPlanShell` add to plan band (3 occurrences: morning, afternoon, evening) | intently-screens-prototype.jsx:312-321 (the AddZone inside each band's `<ul>`) | `useManualAdds.addPlanItem(b.when, v)` (in-memory) | **Q2 decision.** `insertPlanItem(date, when, text)` or inline. Note: plan items have a date scope (today only); the table likely keys by date + band. | One row per plan-item add. | P1 |
-| `PresentPlanShell` add a journal entry | intently-screens-prototype.jsx:330-334 | `useManualAdds.addJournal('today', v)` | **Q2 decision.** Same as `JournalComposer` save below — single `insertJournal(text, date)` helper. | One row. | P1 |
-| `PastJournalProto` add a journal entry | intently-screens-prototype.jsx:163-168 | Same as above | Same as above. | One row. | P1 |
-| Open profile sheet | intently-screens-prototype.jsx:737, `<ProfileButton onClick={() => setProfileView('sheet')} />` | Local state | None — pure UI. | n/a | n/a |
-| Profile sub-page navigation (account, preferences, help, connections, sign out) | intently-screens-prototype.jsx:755-779 | Local state routing | None — pure UI. (Sign-out becomes `supabase.auth.signOut()` once auth lands; deferred per ADR.) | n/a | P2 |
-| Reading mode open / close | intently-screens-prototype.jsx:678 (`onPickEntry={setOpenEntry}`), close at 785 | Local state | None — entries are read-only fixtures today. Eventually reads from journal/chat/review tables. | Defer until Q2 lands. | P2 |
+This file was removed in the conservative dead-code cleanup. Its `PrototypePhone` orchestrator and AddZone wiring rows were superseded by inline `PresentPlanProtoAnimated` / `FutureScreenProtoTappable` definitions in `web/index.html`. The wiring rows that lived here have been folded into the relevant per-symbol tables elsewhere in this doc, or deferred per Q2 (manual entity CRUD).
 
 ---
 
@@ -210,14 +195,6 @@ Pure UI state (close, edit, more menu). Edit/More callbacks have no consumers to
 
 ---
 
-### `web/intently-screens.jsx` — Past header, Present empty/closed alternates, Future screen primitives
-
-These are mostly composed inside `intently-screens-prototype.jsx` (covered above). The standalone versions in this file are not the live render path in `index.html` — `index.html` mounts `PrototypePhone` from `intently-screens-prototype.jsx`. Treat as reference; no direct wiring needed.
-
-No interactive surfaces requiring wiring — covered by the prototype variants above.
-
----
-
 ### Pure-presentation files (no wiring)
 
 - **`web/intently-glyphs.jsx`** — icon library. No interactive surfaces.
@@ -234,12 +211,11 @@ No interactive surfaces requiring wiring — covered by the prototype variants a
 |---|---|---|---|
 | Hero affordance | 6 | 3 | 2 |
 | `intently-flows.jsx` (brief + review) | 6 | 2 | 0 |
-| `intently-screens-prototype.jsx` AddZones | 0 | 7 | 2 |
 | `intently-extras.jsx` JournalComposer / OAuth | 0 | 1 | 5 |
-| Other files (manual-add, journal, projects, cards, profile, reading, screens, shell) | 0 | 0 | 7 |
-| **Total** | **12** | **13** | **16** |
+| Other files (manual-add, journal, projects, cards, profile, reading, shell) | 0 | 0 | 7 |
+| **Total** | **12** | **6** | **14** |
 
-Net **12 P0 wiring rows** = the demo path. The other 29 are nice-to-have or post-demo. Saturday's session should aim to land all 12 P0 plus the 6–7 entity-CRUD P1 rows that Q2 unblocks (journal save being the easiest one to demo end-to-end).
+Net **12 P0 wiring rows** = the demo path. The other 20 are nice-to-have or post-demo. Saturday's session should aim to land all 12 P0 plus the entity-CRUD P1 rows that Q2 unblocks (journal save being the easiest one to demo end-to-end). The retired `intently-screens-prototype.jsx` AddZone rows (PR #166) live inline in `web/index.html` now and are not separately tracked here — they remain Q2-blocked.
 
 ---
 
