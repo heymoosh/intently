@@ -549,6 +549,32 @@ function HeroChat({ onDone, onMic, seedTranscript = '', onTranscriptConsumed }) 
             </div>
           );
         })}
+        {/* Thinking bubble — visible while we wait on classify + LLM. Same agent-bubble */}
+        {/* alignment / shape, but content is three dots staggered on the existing */}
+        {/* `intentlyPulse` keyframe (defined in web/index.html) so chat shares one */}
+        {/* "agent is working" motion vocabulary with HeroAffordance / HeroListening. */}
+        {pending && (
+          <div key="thinking" aria-live="polite" aria-label="Agent is thinking" style={{ alignSelf: 'flex-start', maxWidth: '88%' }}>
+            <div style={{
+              padding: '11px 14px', borderRadius: 18, borderTopLeftRadius: 6,
+              background: T.color.SecondarySurface, border: `1px solid ${T.color.EdgeLine}`,
+              display: 'inline-flex', alignItems: 'center', gap: 6, minHeight: 22,
+            }}>
+              <span style={{
+                width: 6, height: 6, borderRadius: 999, background: T.color.SupportingText,
+                animation: 'intentlyPulse 1.2s ease-in-out infinite', animationDelay: '0s',
+              }} />
+              <span style={{
+                width: 6, height: 6, borderRadius: 999, background: T.color.SupportingText,
+                animation: 'intentlyPulse 1.2s ease-in-out infinite', animationDelay: '0.2s',
+              }} />
+              <span style={{
+                width: 6, height: 6, borderRadius: 999, background: T.color.SupportingText,
+                animation: 'intentlyPulse 1.2s ease-in-out infinite', animationDelay: '0.4s',
+              }} />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Composer — equal-status voice + type */}
