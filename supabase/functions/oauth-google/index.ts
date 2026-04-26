@@ -613,6 +613,33 @@ Deno.serve(async (req: Request) => {
       return errResp(500, 'failed to record connection', err instanceof Error ? err.message : String(err));
     }
 
+    // Fetch Google userinfo to populate the profiles row (display_name).
+    // Non-fatal: a failed userinfo fetch should not block the connect flow.
+    try {
+      const userinfoRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: { Authorization: `Bearer ${tokens.access_token}` },
+      });
+      if (userinfoRes.ok) {
+        const userinfo = (await userinfoRes.json()) as { name?: string; email?: string };
+        // Upsert (merge-duplicates) so the row is created for anon users too.
+        await fetch(`${env.supabaseUrl}/rest/v1/profiles`, {
+          method: 'POST',
+          headers: {
+            apikey: env.serviceRoleKey,
+            Authorization: `Bearer ${env.serviceRoleKey}`,
+            'Content-Type': 'application/json',
+            Prefer: 'resolution=merge-duplicates,return=minimal',
+          },
+          body: JSON.stringify({
+            id: state.user_id,
+            display_name: userinfo.name || null,
+          }),
+        });
+      }
+    } catch (err) {
+      console.warn('[oauth-google] userinfo/profile upsert failed (non-fatal):', err);
+    }
+
     // Redirect back to the app. The UI then fires sync-calendar / sync-email
     // to backfill — see web/intently-extras.jsx OAuthFlow rewrite.
     const returnUrl = new URL(state.return_to);
