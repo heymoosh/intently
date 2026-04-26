@@ -422,129 +422,112 @@ function ProjectDetailV2({ p, adds, onBack, onAddProjectTodo, onToggleProjectTod
 }
 
 // ─── BRIEF FLOW ─────────────────────────────────────────────────────
-// Guided conversation: agent asks → user answers → agent asks → ... → confirm
-// This is intentionally distinct from free-form chat (hero 'chat' state).
-// On accept, calls onComplete with the plan — the Present screen then animates
-// the plan populating band-by-band.
-const BRIEF_SCRIPT = [
-  {
-    agent: "Morning.",
-    agentSub: "Let's shape your day.",
-    typing: 1800,
-  },
-  {
-    agent: "What's alive for you today? Tell me in a sentence.",
-    input: { placeholder: "e.g. the pitch dry-run, and the job-hunt pitch for myself" },
-    userDefault: "The pitch dry-run with M, the job-hunt pitch draft, and I owe Jordan a reply.",
-    typing: 1200,
-  },
-  {
-    agent: "Good. Anything you're carrying that you want to park?",
-    input: { placeholder: "Things you'll consciously not do today" },
-    userDefault: "Not opening email before 10. Not rewriting the landing page copy again.",
-    typing: 1200,
-  },
-  {
-    agent: "Got it. Here's the shape of your day — check it, tweak it, accept.",
-    typing: 1400,
-    confirm: true,
-  },
-];
+// Agent-driven conversational session: fires skill='daily-brief' immediately
+// on open. The agent asks questions, user answers, session continues until
+// the agent emits a confirmed plan (JSON tail signals readiness).
+// Falls back to a scripted skeleton if callMaProxy is unavailable.
+
+// Build a thread-context string from prior messages for the next agent turn.
+function buildBriefThreadInput(messages, userReply) {
+  const lines = [];
+  lines.push("You are in a daily-brief conversation. Continue from where you left off.");
+  lines.push("Prior conversation:");
+  for (const m of messages) {
+    lines.push(`${m.role === 'user' ? 'User' : 'Agent'}: ${m.text}`);
+  }
+  if (userReply) lines.push(`User: ${userReply}`);
+  lines.push("Continue the conversation. If you have enough context, propose the day sequence and ask for confirmation.");
+  return lines.join('\n');
+}
 
 function BriefFlow({ onClose, onComplete }) {
-  const [step, setStep] = React.useState(0);
   const [messages, setMessages] = React.useState([]);
-  const [agentTyping, setAgentTyping] = React.useState(true);
+  const [agentTyping, setAgentTyping] = React.useState(false);
   const [draft, setDraft] = React.useState('');
-  const [liveBrief, setLiveBrief] = React.useState(null);   // live ma-proxy daily-brief response
-  const [briefError, setBriefError] = React.useState(null); // set if the live call fails (demo still proceeds)
-  const [briefLoading, setBriefLoading] = React.useState(false);
-  const [consulted, setConsulted] = React.useState([]);     // input traces — what the assembler injected
+  const [confirmedBrief, setConfirmedBrief] = React.useState(null); // final agent response ready for confirm card
+  const [consulted, setConsulted] = React.useState([]);
+  const [inputDisabled, setInputDisabled] = React.useState(false);  // disabled while agent is responding
   const scrollRef = React.useRef(null);
-
-  // Drive the script — when step changes, post agent turn, reveal input/confirm.
-  // Steps that have neither `input` nor `confirm` are passive bubbles (e.g. the
-  // opening greeting) and auto-advance after a short reading pause so the user
-  // is never stuck without an affordance.
-  React.useEffect(() => {
-    const s = BRIEF_SCRIPT[step];
-    if (!s) return;
-    setAgentTyping(true);
-    const typingTimer = setTimeout(() => {
-      setMessages(m => [...m, { role: 'agent', text: s.agent, sub: s.agentSub }]);
-      setAgentTyping(false);
-    }, s.typing);
-    let advanceTimer;
-    if (!s.input && !s.confirm) {
-      advanceTimer = setTimeout(() => setStep(step + 1), s.typing + 1400);
-    }
-    return () => {
-      clearTimeout(typingTimer);
-      if (advanceTimer) clearTimeout(advanceTimer);
-    };
-  }, [step]);
+  const kickedOffRef = React.useRef(false);
 
   React.useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages, agentTyping, liveBrief, briefError, briefLoading]);
+  }, [messages, agentTyping, confirmedBrief]);
 
-  // When we reach the confirm step, fire the live daily-brief call in parallel
-  // with the agent's typing animation. Use the user's actual answers as input.
-  // Falls back gracefully if window.callMaProxy isn't loaded or the call fails —
-  // the demo still proceeds with the scripted confirm card.
+  // On mount: kick off the agent conversation immediately.
+  // If callMaProxy is not available, show a scripted opening so the UI isn't empty.
   React.useEffect(() => {
-    const s = BRIEF_SCRIPT[step];
-    if (!s || !s.confirm) return;
-    if (!window.callMaProxy) return;
-    if (liveBrief || briefError || briefLoading) return;
+    if (kickedOffRef.current) return;
+    kickedOffRef.current = true;
 
-    const userAnswers = messages
-      .filter(m => m.role === 'user')
-      .map(m => m.text);
+    if (!window.callMaProxy) {
+      // Graceful fallback — scripted opening so UI isn't blank.
+      setTimeout(() => {
+        setMessages([{ role: 'agent', text: "Morning. Let's shape your day.", sub: "Tell me what's alive for you today." }]);
+      }, 800);
+      return;
+    }
 
-    setBriefLoading(true);
-    // Context assembler reads goals/projects/yesterday's review/recent journals/
-    // today's plan/calendar/emails/due reminders from Supabase. Returns
-    // {input, consulted} — the consulted list drives the InputTrace UI.
-    const ctxPromise = window.assembleBriefContext
-      ? window.assembleBriefContext(userAnswers)
-      : Promise.resolve({ input: [
-          "It's morning. The user just had this conversation:",
-          ...userAnswers.map((a, i) => `Answer ${i + 1}: ${a}`),
-          '',
-          'Generate a personal daily brief in plain prose. Speak directly to them ("you").',
-        ].join('\n'), consulted: [] });
+    setAgentTyping(true);
+    setInputDisabled(true);
 
-    ctxPromise
+    const kickoff = window.assembleBriefContext
+      ? window.assembleBriefContext([])
+      : Promise.resolve({ input: "Let's start today's brief. Ask the user what's alive for them today, any energy notes, and anything they want to park.", consulted: [] });
+
+    kickoff
       .then(({ input, consulted: c }) => {
         setConsulted(c || []);
         return window.callMaProxy({ skill: 'daily-brief', input });
       })
       .then(r => {
-        setLiveBrief((r && r.finalText) || '');
-        setBriefLoading(false);
+        const reply = (r && r.finalText && r.finalText.trim()) || "Morning. Let's shape your day.";
+        setMessages([{ role: 'agent', text: reply }]);
+        setAgentTyping(false);
+        setInputDisabled(false);
       })
-      .catch(e => {
-        setBriefError((e && e.message) || 'brief call failed');
-        setBriefLoading(false);
+      .catch(() => {
+        setMessages([{ role: 'agent', text: "Morning. Let's shape your day.", sub: "Tell me what's alive for you today." }]);
+        setAgentTyping(false);
+        setInputDisabled(false);
       });
-  }, [step, messages, liveBrief, briefError, briefLoading]);
+  }, []);
 
-  const s = BRIEF_SCRIPT[step];
-  const showInput = s && s.input && !agentTyping;
-  // Hold the confirm card until the live brief lands (or errors out) — the
-  // agent's actual response is the headline beat; the card summarizes it.
-  const liveBriefReady = liveBrief !== null || briefError !== null;
-  const showConfirm = s && s.confirm && !agentTyping && liveBriefReady;
-  const showBriefThinking = s && s.confirm && !agentTyping && briefLoading;
-
-  const submit = (text) => {
-    const t = (text && text.trim()) || (s.userDefault || '');
-    if (!t) return;
-    setMessages(m => [...m, { role: 'user', text: t }]);
+  // Send a user reply and get the next agent turn.
+  const submit = React.useCallback((text) => {
+    const t = (text || draft).trim();
+    if (!t || inputDisabled) return;
     setDraft('');
-    setTimeout(() => setStep(step + 1), 260);
-  };
+    const nextMessages = [...messages, { role: 'user', text: t }];
+    setMessages(nextMessages);
+    setAgentTyping(true);
+    setInputDisabled(true);
+
+    const doCall = window.callMaProxy
+      ? window.callMaProxy({ skill: 'daily-brief', input: buildBriefThreadInput(messages, t) })
+      : Promise.reject(new Error('callMaProxy unavailable'));
+
+    doCall
+      .then(r => {
+        const reply = (r && r.finalText && r.finalText.trim()) || "Got it. Anything else before I propose a shape?";
+        const updated = [...nextMessages, { role: 'agent', text: reply }];
+        setMessages(updated);
+        setAgentTyping(false);
+        setInputDisabled(false);
+        // Check if the agent has emitted a plan (JSON tail = ready for confirm).
+        const hasPlan = /```json[\s\S]*?```\s*$/.test(reply);
+        if (hasPlan) {
+          setConfirmedBrief(reply);
+          setInputDisabled(true); // input locked — confirm card takes over
+        }
+      })
+      .catch(() => {
+        const fallback = "Got it. Keep going — what else?";
+        setMessages(m => [...m, { role: 'agent', text: fallback }]);
+        setAgentTyping(false);
+        setInputDisabled(false);
+      });
+  }, [draft, messages, inputDisabled]);
 
   return (
     <div style={{
@@ -573,72 +556,74 @@ function BriefFlow({ onClose, onComplete }) {
             <ChatBubble key={i} role={m.role} text={m.text} sub={m.sub} />
           ))}
           {agentTyping && <AgentTyping />}
-          {/* Live daily-brief from ma-proxy — appears before the confirm card */}
-          {showBriefThinking && <AgentTyping />}
-          {liveBrief && <ChatBubble role="agent" text={liveBrief} />}
-          {briefError && <ChatBubble role="agent" text="(I couldn't reach the brief generator just now — here's your day shape anyway.)" />}
-          {showConfirm && <BriefConfirmCard plan={parseAgentPlan(liveBrief, MOCK_PLAN)} consulted={consulted} onAccept={async () => {
-            // Persist the brief response as entries.kind='brief' + fire undo toast.
-            let insertedId = null;
-            if (liveBrief && window.getSupabaseClient && window.getCurrentUserId) {
-              try {
-                const sb = window.getSupabaseClient();
-                const userId = await window.getCurrentUserId();
-                const { data } = await sb.from('entries').insert([{
-                  user_id: userId, kind: 'brief', body_markdown: liveBrief,
-                  source: 'agent', mood: 'morning',
-                }]).select().single();
-                if (data) insertedId = data.id;
-              } catch (e) { console.warn('[brief] persist failed:', e && e.message); }
-            }
-            if (insertedId && window.showUndoToast) {
-              window.showUndoToast({
-                message: "Saved today's brief",
-                onUndo: async () => {
-                  const sb = window.getSupabaseClient();
-                  const userId = await window.getCurrentUserId();
-                  await sb.from('entries').delete().eq('id', insertedId).eq('user_id', userId);
-                },
-              });
-            }
-            onComplete && onComplete(parseAgentPlan(liveBrief, MOCK_PLAN));
-          }} />}
+          {/* Confirm card — shown once the agent has proposed a full day plan */}
+          {confirmedBrief && (
+            <BriefConfirmCard
+              plan={parseAgentPlan(confirmedBrief, MOCK_PLAN)}
+              consulted={consulted}
+              onAccept={async () => {
+                // Persist the brief as entries.kind='brief'
+                let insertedId = null;
+                if (window.getSupabaseClient && window.getCurrentUserId) {
+                  try {
+                    const sb = window.getSupabaseClient();
+                    const userId = await window.getCurrentUserId();
+                    const { data } = await sb.from('entries').insert([{
+                      user_id: userId, kind: 'brief', body_markdown: confirmedBrief,
+                      source: 'text', mood: 'morning',
+                    }]).select().single();
+                    if (data) insertedId = data.id;
+                  } catch (e) { console.warn('[brief] persist failed:', e && e.message); }
+                }
+                if (insertedId && window.showUndoToast) {
+                  window.showUndoToast({
+                    message: "Saved today's brief",
+                    onUndo: async () => {
+                      const sb = window.getSupabaseClient();
+                      const userId = await window.getCurrentUserId();
+                      await sb.from('entries').delete().eq('id', insertedId).eq('user_id', userId);
+                    },
+                  });
+                }
+                onComplete && onComplete(parseAgentPlan(confirmedBrief, MOCK_PLAN));
+              }}
+            />
+          )}
         </div>
       </div>
 
-      {/* Input area */}
-      {showInput && (
+      {/* Input area — always visible unless confirm card is showing */}
+      {!confirmedBrief && (
         <div style={{ flexShrink: 0, padding: '10px 16px 20px', background: 'rgba(251,246,234,0.82)', backdropFilter: 'blur(12px)', borderTop: `1px solid ${T.color.EdgeLine}` }}>
           <div style={{
             display: 'flex', alignItems: 'center', gap: 10,
             background: T.color.PrimarySurface, border: `1px solid ${T.color.EdgeLine}`,
             borderRadius: 999, padding: '8px 8px 8px 16px',
+            opacity: inputDisabled ? 0.5 : 1,
           }}>
             <input
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && submit(draft || s.userDefault)}
-              placeholder={s.input.placeholder}
+              onKeyDown={(e) => e.key === 'Enter' && !inputDisabled && submit()}
+              placeholder={inputDisabled ? 'Agent is thinking…' : 'Reply…'}
+              disabled={inputDisabled}
               style={{
                 flex: 1, border: 'none', outline: 'none', background: 'transparent',
                 fontFamily: T.font.Reading, fontSize: 14, color: T.color.PrimaryText,
               }}
             />
-            <button onClick={() => submit(draft || s.userDefault)} aria-label="Send" style={{
+            <button onClick={() => submit()} disabled={inputDisabled} aria-label="Send" style={{
               width: 34, height: 34, borderRadius: 999,
-              background: T.color.FocusObject, color: '#FBF6EA', border: 'none',
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+              background: inputDisabled ? T.color.SubtleText : T.color.FocusObject,
+              color: '#FBF6EA', border: 'none',
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              cursor: inputDisabled ? 'default' : 'pointer',
             }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
               </svg>
             </button>
           </div>
-          {s.userDefault && !draft && (
-            <div style={{ marginTop: 6, fontFamily: T.font.UI, fontSize: 11, color: T.color.SubtleText, textAlign: 'center', fontStyle: 'italic' }}>
-              tap send to use the suggested answer
-            </div>
-          )}
         </div>
       )}
     </div>
