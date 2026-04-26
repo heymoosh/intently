@@ -216,6 +216,15 @@ const SAM_EMAIL_FLAGS = [
   { hours_ago: 14, sender: 'Hackathon Submissions', subject: 'Reminder: deadline Apr 25 8pm EDT', is_urgent: true, awaiting_reply: false },
 ];
 
+// Life areas — persistent ongoing topics that are neither goals (no target
+// outcome) nor projects (no start/end). Sam's four core areas.
+const SAM_LIFE_AREAS = [
+  { name: 'Health & Body',   glyph: 'leaf',     description: 'Physical vitality, sleep, and daily movement', position: 1 },
+  { name: 'Deep Work',       glyph: 'compass',  description: 'Focused creative output and skill-building',   position: 2 },
+  { name: 'Relationships',   glyph: 'spark',    description: 'Tending friendships and family bonds',         position: 3 },
+  { name: 'Finance',         glyph: 'mountain', description: 'Building long-term financial security',        position: 4 },
+];
+
 Object.assign(window, {
   SAM_GOALS,
   SAM_PROJECTS,
@@ -227,4 +236,5 @@ Object.assign(window, {
   SAM_REMINDERS,
   SAM_CALENDAR_TODAY,
   SAM_EMAIL_FLAGS,
+  SAM_LIFE_AREAS,
 });
