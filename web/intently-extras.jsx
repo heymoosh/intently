@@ -311,16 +311,47 @@ function OAuthFlow({ integration, onCancel, onConnected }) {
         return;
       }
 
-      // Step 3: poll the popup. The /callback endpoint redirects back to
-      // our origin with `?connected=<provider>` once the dance succeeds.
-      // Browser SOP lets us read .location.href once the popup is back on
-      // our origin; before then, attempts throw.
+      // Step 3: wait for the popup to come back to our origin with
+      // ?connected=<provider>. Two signals; whichever wins resolves first:
+      //   (a) postMessage from the popup (handleOauthReturn in index.html
+      //       posts as soon as the redirected-back page loads — robust
+      //       against the URL-strip race because it fires synchronously
+      //       with the redirect-load).
+      //   (b) URL-polling backstop, in case postMessage is blocked by some
+      //       extension or the popup's IIFE ran before we could subscribe.
       const provider = integration.provider;
       const result = await new Promise((resolve, reject) => {
+        const cleanup = () => {
+          clearInterval(interval);
+          window.removeEventListener('message', onMessage);
+        };
+
+        // (a) postMessage path.
+        const onMessage = (ev) => {
+          // Origin check: must come from the same app origin.
+          if (ev.origin !== window.location.origin) return;
+          const data = ev.data || {};
+          if (data.type !== 'intently:oauth-callback') return;
+          if (data.error) {
+            cleanup();
+            try { popup.close(); } catch (e) { /* ignore */ }
+            reject(new Error(data.error));
+            return;
+          }
+          if (data.provider === provider) {
+            cleanup();
+            try { popup.close(); } catch (e) { /* ignore */ }
+            resolve(true);
+          }
+        };
+        window.addEventListener('message', onMessage);
+
+        // (b) URL-polling backstop. Reads popup.location.href once the
+        // popup is back on our origin (cross-origin reads throw).
         const interval = setInterval(() => {
           if (!popup || popup.closed) {
-            clearInterval(interval);
-            // Popup closed without making it back to our origin — assume cancel.
+            cleanup();
+            // Popup closed without making it back to our origin — cancel.
             reject(new Error('connection cancelled'));
             return;
           }
@@ -330,19 +361,20 @@ function OAuthFlow({ integration, onCancel, onConnected }) {
           try {
             const u = new URL(href);
             if (u.searchParams.get('connected') === provider) {
-              clearInterval(interval);
+              cleanup();
               try { popup.close(); } catch (e) { /* ignore */ }
               resolve(true);
             } else if (u.searchParams.get('oauth_error')) {
-              clearInterval(interval);
+              cleanup();
               try { popup.close(); } catch (e) { /* ignore */ }
               reject(new Error(u.searchParams.get('oauth_error') || 'oauth error'));
             }
           } catch { /* href not yet parseable; keep polling */ }
         }, 600);
-        // Hard timeout after 5 minutes.
+
+        // Hard timeout — 5 min.
         setTimeout(() => {
-          clearInterval(interval);
+          cleanup();
           reject(new Error('oauth timed out'));
         }, 5 * 60 * 1000);
       });
