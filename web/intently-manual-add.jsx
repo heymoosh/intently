@@ -382,7 +382,16 @@ function useManualAdds() {
           ],
         },
         adminReminders: [
-          ...reminders.map((r) => ({ text: r.text, id: r.id, done: false })),
+          // Preserve remind_on + status from the DB row so the Admin band can
+          // render the date next to the text. `done` is derived from status so
+          // the toggle UI keeps working without a separate column.
+          ...reminders.map((r) => ({
+            id: r.id,
+            text: r.text,
+            remind_on: r.remind_on,
+            status: r.status,
+            done: r.status === 'done',
+          })),
           ...s.adminReminders.filter((r) => _isOptimistic(r.id)),
         ],
         projectTodos: { ...hydratedProjectTodos, ...s.projectTodos },
@@ -426,13 +435,44 @@ function useManualAdds() {
       _persist('insertProject', () => window.insertProject && window.insertProject(text));
     },
     addAdminReminder: (text) => {
+      // insertAdminReminder server-side defaults remind_on to today when no
+      // date is supplied — mirror that in the optimistic row so the Admin
+      // band renders "today" right away (parity with the chat-classified path).
+      const today = _today();
       setState((s) => ({
         ...s,
-        adminReminders: [...s.adminReminders, { text, id: `r-${Date.now()}`, done: false }],
+        adminReminders: [
+          ...s.adminReminders,
+          { text, id: `r-${Date.now()}`, remind_on: today, status: 'pending', done: false },
+        ],
       }));
       _persist('insertAdminReminder', () =>
         window.insertAdminReminder && window.insertAdminReminder(text),
       );
+    },
+    // Optimistically prepend a chat-classified reminder so the Admin band
+    // updates without waiting for a re-hydration. Caller passes the row
+    // returned by classifyTranscript, which matches the listAdminReminders()
+    // shape ({id, user_id, text, remind_on, status, ...}). Idempotent on id —
+    // repeated calls with the same id replace, not duplicate, the row.
+    addOptimisticAdminReminder: (row) => {
+      if (!row || !row.id) return;
+      setState((s) => {
+        const without = s.adminReminders.filter((r) => r.id !== row.id);
+        return {
+          ...s,
+          adminReminders: [
+            {
+              id: row.id,
+              text: row.text,
+              remind_on: row.remind_on,
+              status: row.status || 'pending',
+              done: row.status === 'done',
+            },
+            ...without,
+          ],
+        };
+      });
     },
     toggleAdminReminder: (id) => {
       setState((s) => ({

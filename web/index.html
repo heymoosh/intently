@@ -522,6 +522,41 @@ function FutureWithGoalTap(props) {
   return <FutureScreenProtoTappable {...props} onOpenGoal={onOpenGoal} />;
 }
 
+// formatRelativeRemindOn — render a `remind_on` YYYY-MM-DD string as a
+// calm relative phrase for the Admin band. Parses as LOCAL midnight (split
+// the string and feed the Date constructor numeric parts) — `new Date("2026-04-26")`
+// would parse as UTC and render as the prior day in any negative-offset
+// timezone (CR-09 in chat-reminders-jwt-and-timezone.md).
+//
+// Returns:
+//   - null when `iso` is null/undefined/invalid (caller renders nothing)
+//   - "today" when remind_on is today
+//   - "tomorrow" when remind_on is exactly 1 day in the future
+//   - day-of-week ("Friday") when within the next 7 days
+//   - short date ("Apr 30") otherwise
+//
+// Past dates fall through to the short-date branch — the band only shows
+// pending reminders, so a past `remind_on` means it's overdue; we surface
+// the calendar date so the user can place it.
+function formatRelativeRemindOn(iso) {
+  if (!iso || typeof iso !== 'string') return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!m) return null;
+  const y = Number(m[1]); const mo = Number(m[2]); const d = Number(m[3]);
+  const target = new Date(y, mo - 1, d);
+  if (isNaN(target.getTime())) return null;
+  const now = new Date();
+  const todayLocal = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const msPerDay = 24 * 60 * 60 * 1000;
+  const diffDays = Math.round((target - todayLocal) / msPerDay);
+  if (diffDays === 0) return 'today';
+  if (diffDays === 1) return 'tomorrow';
+  if (diffDays > 1 && diffDays <= 7) {
+    return target.toLocaleDateString('en-US', { weekday: 'long' });
+  }
+  return target.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
 // Forked Future with tappable goal cards.
 function FutureScreenProtoTappable({ adds, onOpenProject, onOpenGoal, onAddGoal, onAddProject, onAddAdminReminder, onToggleAdminReminder, onStartMonthlyRefresh }) {
   // Hydrate goals + projects from Supabase. Falls back to GOAL_DATA / PROJECT_DATA
@@ -762,27 +797,42 @@ function FutureScreenProtoTappable({ adds, onOpenProject, onOpenGoal, onAddGoal,
                 Nothing here yet. Things like "renew passport" or "call the vet" — stuff that isn't tied to a project.
               </div>
             )}
-            {admin.map((r) => (
-              <button key={r.id} onClick={() => onToggleAdminReminder && onToggleAdminReminder(r.id)} style={{
-                display: 'flex', alignItems: 'center', gap: 10, padding: '8px 4px',
-                background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left',
-              }}>
-                <span style={{
-                  width: 20, height: 20, borderRadius: 6, flexShrink: 0,
-                  background: r.done ? T.color.TintSage : 'transparent',
-                  border: `1.5px solid ${r.done ? T.color.TintSageDeep : T.color.SubtleText}`,
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            {admin.map((r) => {
+              const when = formatRelativeRemindOn(r.remind_on);
+              return (
+                <button key={r.id} onClick={() => onToggleAdminReminder && onToggleAdminReminder(r.id)} style={{
+                  display: 'flex', alignItems: 'center', gap: 10, padding: '8px 4px',
+                  background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left',
                 }}>
-                  {r.done && <Icon.Check size={12} color={T.color.TintMoss} stroke={2.5} />}
-                </span>
-                <span style={{
-                  flex: 1, fontFamily: T.font.Reading, fontSize: 14, lineHeight: '20px',
-                  color: T.color.PrimaryText,
-                  textDecoration: r.done ? 'line-through' : 'none',
-                  opacity: r.done ? 0.5 : 1,
-                }}>{r.text}</span>
-              </button>
-            ))}
+                  <span style={{
+                    width: 20, height: 20, borderRadius: 6, flexShrink: 0,
+                    background: r.done ? T.color.TintSage : 'transparent',
+                    border: `1.5px solid ${r.done ? T.color.TintSageDeep : T.color.SubtleText}`,
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    {r.done && <Icon.Check size={12} color={T.color.TintMoss} stroke={2.5} />}
+                  </span>
+                  <span style={{
+                    flex: 1, fontFamily: T.font.Reading, fontSize: 14, lineHeight: '20px',
+                    color: T.color.PrimaryText,
+                    textDecoration: r.done ? 'line-through' : 'none',
+                    opacity: r.done ? 0.5 : 1,
+                  }}>{r.text}</span>
+                  {/* When the row carries a remind_on date, render it as a small
+                      right-aligned chip so the date is visually distinct from the
+                      action text. Reminders without remind_on (post Reminders-intent
+                      reconciliation undated path) gracefully render only the text. */}
+                  {when && (
+                    <span style={{
+                      flexShrink: 0,
+                      fontFamily: T.font.UI, fontSize: 12, lineHeight: '20px',
+                      color: T.color.SubtleText,
+                      opacity: r.done ? 0.5 : 1,
+                    }}>{when}</span>
+                  )}
+                </button>
+              );
+            })}
             <AddZone
               addLabel="Add a reminder"
               placeholder="e.g. renew passport"
@@ -1252,6 +1302,7 @@ function PrototypePhone({ dayState, setDayState, idx, setIdx }) {
             onChange={onHeroChange}
             seedTranscript={capturedTranscript}
             onTranscriptConsumed={() => setCapturedTranscript('')}
+            onReminderCreated={m.addOptimisticAdminReminder}
             onPick={(key) => {
               if (key === 'journal') {
                 setHeroState('idle');
@@ -1269,6 +1320,7 @@ function PrototypePhone({ dayState, setDayState, idx, setIdx }) {
           onChange={onHeroChange}
           seedTranscript={capturedTranscript}
           onTranscriptConsumed={() => setCapturedTranscript('')}
+          onReminderCreated={m.addOptimisticAdminReminder}
           onPick={(key) => {
             if (key === 'journal') {
               setHeroState('idle');

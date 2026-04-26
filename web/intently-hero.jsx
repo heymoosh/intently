@@ -27,7 +27,7 @@ function VoiceWaveform({ color = '#FBF8F2', amplitude = 1 }) {
 // Press-hold behaviour (sticky): long-press opens the menu and LEAVES it open after release.
 // Tap an option to select. Tap outside (or press Escape) to dismiss. Short-tap (release before
 // the long-press threshold) starts voice recording, unchanged.
-function HeroAffordance({ state = 'idle', onChange, onPick, seedTranscript = '', onTranscriptConsumed }) {
+function HeroAffordance({ state = 'idle', onChange, onPick, seedTranscript = '', onTranscriptConsumed, onReminderCreated }) {
   // state: 'idle' | 'listening' | 'processing' | 'expanded' | 'chat'
   const holdTimer = React.useRef(null);
   const openedByHold = React.useRef(false);
@@ -158,6 +158,7 @@ function HeroAffordance({ state = 'idle', onChange, onPick, seedTranscript = '',
       onTranscriptConsumed={onTranscriptConsumed}
       onDone={() => onChange && onChange('idle')}
       onMic={() => onChange && onChange('listening')}
+      onReminderCreated={onReminderCreated}
     />;
   }
 
@@ -423,7 +424,7 @@ function HeroListening({ onDone, onTypeInstead }) {
 // ─── HERO CHAT ─── full-screen chat surface.
 // Mixed text/voice input; inline confirmation cards with Undo for agent actions;
 // quiet back-and-forth with the agent after a brief or a voice capture.
-function HeroChat({ onDone, onMic, seedTranscript = '', onTranscriptConsumed }) {
+function HeroChat({ onDone, onMic, seedTranscript = '', onTranscriptConsumed, onReminderCreated }) {
   const [draft, setDraft] = React.useState('');
   const [thread, setThread] = React.useState([]);
   const [pending, setPending] = React.useState(false);
@@ -463,6 +464,11 @@ function HeroChat({ onDone, onMic, seedTranscript = '', onTranscriptConsumed }) 
       if (cls && cls.classified === true && cls.reminder) {
         const when = cls.reminder.remind_on || 'soon';
         setThread((prev) => [...prev, { kind: 'agent', t: `Got it. I'll surface "${cls.reminder.text}" on ${when}.` }]);
+        // Bubble the persisted row up so the parent's useManualAdds can
+        // optimistically prepend it to state.adminReminders. Without this,
+        // the Future page's Admin band stays stale until a hard refresh —
+        // hydration only runs once on mount with an empty deps guard.
+        if (onReminderCreated) onReminderCreated(cls.reminder);
       } else if (window.callMaProxy) {
         // Live LLM turn. Single-turn for now — recent-thread history can be
         // added via a session id once the proxy + agent support persistence.
@@ -484,7 +490,7 @@ function HeroChat({ onDone, onMic, seedTranscript = '', onTranscriptConsumed }) 
     } finally {
       setPending(false);
     }
-  }, [buildChatInput]);
+  }, [buildChatInput, onReminderCreated]);
 
   // Seed the thread from a voice capture the user just finished, exactly once.
   React.useEffect(() => {
