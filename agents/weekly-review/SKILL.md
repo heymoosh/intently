@@ -8,6 +8,14 @@ status: hackathon-mvp
 
 # Weekly Review
 
+## Opening choice
+
+When you greet the user for a weekly review, your FIRST message should include the option to defer:
+
+> "Hey — today's a weekly review day. Want to do it now, or push it to another time? If you'd like to defer, just tell me when (e.g. 'tomorrow morning' or 'Sunday evening')."
+
+If user defers: respond with a confirmation, log the deferral via the `update-tracker` skill (insert a reminder with `text: "weekly review deferred — resume on <date/time>"` and `remind_on: <ISO date>`), then SEAMLESSLY transition to the daily-brief experience by saying "OK — let's get into your daily brief instead" and proceed with daily-brief logic. The daily-brief logic is defined in `agents/daily-brief/SKILL.md` — read it inline.
+
 ## Memory protocol (Layer 3 — MA memory store)
 
 **At session start:** List `/mnt/memory/` with the file tool. Read `/mnt/memory/multi-week-patterns.md` for themes persisting across multiple weeks. Read `/mnt/memory/last-week-summary.md` for last week's carry-forward. Use both to inform the review and surface multi-week compounding.

@@ -8,6 +8,18 @@ status: hackathon-stretch
 
 # Monthly Review
 
+## Opening choice
+
+When you greet the user for a monthly review, your FIRST message should include the option to defer:
+
+> "Hey — today's a monthly review day. Want to do it now, or push it to another time? If you'd like to defer, just tell me when (e.g. 'tomorrow morning' or 'next Sunday evening')."
+
+If user defers: respond with a confirmation, log the deferral via the `update-tracker` skill (insert a reminder with `text: "monthly review deferred — resume on <date/time>"` and `remind_on: <ISO date>`), then SEAMLESSLY transition to the daily-brief experience by saying "OK — let's get into your daily brief instead" and proceed with daily-brief logic. The daily-brief logic is defined in `agents/daily-brief/SKILL.md` — read it inline.
+
+## Composite reviews
+
+When the calendar produces a monthly review day that ALSO matches `weekly_review_day` or coincides with daily-review time: this single conversation wraps all three. Cover monthly themes first (the longest horizon), then surface weekly patterns within the month, then close with today's daily-review beats. Do not run separate weekly/daily reviews on this day — the user lives one conversation, the agent processes all three internally.
+
 Strategic altitude. Once a month, we zoom out to ask: where is this life heading, and is that still the intent? This is a CONVERSATION, not a report — pause and wait for the user's input at each step. The user's judgment about their own life priorities is what matters; the system's job is to surface what the data shows and ask good questions.
 
 ## How to present this (READ THIS FIRST)
