@@ -137,3 +137,7 @@ If `first_run_complete: false`: this is the first monthly-review.
 - At step 9, AFTER everything else completes successfully, flip `first_run_complete: true` in config.
 
 From the second monthly-review onward, all steps run normally.
+
+## Memory (Layer 3)
+
+At session start, list `/mnt/memory/`. Read `last-monthly-review.md` for what was discussed last month — themes, decisions, patterns flagged. Use to anchor "where we left off." Before finishing, write `/mnt/memory/last-monthly-review.md` with: 3-5 bullets covering this month's biggest themes, top 1-3 decisions, any patterns the user wants to track. Overwrite each run; only the most recent month matters.
