@@ -71,7 +71,7 @@ function SettingGroup({ children }) {
 }
 
 // ─── PROFILE SHEET ───────────────────────────────────────────────────
-function ProfileSheet({ connectedCount, onClose, onOpenConnections, onOpenAccount, onOpenPreferences, onOpenHelp, onSignOut }) {
+function ProfileSheet({ connectedCount, onClose, onOpenConnections, onOpenAccount, onOpenPreferences, onOpenHelp, onSignOut, onStartSetup }) {
   return (
     <div style={{
       position: 'absolute', inset: 0, zIndex: 70,
@@ -157,6 +157,18 @@ function ProfileSheet({ connectedCount, onClose, onOpenConnections, onOpenAccoun
             last
           />
         </SettingGroup>
+
+        {onStartSetup && (
+          <SettingGroup>
+            <SettingRow
+              icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={T.color.PrimaryText} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>}
+              label="Set up Intently as me"
+              sub="Wipes seed data, captures your own goals"
+              onClick={onStartSetup}
+              last
+            />
+          </SettingGroup>
+        )}
 
         <SettingGroup>
           <SettingRow

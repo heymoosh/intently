@@ -605,8 +605,62 @@ function parseMonthlyRefreshResponse(text) {
   }
 }
 
+// ─── Setup (first-run onboarding) ───────────────────────────────────────────
+
+// The setup agent only needs the user's 3 goal titles. It enriches each with
+// a monthly_slice + glyph for the current month. No DB reads — this fires
+// before the user has any data. Returns just {input}.
+function assembleSetupContext(goalTitles) {
+  const today = new Date();
+  const monthName = today.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+  const titles = (goalTitles || []).filter((t) => t && t.trim());
+
+  const sections = [
+    `# First-run setup — ${monthName}`,
+    '',
+    "## What the user just told you",
+    "These are the 3 long-term goals they want to build the system around:",
+    ...titles.map((t, i) => `${i + 1}. ${t.trim()}`),
+    '',
+    '## Your task',
+    `For EACH of the ${titles.length} goals above, draft a single-sentence ${monthName} monthly_slice — concrete, specific to ${monthName}, and pickable as one clear thing to serve this month. Pick a glyph from the canonical set.`,
+    '',
+    'Output ONLY a fenced JSON block of this shape:',
+    '```json',
+    '{',
+    `  "month": "${monthName}",`,
+    '  "slices": [',
+    '    { "goal_index": 0, "title": "...", "monthly_slice": "...", "glyph": "rocket|leaf|moon|pen|footprints|message|mountain|handshake|sparkles|target|book|heart" },',
+    '    { "goal_index": 1, "title": "...", "monthly_slice": "...", "glyph": "..." },',
+    '    { "goal_index": 2, "title": "...", "monthly_slice": "...", "glyph": "..." }',
+    '  ]',
+    '}',
+    '```',
+    '',
+    "title in the response should match the user's input exactly. No prose before or after the JSON. Order matches the goals list above.",
+  ];
+
+  return { input: sections.join('\n') };
+}
+
+// Strict JSON-only parse for the setup response.
+function parseSetupResponse(text) {
+  if (!text || typeof text !== 'string') return null;
+  const trimmed = text.trim();
+  const jsonMatch = trimmed.match(/```json\s*([\s\S]*?)\s*```/);
+  const raw = jsonMatch ? jsonMatch[1] : trimmed;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.slices)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
 Object.assign(window, {
   assembleBriefContext, assembleReviewContext, assembleWeeklyReviewContext,
   assembleMonthlyRefreshContext, parseMonthlyRefreshResponse,
+  assembleSetupContext, parseSetupResponse,
   labelForConsulted,
 });
