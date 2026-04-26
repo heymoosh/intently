@@ -21,19 +21,23 @@ That's why Intently exists.
 
 ---
 
-## Founder Cameo — Raw Riff (2026-04-25)
+## Founder Cameo
 
 > **[Zoom in on app → video of Muxin opens]**
 
-Hey, my name is Muxin. I'm the creator of Intently.
+I'm a product manager by trade. For several years I was managing dozens of cross-functional teams at a large regulated enterprise — an entire portfolio of energy products and digital products. No two launches were the same. Every team had different policies, different processes, different systems. I had to be the glue person coordinating all of it.
 
-I'm a product manager by trade, and for several years I was managing dozens of cross-functional teams in a large regulated enterprise, where I was in charge of an entire portfolio of energy products and digital products. No two launches were the same; every team had different policies and processes, and every brand had a different system in different teams to work with. I had to be the glue person, coordinating this. By the way, I have ADHD, and I'm not naturally organized. All I had for my working tools were Microsoft Office Suites, standard productivity tools. Somehow, over several years of figuring stuff out, I created my own system for staying on top of things and being the person who, funnily enough, earned a reputation for being one of the most organized people any team has ever worked with, which is funny because I literally cannot trust my own memory to remember details if I don't write it down and create a system for follow ups.
+By the way — I have ADHD, and I'm not naturally organized. All I had were Microsoft Office Suites and standard productivity tools. But over several years of just figuring stuff out, I created my own system for staying on top of things — and somehow earned a reputation for being one of the most organized people any team had ever worked with. Which is genuinely funny, because I literally cannot trust my own memory to remember details if I don't write it down and build a system for follow-ups.
 
-So when LLMs came out, I suddenly saw this potential to create the kind of system I'd always dreamed of having. Something that self-organizes and didn't require me to spend all my time and energy keeping track of and maintaining my own system. I found out along the way I wasn't the only person who felt this way: other people with ADHD, women who were the household managers for their lives and for their families. People who are the glue people for their social network. There's always somebody who is keeping it all together and is incredibly mentally taxing. AI and agents can handle a lot of that burden for you, but not everybody wants to figure out how to build their own system. I've been building my own system using Claude coworking, and now I've turned them into a user-friendly app that anybody can just pick up and go.
+When LLMs came out I suddenly saw this potential — the kind of system I'd always dreamed of. Something that self-organizes and doesn't require me to spend all my time and energy keeping track of and maintaining it. I found out I wasn't the only one who felt this way. Other people with ADHD. Household managers. The glue person in every social circle. There's always somebody keeping it all together — and it's incredibly mentally taxing.
 
-I built Intently for the busy parents and professionals who just don't have the time to try and figure out a system for their busy lives and just want something that works out of the box and doesn't require their effort to maintain it. It's the kind of tool that I wish I had all these years while I was struggling through corporate America and academia to stay on top of things. It's built on top of my own real-world lived experiences and productivity best practices that work for a lot of people. I've tried to create it as frictionless as possible so that you don't have to worry so much about where things are getting stored and forgetting things. The system just handles it for you. More importantly, all those big, hairy ideas, projects, and goals that you have now have a place to live alongside your day-to-day. Your day-to-day is synchronized to your goals so that you're never off sync with the things that you care about the most. You're never just living your day in a busy blur, not wondering what the hell happened. You know exactly what your day is about and what purpose it serves, and you know how to get to where you want to be.
+I built Intently for the busy parents and professionals who just want something that works out of the box and doesn't require their effort to maintain. It's the kind of tool I wish I'd had all these years.
 
-> **[Zoom back to app screen recordings]**
+---
+
+The problem with all the apps and tools we have today is that you end up spending more time maintaining them than actually getting things done. They're built in isolation. They don't talk to each other. There's no systemic view of your whole life — your goals, your commitments, what you're actually trying to do. In the SaaS era, without AI, every app is just a silo. They capture stuff. They don't carry it.
+
+> **[Transition to app screen recordings]**
 
 ---
 
