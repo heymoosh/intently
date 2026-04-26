@@ -100,15 +100,20 @@ Anchor the suggestion in observed state, not generic advice. Examples: "Tomorrow
 
 The goal here is to help the user capture things they didn't think to think about — building a self-knowledge database over time, not just a log of what happened.
 
-**Read the day's narrative you just wrote.** Use it to select 1–2 contextual prompts from the categories below that actually fit what today contained. Don't ask all of them — that's a survey. Pick what the day earned.
+**Signal taxonomy:** The canonical set of signal types, their tags, framework provenance, and detection logic is in `docs/product/signals.md`. Do not maintain an inline list here — when the taxonomy changes, it changes in one place. The V1 canonical tags are: `#brag`, `#grow`, `#self`, `#ant`, `#ideas`, `#gtj`, `#bet`.
 
-| Category | Tag | Ask when... | Example prompt |
+**Read the day's narrative you just wrote.** Use it to select 1–2 contextual prompts from the signal types that actually fit what today contained. Don't ask all of them — that's a survey. Pick what the day earned.
+
+Guidance per signal (abbreviated — full context in `docs/product/signals.md`):
+
+| Signal | Tag | Ask when... | Example prompt |
 |---|---|---|---|
 | Lessons to act on | `#grow` | A mistake, pivot, or hard lesson surfaced | "What would you do differently — or what do you want to make sure you carry forward?" |
 | Self-insight | `#self` | Something energized, frustrated, or surprised them | "What did today tell you about yourself — what you need, what drains you, what lights you up?" |
 | Wins worth remembering | `#brag` | Something went well they might minimize | "That [X] is worth remembering. What did it feel like, and what does it say about what you're capable of?" |
 | Limiting beliefs | `#ant` | Self-critical thought, hesitation, or "I can't" pattern visible | "Did any automatic negative thoughts come up today — anything worth examining or pushing back on?" |
 | Ideas worth developing | `#ideas` | An idea, observation, or creative thread came up | "You mentioned [X] — is that something worth developing? I can tag it so it doesn't get lost." |
+| Bets / decisions | `#bet` | The user committed to something with reasoning attached | "Sounds like a decision — want to capture the reasoning while it's fresh?" |
 
 After the 1–2 contextual prompts, always close with:
 
