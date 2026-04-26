@@ -337,6 +337,12 @@ function PresentPlanShell({ phase, adds, onAddPlan, onAddJournal, onPickEntry, b
     'Movement — light, not a workout.': true,
   };
 
+  // Today's locale date label, e.g. "Thursday · Apr 24".
+  const _now = new Date();
+  const _dayName = _now.toLocaleDateString(undefined, { weekday: 'long' });
+  const _monthDay = _now.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const _dateLabel = `${_dayName} · ${_monthDay}`;
+
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
       <div style={{ padding: '14px 24px 6px' }}>
@@ -348,7 +354,7 @@ function PresentPlanShell({ phase, adds, onAddPlan, onAddJournal, onPickEntry, b
           {isEvening
             ? <Icon.Moon size={12} color={T.color.SupportingText} />
             : <Icon.Sun size={12} color={T.color.SupportingText} />}
-          {isEvening ? 'Thursday · Today, in review' : "Thursday · Today's plan"}
+          {isEvening ? `${_dateLabel} · In review` : `${_dateLabel} · Today's plan`}
         </div>
         <div style={{
           fontFamily: T.font.Display, fontSize: 28, fontWeight: 500, lineHeight: '32px',

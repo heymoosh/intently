@@ -428,8 +428,8 @@ function ProjectDetailV2({ p, adds, onBack, onAddProjectTodo, onToggleProjectTod
 // the plan populating band-by-band.
 const BRIEF_SCRIPT = [
   {
-    agent: "Morning, Sam.",
-    agentSub: "Yesterday you shipped the slide and walked after dinner. Today is Thursday, week 17 — three things on your weekly board still.",
+    agent: "Morning.",
+    agentSub: "Let's shape your day.",
     typing: 1800,
   },
   {
@@ -1254,9 +1254,9 @@ function AutoCheckList({ items, checkedIndex }) {
 }
 
 function ReviewConfirmCard({ parsed, onAccept, consulted = [] }) {
-  const journal  = (parsed && parsed.journal)  || 'The dry run actually went well. I walked in present.';
-  const friction = (parsed && parsed.friction) || 'Over-polishing the data slide — twice this week.';
-  const tomorrow = (parsed && parsed.tomorrow) || 'Write the job pitch before opening Slack.';
+  const journal  = (parsed && parsed.journal)  || '';
+  const friction = (parsed && parsed.friction) || '';
+  const tomorrow = (parsed && parsed.tomorrow) || '';
   return (
     <div style={{ marginTop: 4 }}>
       <div style={{
@@ -1360,6 +1360,32 @@ function usePopulate(bands, delayStart = 200, perItem = 90) {
 
 // ─── EMPTY-PRESENT (pre-brief, start of day) ────────────────────────
 function PresentEmpty({ onStartBrief }) {
+  // Live user profile — displayName is null until loaded; greeting drops the
+  // name entirely per user-profile.js comment ("Good morning." not "Good morning, .").
+  const profile = window.useUserProfile ? window.useUserProfile() : { displayName: null };
+  const greeting = profile.displayName
+    ? `Good morning, ${profile.displayName}.`
+    : 'Good morning.';
+
+  // Today's locale date label, e.g. "Thursday · Apr 24".
+  const now = new Date();
+  const dayName = now.toLocaleDateString(undefined, { weekday: 'long' });
+  const monthDay = now.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const dateLabel = `${dayName} · ${monthDay}`;
+
+  // Yesterday's most recent journal entry (pre-today). Loaded async; hidden if none.
+  const [yesterdayEntry, setYesterdayEntry] = React.useState(undefined); // undefined = loading
+  React.useEffect(() => {
+    if (!window.listJournalEntries) { setYesterdayEntry(null); return; }
+    const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
+    window.listJournalEntries({ limit: 10 })
+      .then((entries) => {
+        const pre = (entries || []).filter((e) => e.at && new Date(e.at) < startOfToday);
+        setYesterdayEntry(pre.length > 0 ? (pre[0].body_markdown || '').trim() : null);
+      })
+      .catch(() => setYesterdayEntry(null));
+  }, []);
+
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
       {/* Lock-screen-style ambient image — centered painterly dawn,
@@ -1386,26 +1412,28 @@ function PresentEmpty({ onStartBrief }) {
           display: 'inline-flex', alignItems: 'center', gap: 6,
         }}>
           <Icon.Sun size={12} color={T.color.SupportingText} />
-          Thursday · Apr 23
+          {dateLabel}
         </div>
         <div style={{
           fontFamily: T.font.Display, fontSize: 32, fontWeight: 500, lineHeight: '38px',
           color: T.color.PrimaryText, letterSpacing: -0.6, fontStyle: 'italic',
-        }}>Good morning, Sam.</div>
+        }}>{greeting}</div>
       </div>
 
       <div style={{ position: 'relative', zIndex: 1, flex: 1, overflowY: 'auto', padding: '20px 24px 240px', display: 'flex', flexDirection: 'column', gap: 28 }}>
-        {/* Yesterday's one-line */}
-        <div>
-          <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: T.color.SupportingText, marginBottom: 8 }}>Yesterday</div>
-          <div style={{
-            padding: '14px 16px', borderRadius: 12,
-            background: T.color.TintLilac + '2a',
-            borderLeft: `3px solid ${T.color.TintLilac}`,
-            fontFamily: T.font.Display, fontSize: 17, lineHeight: '24px',
-            fontStyle: 'italic', color: T.color.PrimaryText, letterSpacing: -0.2,
-          }}>"Shipped the slide. Walked after dinner."</div>
-        </div>
+        {/* Yesterday's one-line — only rendered when a pre-today entry exists */}
+        {yesterdayEntry && (
+          <div>
+            <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: T.color.SupportingText, marginBottom: 8 }}>Yesterday</div>
+            <div style={{
+              padding: '14px 16px', borderRadius: 12,
+              background: T.color.TintLilac + '2a',
+              borderLeft: `3px solid ${T.color.TintLilac}`,
+              fontFamily: T.font.Display, fontSize: 17, lineHeight: '24px',
+              fontStyle: 'italic', color: T.color.PrimaryText, letterSpacing: -0.2,
+            }}>"{yesterdayEntry}"</div>
+          </div>
+        )}
 
         {/* Empty-plan whisper */}
         <div style={{ textAlign: 'center', padding: '30px 20px' }}>
@@ -1445,12 +1473,17 @@ function PresentEmpty({ onStartBrief }) {
 // ─── END-OF-DAY (post-review) — simple closed-state ─────────────────
 function PresentClosed({ onReopenReview, review }) {
   // Review shape (from ReviewFlow → onComplete): { journalText, friction[], tomorrow[], calendar[] }
-  // Falls back to seeded copy when no live review has landed yet.
-  const oneLine = (review && (review.journalText || review.journal)) || 'The dry run actually went well. I walked in present.';
+  // Falls back to empty/null when no live review has landed — don't show fixture copy.
+  const oneLine = (review && (review.journalText || review.journal)) || null;
   const tomorrowList = (review && Array.isArray(review.tomorrow)) ? review.tomorrow : null;
   const tomorrow = tomorrowList && tomorrowList.length > 0
     ? tomorrowList.map((t) => t.text || t).join(' · ')
-    : (review && typeof review.tomorrow === 'string' ? review.tomorrow : 'Write the job pitch before opening Slack.');
+    : (review && typeof review.tomorrow === 'string' ? review.tomorrow : null);
+
+  // Today's locale date label — e.g. "Thursday · Closed".
+  const _dayName = new Date().toLocaleDateString(undefined, { weekday: 'long' });
+  const dateLabel = `${_dayName} · Closed`;
+
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
       <div style={{ padding: '14px 24px 10px' }}>
@@ -1460,7 +1493,7 @@ function PresentClosed({ onReopenReview, review }) {
           display: 'inline-flex', alignItems: 'center', gap: 6,
         }}>
           <Icon.Moon size={12} color={T.color.SupportingText} />
-          Thursday · Closed
+          {dateLabel}
         </div>
         <div style={{
           fontFamily: T.font.Display, fontSize: 40, fontWeight: 500, lineHeight: '44px',
@@ -1469,18 +1502,22 @@ function PresentClosed({ onReopenReview, review }) {
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px 240px', display: 'flex', flexDirection: 'column', gap: 20 }}>
-        <div style={{
-          padding: '16px 18px', borderRadius: 14,
-          background: T.color.TintLilac + '2a',
-          borderLeft: `3px solid ${T.color.TintLilac}`,
-        }}>
-          <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: T.color.SupportingText, marginBottom: 6 }}>Today, in one line</div>
-          <div style={{ fontFamily: T.font.Display, fontSize: 22, lineHeight: '29px', fontStyle: 'italic', color: T.color.PrimaryText, letterSpacing: -0.3 }}>"{oneLine}"</div>
-        </div>
-        <div style={{ padding: '14px 16px', borderRadius: 12, background: T.color.SecondarySurface, border: `1px solid ${T.color.EdgeLine}` }}>
-          <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: T.color.SupportingText, marginBottom: 4 }}>For tomorrow</div>
-          <div style={{ fontFamily: T.font.Reading, fontSize: 15, lineHeight: '22px', color: T.color.PrimaryText }}>{tomorrow}</div>
-        </div>
+        {oneLine && (
+          <div style={{
+            padding: '16px 18px', borderRadius: 14,
+            background: T.color.TintLilac + '2a',
+            borderLeft: `3px solid ${T.color.TintLilac}`,
+          }}>
+            <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: T.color.SupportingText, marginBottom: 6 }}>Today, in one line</div>
+            <div style={{ fontFamily: T.font.Display, fontSize: 22, lineHeight: '29px', fontStyle: 'italic', color: T.color.PrimaryText, letterSpacing: -0.3 }}>"{oneLine}"</div>
+          </div>
+        )}
+        {tomorrow && (
+          <div style={{ padding: '14px 16px', borderRadius: 12, background: T.color.SecondarySurface, border: `1px solid ${T.color.EdgeLine}` }}>
+            <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: T.color.SupportingText, marginBottom: 4 }}>For tomorrow</div>
+            <div style={{ fontFamily: T.font.Reading, fontSize: 15, lineHeight: '22px', color: T.color.PrimaryText }}>{tomorrow}</div>
+          </div>
+        )}
         <div style={{ textAlign: 'center', padding: '20px 10px' }}>
           <div style={{ fontFamily: T.font.Reading, fontSize: 14, lineHeight: '20px', color: T.color.SubtleText, fontStyle: 'italic' }}>
             Saved to your journal. Tomorrow's brief is waiting.
