@@ -1,9 +1,11 @@
 # Demo Script — Opus 4.7 Hackathon
 
+> **⚠️ Script revision in progress (2026-04-25).** The VO below is solid but was written in pure product-ad register. After reviewing Mike Brown's winning demo, we identified missing pieces: no investor/problem angle with a real person, no technical architecture beat. We're keeping the 3-act storyboard and VO intact but inserting two new sections in the middle (founder cameo + technical layer). See § Session Notes at the bottom for the full list of additions.
+
 **Type:** Creative/strategy — pitch narrative and VO script.
-**Updated:** 2026-04-24
+**Updated:** 2026-04-25
 **For:** 3-minute submission video due Apr 26, 8 PM EDT
-**Format:** Narrated video, no presenter on camera. Voiceover + screen recordings + animation/visuals.
+**Format:** Narrated video. Brief on-camera founder cameo at Act 1→2 transition, then screen recordings + animation/visuals.
 
 ---
 
@@ -54,3 +56,42 @@ Your days feed your weeks. A year of that and you're not where life took you —
 - [ ] Lock VO before touching visuals
 - [ ] Build visual sequences in Remotion around locked VO
 - [ ] Brutal edit to 2:59
+
+---
+
+## Session Notes — 2026-04-25 (additions to incorporate)
+
+Ideas surfaced during strategy session reviewing Mike Brown's demo. Not yet woven into the VO or storyboard — this is the raw list to build from.
+
+### Narrative structure changes
+- 3-act storyboard stays intact — don't blow it up
+- **Insert founder cameo** at the zoom-in transition (Act 1 → Act 2): Muxin on camera, ~15–20 seconds. "I built this because..." framing. Leads naturally into app screen recordings. After app + tech section, zoom back out to 2D animated story for Act 3.
+- Format note: "Format" header updated — not no-camera anymore; brief cameo is in
+
+### Personal / investor beat (for the cameo and/or VO)
+- PM at Fortune 500, holding context for many teams simultaneously — couldn't hold the thread for his own life
+- ADHD angle — personal, but also a massive population (not niche)
+- Line to consider: "The apps capture; they don't carry. They store; they don't notice."
+
+### Technical beats to insert (Act 2, after screen recordings)
+- **Temporal altitude diagram** — six agents arranged by altitude (daily at base, monthly at top). Each altitude sees what the others can't — drone vs. plane vs. satellite. Animated in Remotion. ~15–20 seconds.
+- **State-mediated coordination** — agents share a world (Supabase), not commands. One sentence, visual of a shared logbook or whiteboard. Deliberately no orchestrator — durability and auditability over command hierarchy.
+- **Model-per-role** — Opus 4.7 for judgment agents (daily-brief, daily-review, weekly-review, monthly-review), Sonnet for mechanical (setup, update-tracker). Sonnet = fixed inputs/outputs; Opus = synthesis and judgment.
+- **Data complexity visual** — show how the context layer grows over time (more projects, more logs, more patterns). This is why Opus matters more as the app matures: synthesis gets harder; the model scales with it. The whole app exists to mine these patterns and surface them as priorities.
+
+### Architecture story (for MA prize writeup too)
+- Six agents, each with a SKILL.md defining behavior
+- Scheduled cadence — not one-shot. Daily brief every morning, daily review every evening, weekly/monthly on cadence.
+- "Something you'd actually ship" — it's live at intently-eta.vercel.app
+- Framing: "We didn't build a manager and workers. We built six specialists who share a world — each watching at a different altitude, each leaving notes for the others."
+
+### Music
+- Single musical theme running through all three acts
+- Sparse/tense in Act 1 → building in Act 2 → resolving/blooming in Act 3
+- Ties animation to emotional arc; makes it feel unified, not illustrated slides
+
+### What we must NOT claim (not built as of 2026-04-25)
+- Memory tiering / promotion pipeline
+- Opus orchestrator / dynamic subagents
+- Multi-destination hero button routing
+- Topic clustering / auto-project creation
