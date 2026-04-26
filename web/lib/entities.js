@@ -185,25 +185,6 @@ async function insertJournalEntry(text, date) {
   return data;
 }
 
-// Update an existing journal entry's text body. Used by reading-mode's
-// edit button (intently-reading.jsx) — JournalComposer in edit mode
-// calls this on save so we update the row instead of inserting a new
-// one. RLS + explicit user_id filter guarantees the row belongs to the
-// caller. Throws on FK / RLS / network failures so the caller can
-// surface a toast.
-async function updateJournalEntry(id, text) {
-  const { data, error } = await _client()
-    .from('entries')
-    .update({ body_markdown: text })
-    .eq('id', id)
-    .eq('user_id', (await _userId()))
-    .eq('kind', 'journal')
-    .select()
-    .single();
-  if (error) _throw('updateJournalEntry', error);
-  return data;
-}
-
 async function listJournalEntries(opts) {
   const limit = opts && typeof opts.limit === 'number' ? opts.limit : null;
   let q = _client()
@@ -216,6 +197,44 @@ async function listJournalEntries(opts) {
   const { data, error } = await q;
   if (error) _throw('listJournalEntries', error);
   return data || [];
+}
+
+// ─── Life ops config ─────────────────────────────────────────────────────────
+
+async function updateLifeOpsConfig(patch) {
+  // Upsert a row for this user, merging `patch` into the existing JSONB config.
+  // Supabase does not natively deep-merge JSONB on upsert, so we read-merge-write.
+  // Single-user V1: read/write race is acceptable.
+  const sb = _client();
+  const uid = await _userId();
+
+  // Fetch existing config (may not exist yet for brand-new users).
+  const { data: existing, error: readErr } = await sb
+    .from('life_ops_config')
+    .select('config')
+    .eq('user_id', uid)
+    .maybeSingle();
+  if (readErr) _throw('updateLifeOpsConfig (read)', readErr);
+
+  const merged = Object.assign({}, (existing && existing.config) || {}, patch);
+
+  const { data, error } = await sb
+    .from('life_ops_config')
+    .upsert({ user_id: uid, config: merged }, { onConflict: 'user_id' })
+    .select()
+    .single();
+  if (error) _throw('updateLifeOpsConfig (write)', error);
+  return data;
+}
+
+async function getLifeOpsConfig() {
+  const { data, error } = await _client()
+    .from('life_ops_config')
+    .select('config')
+    .eq('user_id', (await _userId()))
+    .maybeSingle();
+  if (error) _throw('getLifeOpsConfig', error);
+  return (data && data.config) || {};
 }
 
 // ─── Admin reminders (uses the existing public.reminders table) ─────────────
@@ -272,8 +291,9 @@ Object.assign(window, {
   insertPlanItem,
   listPlanItems,
   insertJournalEntry,
-  updateJournalEntry,
   listJournalEntries,
+  updateLifeOpsConfig,
+  getLifeOpsConfig,
   insertAdminReminder,
   listAdminReminders,
   markAdminReminderDone,

@@ -117,32 +117,19 @@ const PROJECT_EXTRAS = {
 };
 
 // ─── GOAL DETAIL SCREEN ─────────────────────────────────────────────
-function GoalDetail({ goal, onBack, onOpenProject, dbProjects }) {
-  // Resolve projects from (1) the live DB list (preferred), (2) PROJECT_DATA
-  // fixtures, (3) hard-coded stubs for the demo journey. Goals from Supabase
-  // expose projectIds as actual UUIDs; fixture goals use kebab keys like 'visa'.
-  const lookupProject = (id) => {
-    if (Array.isArray(dbProjects)) {
-      const hit = dbProjects.find((x) => x.id === id);
-      if (hit) return hit;
-    }
-    if (typeof PROJECT_DATA !== 'undefined') {
-      const hit = PROJECT_DATA.find((x) => x.id === id);
-      if (hit) return hit;
-    }
-    const stubs = {
-      visa:      { id: 'visa',     name: 'Visa paperwork',      blurb: 'HSP track. Passport renewal is the open blocker.',        tint: T.color.TintPeachSoft, glyph: 'alarm', count: 8, done: 6, tracker: [], markdown: [] },
-      japanese:  { id: 'japanese', name: 'Japanese — N4 by landing', blurb: '20 min/day. N5 feels close. N4 is the real target.',     tint: T.color.TintButter,    glyph: 'book',  count: 4, done: 1, tracker: [], markdown: [] },
-    };
-    return stubs[id] || null;
-  };
-  const projects = (goal.projectIds || []).map(lookupProject).filter(Boolean);
-  const milestones = Array.isArray(goal.milestones) ? goal.milestones : [];
-  const reflections = Array.isArray(goal.reflections) ? goal.reflections : [];
-  const intention = (goal.intention || '').trim();
-  const monthSlice = (goal.month || '').trim();
-  const monthNarr = (goal.monthNarrative || '').trim();
-  const showMonthSection = !!(monthSlice || monthNarr);
+function GoalDetail({ goal, onBack, onOpenProject }) {
+  const projects = goal.projectIds
+    .map(id => {
+      const p = (typeof PROJECT_DATA !== 'undefined' && PROJECT_DATA.find(x => x.id === id)) || null;
+      if (p) return p;
+      // Fallback stub for visa/japanese (not in original PROJECT_DATA)
+      const stubs = {
+        visa:      { id: 'visa',     name: 'Visa paperwork',      blurb: 'HSP track. Passport renewal is the open blocker.',        tint: T.color.TintPeachSoft, glyph: 'alarm', count: 8, done: 6, tracker: [], markdown: [] },
+        japanese:  { id: 'japanese', name: 'Japanese — N4 by landing', blurb: '20 min/day. N5 feels close. N4 is the real target.',     tint: T.color.TintButter,    glyph: 'book',  count: 4, done: 1, tracker: [], markdown: [] },
+      };
+      return stubs[id];
+    })
+    .filter(Boolean);
 
   return (
     <div style={{ height: '100%', background: T.color.PrimarySurface, display: 'flex', flexDirection: 'column', overflow: 'hidden', }}>
@@ -176,47 +163,33 @@ function GoalDetail({ goal, onBack, onOpenProject, dbProjects }) {
 
       {/* Scroll */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '18px 22px 140px' }}>
-        {/* Intention — the original why. Hidden for newly-added goals until the
-            user authors one (placeholder shown so the section is discoverable). */}
-        {intention ? (
-          <Section label="Intention">
-            <p style={readingP}>{intention}</p>
-          </Section>
-        ) : (
-          <Section label="Intention" sub="not written yet">
-            <p style={{ ...readingP, color: T.color.SubtleText, fontStyle: 'italic' }}>Tap the mic to dictate the why behind this goal.</p>
-          </Section>
-        )}
+        {/* Intention — the original why */}
+        <Section label="Intention">
+          <p style={readingP}>{goal.intention}</p>
+        </Section>
 
         {/* This month — the agent's monthly review narrative */}
-        {showMonthSection && (
-          <Section label="This month" sub="from your monthly review">
-            <div style={{
-              background: T.color.TintSage + '33',
-              border: `1px solid ${T.color.TintSage}88`,
-              borderRadius: 12, padding: '14px 16px',
-            }}>
-              <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: T.color.TintSageDeep, marginBottom: 6 }}>This month</div>
-              {monthSlice && (
-                <div style={{ fontFamily: T.font.Reading, fontSize: 15, lineHeight: '23px', color: T.color.PrimaryText, fontStyle: 'italic', marginBottom: monthNarr ? 10 : 0 }}>
-                  "{monthSlice.replace(/^[A-Z][a-z]+:\s*/, '')}"
-                </div>
-              )}
-              {monthNarr && (
-                <div style={{ fontFamily: T.font.Reading, fontSize: 14, lineHeight: '22px', color: T.color.SupportingText }}>
-                  {monthNarr}
-                </div>
-              )}
+        <Section label="This month" sub="from your monthly review">
+          <div style={{
+            background: T.color.TintSage + '33',
+            border: `1px solid ${T.color.TintSage}88`,
+            borderRadius: 12, padding: '14px 16px',
+          }}>
+            <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: T.color.TintSageDeep, marginBottom: 6 }}>April · focus</div>
+            <div style={{ fontFamily: T.font.Reading, fontSize: 15, lineHeight: '23px', color: T.color.PrimaryText, fontStyle: 'italic', marginBottom: 10 }}>
+              "{goal.month.replace(/^April:\s*/, '')}"
             </div>
-          </Section>
-        )}
+            <div style={{ fontFamily: T.font.Reading, fontSize: 14, lineHeight: '22px', color: T.color.SupportingText }}>
+              {goal.monthNarrative}
+            </div>
+          </div>
+        </Section>
 
-        {/* Milestones — target months, not dates. Hidden when none authored. */}
-        {milestones.length > 0 && (
-          <Section label="Milestones" sub="the higher-level beats">
+        {/* Milestones — target months, not dates */}
+        <Section label="Milestones" sub="the higher-level beats">
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {milestones.map((m, i) => {
-              const isLast = i === milestones.length - 1;
+            {goal.milestones.map((m, i) => {
+              const isLast = i === goal.milestones.length - 1;
               const dotColor = m.status === 'done' ? T.color.TintSageDeep
                              : m.status === 'doing' ? T.color.FocusObject
                              : T.color.SubtleText;
@@ -255,26 +228,19 @@ function GoalDetail({ goal, onBack, onOpenProject, dbProjects }) {
             })}
           </div>
         </Section>
-        )}
 
         {/* Projects under this goal */}
-        <Section label="Projects" sub={projects.length === 0 ? 'none yet' : `${projects.length} under this goal`}>
-          {projects.length === 0 ? (
-            <div style={{ padding: '12px 14px', borderRadius: 10, background: T.color.SecondarySurface, border: `1px solid ${T.color.EdgeLine}`, fontFamily: T.font.Reading, fontSize: 13, lineHeight: '19px', color: T.color.SubtleText, fontStyle: 'italic' }}>
-              No projects under this goal yet. Add one from Future.
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              {projects.map(p => <ProjectCard key={p.id} p={p} onOpen={() => onOpenProject && onOpenProject(p)} />)}
-            </div>
-          )}
+        <Section label="Projects" sub={`${projects.length} under this goal`}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            {projects.map(p => <ProjectCard key={p.id} p={p} onOpen={() => onOpenProject && onOpenProject(p)} />)}
+          </div>
         </Section>
 
         {/* Reflections — pulled journal quotes */}
-        {reflections.length > 0 && (
+        {goal.reflections && goal.reflections.length > 0 && (
           <Section label="Reflections" sub="pulled from your journal">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {reflections.map((r, i) => (
+              {goal.reflections.map((r, i) => (
                 <div key={i} style={{
                   padding: '14px 16px',
                   background: T.color.TintLilac + '2a',
@@ -312,25 +278,19 @@ const readingP = { fontFamily: T.font.Reading, fontSize: 15, lineHeight: '24px',
 // Impact, and a tight one-line Status. Also a proper X close button in
 // the hero.
 function ProjectDetailV2({ p, adds, onBack, onAddProjectTodo, onToggleProjectTodo, onOpenGoal }) {
-  // Defensive across both fixture (PROJECT_DATA) and DB-hydrated project shapes.
-  const extras = (typeof PROJECT_EXTRAS !== 'undefined' && PROJECT_EXTRAS[p.id]) || { goalId: null, intention: null, impact: null, status: null };
-  const goal = extras.goalId && (typeof GOAL_DATA !== 'undefined') && GOAL_DATA.find(g => g.id === extras.goalId);
+  const extras = PROJECT_EXTRAS[p.id] || { goalId: null, intention: null, impact: null, status: null };
+  const goal = extras.goalId && GOAL_DATA.find(g => g.id === extras.goalId);
   const addedTodos = (adds && adds.projectTodos && adds.projectTodos[p.id]) || [];
-  const tracker = Array.isArray(p.tracker) ? p.tracker : [];
-  const markdown = Array.isArray(p.markdown) ? p.markdown : [];
-  const projectName = p.name || p.title || 'Project';
-  const projectGlyph = p.glyph || 'leaf';
-  const projectTint = p.tint || T.color.TintSage;
 
   // Derive a tight status — use the extras.status if present, otherwise fall back to first status-y paragraph from markdown.
   const statusText = extras.status
-    || (markdown.find(b => b.kind === 'p' && /^(lease|draft|status|held)/i.test(b.text))?.text)
+    || (p.markdown && p.markdown.find(b => b.kind === 'p' && /^(lease|draft|status|held)/i.test(b.text))?.text)
     || p.blurb;
 
   return (
     <div style={{ height: '100%', background: T.color.PrimarySurface, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* Cover */}
-      <div style={{ position: 'relative', padding: '14px 18px 20px', background: projectTint, overflow: 'hidden', flexShrink: 0 }}>
+      <div style={{ position: 'relative', padding: '14px 18px 20px', background: p.tint, overflow: 'hidden', flexShrink: 0 }}>
         <div className="intently-grain" style={{ opacity: 0.25 }} />
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
           <button onClick={onBack} aria-label="Back" style={{
@@ -352,7 +312,7 @@ function ProjectDetailV2({ p, adds, onBack, onAddProjectTodo, onToggleProjectTod
         <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-end', gap: 12, marginTop: 18 }}>
           <div style={{ flex: 1 }}>
             <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: T.color.TintMoss, opacity: 0.8 }}>Project</div>
-            <div style={{ fontFamily: T.font.Display, fontSize: 26, lineHeight: '30px', fontStyle: 'italic', fontWeight: 500, color: T.color.TintMoss, letterSpacing: -0.4, marginTop: 2 }}>{projectName}</div>
+            <div style={{ fontFamily: T.font.Display, fontSize: 26, lineHeight: '30px', fontStyle: 'italic', fontWeight: 500, color: T.color.TintMoss, letterSpacing: -0.4, marginTop: 2 }}>{p.name}</div>
             {goal && (
               <button onClick={() => onOpenGoal && onOpenGoal(goal)} style={{
                 marginTop: 10,
@@ -369,7 +329,7 @@ function ProjectDetailV2({ p, adds, onBack, onAddProjectTodo, onToggleProjectTod
             )}
           </div>
           <span style={{ width: 48, height: 48, borderRadius: 12, background: 'rgba(43,33,24,0.12)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <Glyph name={projectGlyph} size={26} color={T.color.TintMoss} stroke={1.75} />
+            <Glyph name={p.glyph} size={26} color={T.color.TintMoss} stroke={1.75} />
           </span>
         </div>
       </div>
@@ -400,9 +360,9 @@ function ProjectDetailV2({ p, adds, onBack, onAddProjectTodo, onToggleProjectTod
         )}
 
         {/* Tracker */}
-        <Section label="Tracker" sub={tracker.length === 0 && addedTodos.length === 0 ? 'add a todo to start tracking' : undefined}>
+        <Section label="Tracker">
           <div style={{ background: T.color.SecondarySurface, border: `1px solid ${T.color.EdgeLine}`, borderRadius: 12, overflow: 'hidden' }}>
-            {tracker.map((r, i) => {
+            {p.tracker.map((r, i) => {
               const dot = { done: T.color.TintSageDeep, doing: T.color.TintDusk, todo: T.color.SubtleText }[r.status];
               return (
                 <div key={i} style={{
@@ -468,7 +428,7 @@ function ProjectDetailV2({ p, adds, onBack, onAddProjectTodo, onToggleProjectTod
 // the plan populating band-by-band.
 const BRIEF_SCRIPT = [
   {
-    agent: "Morning, {NAME}.",
+    agent: "Morning, Sam.",
     agentSub: "Yesterday you shipped the slide and walked after dinner. Today is Thursday, week 17 — three things on your weekly board still.",
     typing: 1800,
   },
@@ -502,18 +462,6 @@ function BriefFlow({ onClose, onComplete }) {
   const [consulted, setConsulted] = React.useState([]);     // input traces — what the assembler injected
   const scrollRef = React.useRef(null);
 
-  // Resolve display name for greeting substitution. Read from the module-level
-  // cache (_profileCache) so the hook state is stable at step 0. By the time
-  // the user opens the brief the profile is already cached (fetched on app
-  // load via useUserProfile in the shell). Falls back to null → "Morning."
-  const profile = window.useUserProfile ? window.useUserProfile() : { displayName: null };
-  const briefDisplayName = (profile && profile.displayName) || null;
-  // Keep a ref so the step-0 effect doesn't need briefDisplayName in its deps
-  // (which would re-fire the greeting useEffect each time the async profile
-  // resolves, posting a duplicate first message).
-  const briefDisplayNameRef = React.useRef(briefDisplayName);
-  briefDisplayNameRef.current = briefDisplayName;
-
   // Drive the script — when step changes, post agent turn, reveal input/confirm.
   // Steps that have neither `input` nor `confirm` are passive bubbles (e.g. the
   // opening greeting) and auto-advance after a short reading pause so the user
@@ -522,14 +470,8 @@ function BriefFlow({ onClose, onComplete }) {
     const s = BRIEF_SCRIPT[step];
     if (!s) return;
     setAgentTyping(true);
-    // Substitute {NAME} placeholder with the user's display name at render time.
-    // Falls back to empty string so the result is "Morning." (no dangling comma).
-    const name = briefDisplayNameRef.current;
-    const agentText = typeof s.agent === 'string'
-      ? s.agent.replace('{NAME}', name || '').replace(/,\s*\.$/, '.').trim()
-      : s.agent;
     const typingTimer = setTimeout(() => {
-      setMessages(m => [...m, { role: 'agent', text: agentText, sub: s.agentSub }]);
+      setMessages(m => [...m, { role: 'agent', text: s.agent, sub: s.agentSub }]);
       setAgentTyping(false);
     }, s.typing);
     let advanceTimer;
@@ -596,39 +538,12 @@ function BriefFlow({ onClose, onComplete }) {
   const showConfirm = s && s.confirm && !agentTyping && liveBriefReady;
   const showBriefThinking = s && s.confirm && !agentTyping && briefLoading;
 
-  // Per-turn ack — mirror of the ReviewFlow pattern. Lets the morning brief
-  // agent react to what the user actually said before queuing the next
-  // scripted prompt. ~3-6s latency is hidden behind the agent-typing dots.
-  const ackUserTurn = React.useCallback(async (userText) => {
-    if (!window.callMaProxy) return;
-    setAgentTyping(true);
-    try {
-      const ackInput = [
-        "You are partway through the user's morning brief. They just answered the previous prompt.",
-        `User said: "${userText}"`,
-        "",
-        "Reply with ONE short sentence (max 18 words) that shows you actually heard them — reflect a specific word or beat from what they said. Do NOT summarize, do NOT give advice, do NOT propose a plan, do NOT ask the next brief question (that's pre-scripted and will follow). If their answer was off-topic / a test / a meta comment, gently acknowledge that and invite them to say more.",
-        "Do not emit a JSON tail.",
-      ].join('\n');
-      const r = await window.callMaProxy({ skill: 'daily-brief', input: ackInput });
-      let reply = (r && r.finalText) || '';
-      reply = reply.replace(/```json[\s\S]*?```\s*$/, '').trim();
-      if (reply) setMessages(m => [...m, { role: 'agent', text: reply }]);
-    } catch (e) { /* fail silently */ }
-    setAgentTyping(false);
-  }, []);
-
-  const submit = async (text) => {
+  const submit = (text) => {
     const t = (text && text.trim()) || (s.userDefault || '');
     if (!t) return;
     setMessages(m => [...m, { role: 'user', text: t }]);
     setDraft('');
-    const nextStep = step + 1;
-    const nextS = BRIEF_SCRIPT[nextStep];
-    if (nextS && !nextS.confirm) {
-      await ackUserTurn(t);
-    }
-    setStep(nextStep);
+    setTimeout(() => setStep(step + 1), 260);
   };
 
   return (
@@ -660,14 +575,11 @@ function BriefFlow({ onClose, onComplete }) {
           {agentTyping && <AgentTyping />}
           {/* Live daily-brief from ma-proxy — appears before the confirm card */}
           {showBriefThinking && <AgentTyping />}
-          {liveBrief && <ChatBubble role="agent" text={(parseAgentPlan(liveBrief, MOCK_PLAN).proseBody) || liveBrief} />}
+          {liveBrief && <ChatBubble role="agent" text={liveBrief} />}
           {briefError && <ChatBubble role="agent" text="(I couldn't reach the brief generator just now — here's your day shape anyway.)" />}
           {showConfirm && <BriefConfirmCard plan={parseAgentPlan(liveBrief, MOCK_PLAN)} consulted={consulted} onAccept={async () => {
-            // Persist the brief response as entries.kind='brief' AND insert one
-            // plan_items row per band item so the populated plan survives a
-            // refresh. Undo rolls back both the entry and the plan_items rows.
+            // Persist the brief response as entries.kind='brief' + fire undo toast.
             let insertedId = null;
-            const insertedPlanIds = [];
             if (liveBrief && window.getSupabaseClient && window.getCurrentUserId) {
               try {
                 const sb = window.getSupabaseClient();
@@ -679,36 +591,13 @@ function BriefFlow({ onClose, onComplete }) {
                 if (data) insertedId = data.id;
               } catch (e) { console.warn('[brief] persist failed:', e && e.message); }
             }
-            // Plan items: one row per agent-suggested band item. We don't
-            // dedupe against existing today rows — the brief is the
-            // authoritative shape of "today's intent" at accept time.
-            try {
-              const parsed = parseAgentPlan(liveBrief, MOCK_PLAN);
-              if (parsed && Array.isArray(parsed.bands) && window.insertPlanItem) {
-                const today = new Date().toISOString().slice(0, 10);
-                for (const band of parsed.bands) {
-                  const bandKey = String(band.when || '').toLowerCase();
-                  if (!['morning', 'afternoon', 'evening'].includes(bandKey)) continue;
-                  for (const it of (band.items || [])) {
-                    if (!it || !it.t) continue;
-                    try {
-                      const row = await window.insertPlanItem(today, bandKey, it.t, it.tier || null, it.duration_min || null);
-                      if (row && row.id) insertedPlanIds.push(row.id);
-                    } catch (e) { console.warn('[brief] plan_item insert failed:', e && e.message); }
-                  }
-                }
-              }
-            } catch (e) { console.warn('[brief] parse-for-plan failed:', e && e.message); }
             if (insertedId && window.showUndoToast) {
               window.showUndoToast({
-                message: `Saved today's brief${insertedPlanIds.length ? ` + ${insertedPlanIds.length} plan items` : ''}`,
+                message: "Saved today's brief",
                 onUndo: async () => {
                   const sb = window.getSupabaseClient();
                   const userId = await window.getCurrentUserId();
                   await sb.from('entries').delete().eq('id', insertedId).eq('user_id', userId);
-                  if (insertedPlanIds.length) {
-                    await sb.from('plan_items').delete().in('id', insertedPlanIds).eq('user_id', userId);
-                  }
                 },
               });
             }
@@ -867,8 +756,6 @@ function parseAgentPlan(prose, fallback) {
           items: (b.items || []).map((it) => ({
             g: glyphForTier(it.tier),
             t: it.text || '',
-            tier: it.tier || null,
-            duration_min: it.duration_min || null,
           })),
         }));
       }
@@ -1156,43 +1043,12 @@ function ReviewFlow({ onClose, onComplete }) {
   const showConfirm = s && s.confirm && !agentTyping && liveReviewReady;
   const showReviewThinking = s && s.confirm && !agentTyping && reviewLoading;
 
-  // Per-turn acknowledgement: the agent responds to what the user just said
-  // before the script advances to the next prompt. Without this beat the flow
-  // feels like a form (collect answer → next question) instead of a
-  // conversation (hear answer → react → ask next thing). Latency cost is real
-  // (~3-6s) — the agent-typing indicator covers it.
-  const ackUserTurn = React.useCallback(async (userText) => {
-    if (!window.callMaProxy) return;
-    setAgentTyping(true);
-    try {
-      const ackInput = [
-        "You are partway through the user's daily review. They just answered the previous prompt.",
-        `User said: "${userText}"`,
-        "",
-        "Reply with ONE short sentence (max 18 words) that shows you actually heard them — reflect a specific word or beat from what they said. Do NOT summarize, do NOT give advice, do NOT ask the next review question (that's pre-scripted and will follow). If their answer was off-topic / a test / a meta comment, gently acknowledge that and invite them to say more.",
-        "Do not emit a JSON tail.",
-      ].join('\n');
-      const r = await window.callMaProxy({ skill: 'daily-review', input: ackInput });
-      let reply = (r && r.finalText) || '';
-      reply = reply.replace(/```json[\s\S]*?```\s*$/, '').trim();
-      if (reply) setMessages(m => [...m, { role: 'agent', text: reply }]);
-    } catch (e) { /* fail silently — keep the flow moving */ }
-    setAgentTyping(false);
-  }, []);
-
-  const submit = async (text) => {
+  const submit = (text) => {
     const t = (text && text.trim()) || (s.userDefault || '');
     if (!t) return;
     setMessages(m => [...m, { role: 'user', text: t }]);
     setDraft('');
-    // Per-turn LLM ack BEFORE advancing the script. We don't ack the final
-    // confirm step — the review summary card itself is the agent's response.
-    const nextStep = step + 1;
-    const nextS = REVIEW_SCRIPT[nextStep];
-    if (nextS && !nextS.confirm) {
-      await ackUserTurn(t);
-    }
-    setStep(nextStep);
+    setTimeout(() => setStep(step + 1), 260);
   };
 
   return (
@@ -1228,7 +1084,7 @@ function ReviewFlow({ onClose, onComplete }) {
           {agentTyping && <AgentTypingDark />}
           {/* Live daily-review from ma-proxy — appears before the confirm card */}
           {showReviewThinking && <AgentTypingDark />}
-          {liveReview && <ChatBubbleDark role="agent" text={(window.parseAgentReview && window.parseAgentReview(liveReview) && window.parseAgentReview(liveReview).proseBody) || liveReview} />}
+          {liveReview && <ChatBubbleDark role="agent" text={liveReview} />}
           {reviewError && <ChatBubbleDark role="agent" text="(I couldn't reach the review generator just now — saving what you said anyway.)" />}
           {showConfirm && (() => {
             const parsed = liveReview ? (window.parseAgentReview && window.parseAgentReview(liveReview)) : null;
@@ -1398,27 +1254,9 @@ function AutoCheckList({ items, checkedIndex }) {
 }
 
 function ReviewConfirmCard({ parsed, onAccept, consulted = [] }) {
-  // Normalize across two shapes:
-  //   - JSON-tail (current): { journalText, friction:[{text,tag}], tomorrow:[{text,tier}], calendar:[{text}] }
-  //   - Prose-only fallback: { journal, friction, tomorrow } as strings
-  const _toText = (v) => {
-    if (!v) return '';
-    if (typeof v === 'string') return v;
-    if (Array.isArray(v)) {
-      return v.map((it) => (typeof it === 'string' ? it : (it && it.text) || '')).filter(Boolean).join(' • ');
-    }
-    return '';
-  };
-  const journal  = (parsed && (parsed.journalText || parsed.journal)) || 'The dry run actually went well. I walked in present.';
-  const friction = _toText(parsed && parsed.friction) || 'Over-polishing the data slide — twice this week.';
-  const tomorrow = _toText(parsed && parsed.tomorrow) || 'Write the job pitch before opening Slack.';
-  const calendarItems = (parsed && Array.isArray(parsed.calendar) && parsed.calendar.length > 0)
-    ? parsed.calendar.map((c) => ({ t: c.time || '', body: (typeof c === 'string' ? c : c.text) || '' })).filter(c => c.body)
-    : [
-        { t: '9:30 AM', body: 'Anya — pitch follow-up' },
-        { t: '12:00 PM', body: 'Lunch w/ Jordan (finally)' },
-        { t: '4:00 PM', body: 'Hackathon retro' },
-      ];
+  const journal  = (parsed && parsed.journal)  || 'The dry run actually went well. I walked in present.';
+  const friction = (parsed && parsed.friction) || 'Over-polishing the data slide — twice this week.';
+  const tomorrow = (parsed && parsed.tomorrow) || 'Write the job pitch before opening Slack.';
   return (
     <div style={{ marginTop: 4 }}>
       <div style={{
@@ -1475,7 +1313,11 @@ function ReviewConfirmCard({ parsed, onAccept, consulted = [] }) {
             marginBottom: 6,
           }}>What's on the calendar</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {calendarItems.map((e, i) => (
+            {[
+              { t: '9:30 AM', body: 'Anya — pitch follow-up' },
+              { t: '12:00 PM', body: 'Lunch w/ Jordan (finally)' },
+              { t: '4:00 PM', body: 'Hackathon retro' },
+            ].map((e, i) => (
               <div key={i} style={{
                 display: 'flex', gap: 10, alignItems: 'baseline',
                 fontFamily: T.font.Reading, fontSize: 13, lineHeight: '18px',
@@ -1518,11 +1360,6 @@ function usePopulate(bands, delayStart = 200, perItem = 90) {
 
 // ─── EMPTY-PRESENT (pre-brief, start of day) ────────────────────────
 function PresentEmpty({ onStartBrief }) {
-  // Parameterized greeting — read display_name from shared profile
-  // context. Anonymous users (no name yet) get "Good morning." with
-  // no name attached.
-  const profile = window.useUserProfile ? window.useUserProfile() : { displayName: null };
-  const greeting = profile.displayName ? `Good morning, ${profile.displayName}.` : 'Good morning.';
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
       {/* Lock-screen-style ambient image — centered painterly dawn,
@@ -1554,7 +1391,7 @@ function PresentEmpty({ onStartBrief }) {
         <div style={{
           fontFamily: T.font.Display, fontSize: 32, fontWeight: 500, lineHeight: '38px',
           color: T.color.PrimaryText, letterSpacing: -0.6, fontStyle: 'italic',
-        }}>{greeting}</div>
+        }}>Good morning, Sam.</div>
       </div>
 
       <div style={{ position: 'relative', zIndex: 1, flex: 1, overflowY: 'auto', padding: '20px 24px 240px', display: 'flex', flexDirection: 'column', gap: 28 }}>
@@ -1606,7 +1443,7 @@ function PresentEmpty({ onStartBrief }) {
 }
 
 // ─── END-OF-DAY (post-review) — simple closed-state ─────────────────
-function PresentClosed({ review }) {
+function PresentClosed({ onReopenReview, review }) {
   // Review shape (from ReviewFlow → onComplete): { journalText, friction[], tomorrow[], calendar[] }
   // Falls back to seeded copy when no live review has landed yet.
   const oneLine = (review && (review.journalText || review.journal)) || 'The dry run actually went well. I walked in present.';
@@ -1754,37 +1591,12 @@ function WeeklyReviewFlow({ onClose, onComplete }) {
   const showConfirm = s && s.confirm && !agentTyping && liveReviewReady;
   const showThinking = s && s.confirm && !agentTyping && reviewLoading;
 
-  // Per-turn ack — same pattern as ReviewFlow / BriefFlow.
-  const ackUserTurn = React.useCallback(async (userText) => {
-    if (!window.callMaProxy) return;
-    setAgentTyping(true);
-    try {
-      const ackInput = [
-        "You are partway through the user's weekly review. They just answered the previous prompt.",
-        `User said: "${userText}"`,
-        "",
-        "Reply with ONE short sentence (max 18 words) that shows you actually heard them — reflect a specific word or beat from what they said. Do NOT summarize the week, do NOT give advice, do NOT ask the next weekly question (that's pre-scripted and will follow). If their answer was off-topic / a test / a meta comment, gently acknowledge that and invite them to say more.",
-        "Do not emit a JSON tail.",
-      ].join('\n');
-      const r = await window.callMaProxy({ skill: 'weekly-review', input: ackInput });
-      let reply = (r && r.finalText) || '';
-      reply = reply.replace(/```json[\s\S]*?```\s*$/, '').trim();
-      if (reply) setMessages(m => [...m, { role: 'agent', text: reply }]);
-    } catch (e) { /* fail silently */ }
-    setAgentTyping(false);
-  }, []);
-
-  const submit = async (text) => {
+  const submit = (text) => {
     const t = (text && text.trim()) || (s.userDefault || '');
     if (!t) return;
     setMessages(m => [...m, { role: 'user', text: t }]);
     setDraft('');
-    const nextStep = step + 1;
-    const nextS = WEEKLY_REVIEW_SCRIPT[nextStep];
-    if (nextS && !nextS.confirm) {
-      await ackUserTurn(t);
-    }
-    setStep(nextStep);
+    setTimeout(() => setStep(step + 1), 260);
   };
 
   // Persist weekly review entry on accept. Insert into `entries` with
@@ -1851,7 +1663,7 @@ function WeeklyReviewFlow({ onClose, onComplete }) {
           {messages.map((m, i) => <ChatBubbleDark key={i} role={m.role} text={m.text} sub={m.sub} />)}
           {agentTyping && <AgentTypingDark />}
           {showThinking && <AgentTypingDark />}
-          {liveReview && <ChatBubbleDark role="agent" text={(window.parseAgentWeeklyReview && window.parseAgentWeeklyReview(liveReview) && window.parseAgentWeeklyReview(liveReview).proseBody) || liveReview} />}
+          {liveReview && <ChatBubbleDark role="agent" text={liveReview} />}
           {reviewError && <ChatBubbleDark role="agent" text="(I couldn't reach the weekly-review generator just now — saving what you said anyway.)" />}
           {showConfirm && (() => {
             const parsed = liveReview && window.parseAgentWeeklyReview
@@ -1895,8 +1707,6 @@ function WeeklyReviewFlow({ onClose, onComplete }) {
 function WeeklyReviewConfirmCard({ parsed, consulted = [], weekId, onAccept }) {
   const summary = (parsed && parsed.summary) || 'A solid week — the through-line is starting to form.';
   const outcomes = (parsed && parsed.outcomes) || [];
-  // eslint-disable-next-line no-unused-vars -- parsed by the model but rendered separately in the review reading-mode
-  const keyMoments = (parsed && parsed.key_moments) || [];
   const nextWeek = (parsed && parsed.next_week_directions) || [];
   return (
     <div style={{ marginTop: 4 }}>
@@ -2245,19 +2055,91 @@ const SETUP_DEFAULT_PALETTES = [
   ['#7A4A5B', '#B87A82', '#DCBEC4', '#F0DCC4'], // peach
 ];
 
+// ─── SetupFlow helpers ────────────────────────────────────────────────────────
+
+// Shared input style for setup forms.
+const SETUP_INPUT_STYLE = {
+  width: '100%', padding: '12px 14px', resize: 'vertical', minHeight: 48,
+  border: '1px solid rgba(31,27,21,0.14)', borderRadius: 12,
+  background: 'rgba(255,255,255,0.7)', boxSizing: 'border-box',
+  fontFamily: T.font.Reading, fontSize: 15, lineHeight: '21px', color: T.color.PrimaryText,
+  outline: 'none',
+};
+
+const SETUP_LABEL_STYLE = {
+  fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2,
+  textTransform: 'uppercase', color: T.color.SubtleText, marginBottom: 6, display: 'block',
+};
+
+const SETUP_SECTION_HEADING = {
+  fontFamily: T.font.Display, fontSize: 22, lineHeight: '28px', fontStyle: 'italic',
+  fontWeight: 500, color: T.color.PrimaryText, letterSpacing: -0.3, marginBottom: 8,
+};
+
+const SETUP_BODY_TEXT = {
+  fontFamily: T.font.Reading, fontSize: 15, lineHeight: '22px',
+  color: T.color.SupportingText, marginBottom: 18,
+};
+
+const SETUP_BTN_PRIMARY = {
+  width: '100%', padding: '12px 18px',
+  background: T.color.PrimaryText, color: '#FBF6EA',
+  border: 'none', borderRadius: 999, cursor: 'pointer',
+  fontFamily: T.font.UI, fontSize: 14, fontWeight: 600, letterSpacing: 0.2,
+};
+
+const SETUP_BTN_GHOST = {
+  width: '100%', padding: '11px 18px',
+  background: 'transparent', color: T.color.SupportingText,
+  border: `1px solid ${T.color.EdgeLine}`, borderRadius: 999, cursor: 'pointer',
+  fontFamily: T.font.UI, fontSize: 14, fontWeight: 500, letterSpacing: 0.1,
+};
+
+// ─── SetupFlow ────────────────────────────────────────────────────────────────
+
 function SetupFlow({ onClose, onComplete }) {
-  const [step, setStep] = React.useState('intro'); // intro | input | drafting | review | error | saving
-  const [goalDrafts, setGoalDrafts] = React.useState(['', '', '']);
-  const [enriched, setEnriched] = React.useState([]); // [{title, monthly_slice, glyph}]
+  // Steps: intro | goals_input | drafting | goals_review | projects | outcome | prefs | journal_prompt | saving | error
+  const [step, setStep] = React.useState('intro');
   const [errorMsg, setErrorMsg] = React.useState('');
 
+  // Phase 1 — goals
+  const [goalDrafts, setGoalDrafts] = React.useState(['', '', '']);
+  const [enriched, setEnriched] = React.useState([]); // [{title, monthly_slice, glyph}]
+
+  // Phase 2 — projects [{title, goalIdx}]  (goalIdx is index into enriched[])
+  const [projects, setProjects] = React.useState([{ title: '', goalIdx: '' }]);
+
+  // Phase 3 — this-week outcome
+  const [weekOutcome, setWeekOutcome] = React.useState('');
+
+  // Phase 4 — preferences (pre-filled defaults)
+  const [prefs, setPrefs] = React.useState({
+    focus_area: '',
+    work_start: '09:00',
+    work_end: '18:00',
+    energy_pattern: 'unset',
+    daily_brief_time: '07:00',
+    weekly_review_day: 'Sunday',
+  });
+
+  // Phase 5 — journal seed
+  const [journalText, setJournalText] = React.useState('');
+
+  // ── helpers ──────────────────────────────────────────────────────────────
+
   const updateGoal = (i, v) => setGoalDrafts((g) => g.map((x, j) => j === i ? v : x));
+  const updateSlice = (i, v) => setEnriched((e) => e.map((x, j) => j === i ? { ...x, monthly_slice: v } : x));
+
+  const addProjectRow = () => setProjects((p) => [...p, { title: '', goalIdx: '' }]);
+  const removeProjectRow = (i) => setProjects((p) => p.filter((_, j) => j !== i));
+  const updateProject = (i, field, val) => setProjects((p) => p.map((x, j) => j === i ? { ...x, [field]: val } : x));
+  const updatePref = (key, val) => setPrefs((p) => ({ ...p, [key]: val }));
+
+  // ── Phase 1: call agent after goals entered ───────────────────────────────
 
   const draftWithAgent = async () => {
     const titles = goalDrafts.map((g) => g.trim()).filter(Boolean);
-    if (titles.length === 0) {
-      setErrorMsg('Add at least one goal first.'); return;
-    }
+    if (titles.length === 0) { setErrorMsg('Add at least one goal first.'); return; }
     setStep('drafting');
     try {
       const ctx = window.assembleSetupContext(titles);
@@ -2265,7 +2147,6 @@ function SetupFlow({ onClose, onComplete }) {
       const text = (r && r.finalText) || '';
       const parsed = window.parseSetupResponse(text);
       if (!parsed || !parsed.slices || parsed.slices.length === 0) {
-        // Fallback: empty slices, agent failed — let user fill in manually.
         setEnriched(titles.map((t) => ({ title: t, monthly_slice: '', glyph: 'leaf' })));
       } else {
         setEnriched(titles.map((t, i) => {
@@ -2277,25 +2158,28 @@ function SetupFlow({ onClose, onComplete }) {
           };
         }));
       }
-      setStep('review');
+      // Pre-fill focus_area from first goal title
+      if (titles[0]) setPrefs((p) => ({ ...p, focus_area: titles[0] }));
+      setStep('goals_review');
     } catch (e) {
-      setErrorMsg((e && e.message) || 'setup call failed');
+      setErrorMsg((e && e.message) || 'setup agent call failed');
       setStep('error');
     }
   };
 
-  const updateSlice = (i, v) => setEnriched((e) => e.map((x, j) => j === i ? { ...x, monthly_slice: v } : x));
+  // ── Final persist ─────────────────────────────────────────────────────────
 
-  const acceptAndPersist = async () => {
+  const finalPersist = async () => {
     setStep('saving');
     try {
-      // Wipe prior data so the user starts clean (Sam's seed gets removed).
-      if (window.clearAllUserData) {
-        await window.clearAllUserData();
-      }
+      // Wipe prior seed data.
+      if (window.clearAllUserData) await window.clearAllUserData();
+
       const sb = window.getSupabaseClient();
       const userId = await window.getCurrentUserId();
-      const rows = enriched.map((g, i) => ({
+
+      // Phase 1 — insert goals and collect their IDs.
+      const goalRows = enriched.map((g, i) => ({
         user_id: userId,
         title: g.title,
         monthly_slice: g.monthly_slice,
@@ -2303,8 +2187,18 @@ function SetupFlow({ onClose, onComplete }) {
         palette: SETUP_DEFAULT_PALETTES[i] || SETUP_DEFAULT_PALETTES[0],
         position: i,
       }));
-      await sb.from('goals').insert(rows);
-      // Also insert an Admin project so the AddZone admin band has a target.
+      const { data: insertedGoals, error: goalsErr } = await sb
+        .from('goals').insert(goalRows).select();
+      if (goalsErr) throw new Error('goals: ' + goalsErr.message);
+
+      // Phase 2 — insert user-entered projects (skip blank titles).
+      const activeProjects = projects.filter((p) => p.title && p.title.trim());
+      for (const p of activeProjects) {
+        const goalId = (insertedGoals && insertedGoals[parseInt(p.goalIdx)]) ?
+          insertedGoals[parseInt(p.goalIdx)].id : null;
+        await window.insertProject(p.title.trim(), goalId);
+      }
+      // Always ensure an Admin project exists.
       await sb.from('projects').insert([{
         user_id: userId,
         title: 'Admin',
@@ -2312,11 +2206,28 @@ function SetupFlow({ onClose, onComplete }) {
         status: 'active',
         is_admin: true,
       }]);
+
+      // Phase 3 + Phase 4 — merge into life_ops_config.
+      const configPatch = {
+        focus_area: prefs.focus_area || (enriched[0] && enriched[0].title) || '',
+        work_hours: { start: prefs.work_start, end: prefs.work_end },
+        energy_pattern: prefs.energy_pattern,
+        daily_brief_time: prefs.daily_brief_time,
+        weekly_review_day: prefs.weekly_review_day,
+        first_run_complete: true,
+      };
+      if (weekOutcome && weekOutcome.trim()) {
+        configPatch.this_week_outcome = weekOutcome.trim();
+      }
+      await window.updateLifeOpsConfig(configPatch);
+
+      // Phase 5 — optional journal entry.
+      if (journalText && journalText.trim()) {
+        await window.insertJournalEntry(journalText.trim());
+      }
+
       if (window.showUndoToast) {
-        window.showUndoToast({
-          message: `Set up ${enriched.length} goals — fresh start`,
-          // No undo for setup — wiping is part of the deal; user expects fresh.
-        });
+        window.showUndoToast({ message: `Set up ${enriched.length} goal${enriched.length !== 1 ? 's' : ''} — fresh start` });
       }
       if (onComplete) onComplete({ goals: enriched.length });
     } catch (e) {
@@ -2325,12 +2236,19 @@ function SetupFlow({ onClose, onComplete }) {
     }
   };
 
+  // ── Phase 4 confirm → Phase 5 ─────────────────────────────────────────────
+
+  const confirmPrefs = () => setStep('journal_prompt');
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
   return (
     <div style={{
       position: 'absolute', inset: 0, zIndex: 70,
       background: `linear-gradient(180deg, ${T.color.PrimarySurface} 0%, #F5EBD6 60%, #F0D9B5 100%)`,
       display: 'flex', flexDirection: 'column',
     }}>
+      {/* Header */}
       <div style={{ flexShrink: 0, padding: '14px 18px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
           <Icon.Sparkles size={14} color={T.color.FocusObject} />
@@ -2347,59 +2265,58 @@ function SetupFlow({ onClose, onComplete }) {
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '8px 22px 28px' }}>
+
+        {/* ── Step: intro ── */}
         {step === 'intro' && (
           <div>
             <div style={{ fontFamily: T.font.Display, fontSize: 28, lineHeight: '34px', fontStyle: 'italic', fontWeight: 500, color: T.color.PrimaryText, letterSpacing: -0.5, marginBottom: 14 }}>
-              Three long-term things that matter most to you.
+              Ten minutes to set up your system.
             </div>
-            <div style={{ fontFamily: T.font.Reading, fontSize: 15, lineHeight: '22px', color: T.color.SupportingText, marginBottom: 22 }}>
-              Not goals as KPIs — goals as directions. The agent will draft a concrete this-month slice for each one. Edit anything before saving.
+            <div style={{ ...SETUP_BODY_TEXT }}>
+              We'll cover four things: the areas of life that matter most to you, what you're actively working on, what you want to move this week, and a few preferences. The agent drafts this-month slices for your goals — edit anything before saving.
             </div>
-            <div style={{ background: '#FBF6EA88', border: `1px dashed ${T.color.EdgeLine}`, borderRadius: 14, padding: '14px 16px', marginBottom: 18, fontFamily: T.font.Reading, fontSize: 13, lineHeight: '19px', color: T.color.SupportingText, fontStyle: 'italic' }}>
-              Heads up: this wipes any seeded sample data for your session and replaces it with these goals. Daily brief tomorrow morning will be from-scratch.
+            <div style={{ background: '#FBF6EA88', border: `1px dashed ${T.color.EdgeLine}`, borderRadius: 14, padding: '14px 16px', marginBottom: 22, fontFamily: T.font.Reading, fontSize: 13, lineHeight: '19px', color: T.color.SupportingText, fontStyle: 'italic' }}>
+              This wipes any sample data and replaces it with yours. Daily brief tomorrow morning will be from your goals.
             </div>
-            <button onClick={() => setStep('input')} style={{
-              padding: '12px 22px', background: T.color.PrimaryText, color: '#FBF6EA',
-              border: 'none', borderRadius: 999, cursor: 'pointer',
-              fontFamily: T.font.UI, fontSize: 14, fontWeight: 600, letterSpacing: 0.2,
-            }}>Start</button>
+            <button onClick={() => setStep('goals_input')} style={{ ...SETUP_BTN_PRIMARY }}>Start</button>
           </div>
         )}
 
-        {step === 'input' && (
+        {/* ── Step: goals_input ── */}
+        {step === 'goals_input' && (
           <div>
-            <div style={{ marginBottom: 16, fontFamily: T.font.Display, fontSize: 22, lineHeight: '28px', fontStyle: 'italic', fontWeight: 500, color: T.color.PrimaryText, letterSpacing: -0.3 }}>
-              Name your three goals.
+            <div style={{ ...SETUP_SECTION_HEADING }}>What areas of life matter most to you?</div>
+            <div style={{ ...SETUP_BODY_TEXT, marginBottom: 20 }}>
+              2–5 areas — career, health, a relationship, creative work, financial. Not aspirations as KPIs, just directions. Add a short rationale if it helps.
             </div>
-            {[0, 1, 2].map((i) => (
-              <div key={i} style={{ marginBottom: 12 }}>
-                <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: T.color.SubtleText, marginBottom: 6 }}>Goal {i + 1}</div>
+            {goalDrafts.map((val, i) => (
+              <div key={i} style={{ marginBottom: 14 }}>
+                <label style={{ ...SETUP_LABEL_STYLE }}>
+                  {i === 0 ? 'Goal 1 (required)' : `Goal ${i + 1} (optional)`}
+                </label>
                 <textarea
-                  value={goalDrafts[i]}
+                  value={val}
                   onChange={(e) => updateGoal(i, e.target.value)}
                   rows={2}
-                  placeholder="e.g. Ship something people rely on daily"
-                  style={{
-                    width: '100%', padding: '12px 14px', resize: 'vertical', minHeight: 56,
-                    border: `1px solid ${T.color.EdgeLine}`, borderRadius: 12,
-                    background: 'rgba(255,255,255,0.7)', boxSizing: 'border-box',
-                    fontFamily: T.font.Reading, fontSize: 15, lineHeight: '21px', color: T.color.PrimaryText,
-                    outline: 'none',
-                  }}
+                  placeholder={i === 0 ? 'e.g. Ship something people rely on daily' : i === 1 ? 'e.g. Build a consistent health routine' : 'e.g. More quality time with family'}
+                  style={{ ...SETUP_INPUT_STYLE }}
                 />
               </div>
             ))}
-            <button onClick={draftWithAgent} style={{
-              marginTop: 8, width: '100%', padding: '12px 18px',
-              background: T.color.PrimaryText, color: '#FBF6EA',
-              border: 'none', borderRadius: 999, cursor: 'pointer',
-              fontFamily: T.font.UI, fontSize: 14, fontWeight: 600, letterSpacing: 0.2,
-            }}>
-              Draft monthly slices →
-            </button>
+            <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+              <button
+                onClick={() => setGoalDrafts((g) => [...g, ''])}
+                style={{ ...SETUP_BTN_GHOST, width: 'auto', padding: '9px 16px', fontSize: 13 }}
+                disabled={goalDrafts.length >= 5}
+              >+ Add goal</button>
+              <button onClick={draftWithAgent} style={{ ...SETUP_BTN_PRIMARY }}>
+                Draft this-month slices →
+              </button>
+            </div>
           </div>
         )}
 
+        {/* ── Step: drafting ── */}
         {step === 'drafting' && (
           <div style={{ padding: '40px 8px', textAlign: 'center' }}>
             <AgentTyping />
@@ -2409,10 +2326,14 @@ function SetupFlow({ onClose, onComplete }) {
           </div>
         )}
 
-        {step === 'review' && (
+        {/* ── Step: goals_review ── */}
+        {step === 'goals_review' && (
           <div>
-            <div style={{ marginBottom: 14, fontFamily: T.font.Display, fontSize: 22, lineHeight: '28px', fontStyle: 'italic', fontWeight: 500, color: T.color.PrimaryText, letterSpacing: -0.3 }}>
+            <div style={{ ...SETUP_SECTION_HEADING, marginBottom: 6 }}>
               Edit anything that doesn't sound like you.
+            </div>
+            <div style={{ fontFamily: T.font.Reading, fontSize: 13, color: T.color.SubtleText, marginBottom: 16, fontStyle: 'italic' }}>
+              Phase 1 of 4
             </div>
             {enriched.map((g, i) => (
               <div key={i} style={{
@@ -2431,39 +2352,243 @@ function SetupFlow({ onClose, onComplete }) {
                   onChange={(e) => updateSlice(i, e.target.value)}
                   rows={3}
                   style={{
-                    width: '100%', resize: 'vertical', minHeight: 60,
-                    padding: '10px 12px', border: `1px solid ${T.color.EdgeLine}`,
-                    borderRadius: 10, background: 'rgba(255,255,255,0.6)', boxSizing: 'border-box',
-                    fontFamily: T.font.Reading, fontSize: 14, lineHeight: '20px', color: T.color.PrimaryText, outline: 'none',
+                    ...SETUP_INPUT_STYLE, minHeight: 60,
+                    background: 'rgba(255,255,255,0.6)',
                   }}
                 />
               </div>
             ))}
-            <button onClick={acceptAndPersist} style={{
-              marginTop: 8, width: '100%', padding: '12px 18px',
-              background: T.color.PrimaryText, color: '#FBF6EA',
-              border: 'none', borderRadius: 999, cursor: 'pointer',
-              fontFamily: T.font.UI, fontSize: 14, fontWeight: 600, letterSpacing: 0.2,
-            }}>
-              Save and start fresh
+            <button onClick={() => setStep('projects')} style={{ ...SETUP_BTN_PRIMARY, marginTop: 4 }}>
+              Looks good — next: active projects →
             </button>
           </div>
         )}
 
-        {step === 'saving' && (
-          <div style={{ padding: '40px 8px', textAlign: 'center' }}>
-            <AgentTyping />
-            <div style={{ marginTop: 14, fontFamily: T.font.UI, fontSize: 12, color: T.color.SupportingText, fontStyle: 'italic' }}>
-              Wiping seed data and saving your goals…
+        {/* ── Step: projects (Phase 2) ── */}
+        {step === 'projects' && (
+          <div>
+            <div style={{ ...SETUP_SECTION_HEADING, marginBottom: 6 }}>
+              What are you actively working on?
+            </div>
+            <div style={{ fontFamily: T.font.Reading, fontSize: 13, color: T.color.SubtleText, marginBottom: 4, fontStyle: 'italic' }}>
+              Phase 2 of 4
+            </div>
+            <div style={{ ...SETUP_BODY_TEXT, marginBottom: 16 }}>
+              Things you've touched in the last two weeks — not aspirations. Link each to a goal if it fits. You can skip this phase.
+            </div>
+            {projects.map((p, i) => (
+              <div key={i} style={{ marginBottom: 14, padding: '12px 14px', background: 'rgba(255,255,255,0.5)', borderRadius: 12, border: `1px solid ${T.color.EdgeLine}` }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ ...SETUP_LABEL_STYLE }}>Project name</label>
+                    <input
+                      type="text"
+                      value={p.title}
+                      onChange={(e) => updateProject(i, 'title', e.target.value)}
+                      placeholder="e.g. Intently launch"
+                      style={{ ...SETUP_INPUT_STYLE, minHeight: 0, resize: 'none' }}
+                    />
+                  </div>
+                  {projects.length > 1 && (
+                    <button
+                      onClick={() => removeProjectRow(i)}
+                      aria-label="Remove project"
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.color.SubtleText, padding: '24px 0 0 0' }}
+                    >
+                      <Icon.X size={14} />
+                    </button>
+                  )}
+                </div>
+                <div style={{ marginTop: 10 }}>
+                  <label style={{ ...SETUP_LABEL_STYLE }}>Serves which goal? (optional)</label>
+                  <select
+                    value={p.goalIdx}
+                    onChange={(e) => updateProject(i, 'goalIdx', e.target.value)}
+                    style={{ ...SETUP_INPUT_STYLE, minHeight: 0, resize: 'none', appearance: 'none', cursor: 'pointer' }}
+                  >
+                    <option value="">— none / not sure —</option>
+                    {enriched.map((g, gi) => (
+                      <option key={gi} value={gi}>{g.title}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            ))}
+            <button
+              onClick={addProjectRow}
+              style={{ ...SETUP_BTN_GHOST, marginBottom: 10 }}
+              disabled={projects.length >= 10}
+            >+ Add another project</button>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setStep('outcome')} style={{ ...SETUP_BTN_GHOST, flex: '0 0 auto', width: 'auto', padding: '11px 18px' }}>
+                Skip this step
+              </button>
+              <button onClick={() => setStep('outcome')} style={{ ...SETUP_BTN_PRIMARY }}>
+                Next: this week →
+              </button>
             </div>
           </div>
         )}
 
+        {/* ── Step: outcome (Phase 3) ── */}
+        {step === 'outcome' && (
+          <div>
+            <div style={{ ...SETUP_SECTION_HEADING, marginBottom: 6 }}>
+              What does a good week look like?
+            </div>
+            <div style={{ fontFamily: T.font.Reading, fontSize: 13, color: T.color.SubtleText, marginBottom: 4, fontStyle: 'italic' }}>
+              Phase 3 of 4
+            </div>
+            <div style={{ ...SETUP_BODY_TEXT, marginBottom: 18 }}>
+              One specific thing you want to have moved forward by Sunday. Keep it concrete enough to evaluate.
+            </div>
+            <textarea
+              value={weekOutcome}
+              onChange={(e) => setWeekOutcome(e.target.value)}
+              rows={3}
+              placeholder="e.g. Have the onboarding flow working end-to-end"
+              style={{ ...SETUP_INPUT_STYLE, minHeight: 72, marginBottom: 14 }}
+            />
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setStep('prefs')} style={{ ...SETUP_BTN_GHOST, flex: '0 0 auto', width: 'auto', padding: '11px 18px' }}>
+                Skip
+              </button>
+              <button onClick={() => setStep('prefs')} style={{ ...SETUP_BTN_PRIMARY }}>
+                Next: preferences →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Step: prefs (Phase 4) ── */}
+        {step === 'prefs' && (
+          <div>
+            <div style={{ ...SETUP_SECTION_HEADING, marginBottom: 6 }}>
+              A few defaults to get started.
+            </div>
+            <div style={{ fontFamily: T.font.Reading, fontSize: 13, color: T.color.SubtleText, marginBottom: 4, fontStyle: 'italic' }}>
+              Phase 4 of 4
+            </div>
+            <div style={{ ...SETUP_BODY_TEXT, marginBottom: 16 }}>
+              These are pre-filled with sensible defaults. Change anything; all editable later in settings.
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ ...SETUP_LABEL_STYLE }}>Focus area (primary context for daily briefs)</label>
+              <input
+                type="text"
+                value={prefs.focus_area}
+                onChange={(e) => updatePref('focus_area', e.target.value)}
+                placeholder="e.g. Product work"
+                style={{ ...SETUP_INPUT_STYLE, minHeight: 0, resize: 'none' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ ...SETUP_LABEL_STYLE }}>Work start</label>
+                <input
+                  type="time"
+                  value={prefs.work_start}
+                  onChange={(e) => updatePref('work_start', e.target.value)}
+                  style={{ ...SETUP_INPUT_STYLE, minHeight: 0, resize: 'none' }}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ ...SETUP_LABEL_STYLE }}>Work end</label>
+                <input
+                  type="time"
+                  value={prefs.work_end}
+                  onChange={(e) => updatePref('work_end', e.target.value)}
+                  style={{ ...SETUP_INPUT_STYLE, minHeight: 0, resize: 'none' }}
+                />
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ ...SETUP_LABEL_STYLE }}>Daily brief time</label>
+              <input
+                type="time"
+                value={prefs.daily_brief_time}
+                onChange={(e) => updatePref('daily_brief_time', e.target.value)}
+                style={{ ...SETUP_INPUT_STYLE, minHeight: 0, resize: 'none' }}
+              />
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ ...SETUP_LABEL_STYLE }}>Weekly review day</label>
+              <select
+                value={prefs.weekly_review_day}
+                onChange={(e) => updatePref('weekly_review_day', e.target.value)}
+                style={{ ...SETUP_INPUT_STYLE, minHeight: 0, resize: 'none', appearance: 'none', cursor: 'pointer' }}
+              >
+                {['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'].map((d) => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ marginBottom: 18 }}>
+              <label style={{ ...SETUP_LABEL_STYLE }}>Energy pattern</label>
+              <select
+                value={prefs.energy_pattern}
+                onChange={(e) => updatePref('energy_pattern', e.target.value)}
+                style={{ ...SETUP_INPUT_STYLE, minHeight: 0, resize: 'none', appearance: 'none', cursor: 'pointer' }}
+              >
+                <option value="unset">Not sure yet</option>
+                <option value="morning_peak">Morning peak (best focus AM)</option>
+                <option value="afternoon_peak">Afternoon peak (best focus PM)</option>
+                <option value="even">Fairly even through the day</option>
+              </select>
+            </div>
+
+            <button onClick={confirmPrefs} style={{ ...SETUP_BTN_PRIMARY }}>
+              Confirm →
+            </button>
+          </div>
+        )}
+
+        {/* ── Step: journal_prompt (Phase 5 — optional) ── */}
+        {step === 'journal_prompt' && (
+          <div>
+            <div style={{ ...SETUP_SECTION_HEADING, marginBottom: 6 }}>
+              Anything on your mind right now?
+            </div>
+            <div style={{ ...SETUP_BODY_TEXT, marginBottom: 18 }}>
+              Optional — drop a quick note about why you're starting Intently or what you're hoping it changes. It'll be your first journal entry.
+            </div>
+            <textarea
+              value={journalText}
+              onChange={(e) => setJournalText(e.target.value)}
+              rows={4}
+              placeholder="Write anything, or leave blank to skip…"
+              style={{ ...SETUP_INPUT_STYLE, minHeight: 88, marginBottom: 14 }}
+            />
+            <button onClick={finalPersist} style={{ ...SETUP_BTN_PRIMARY }}>
+              {journalText.trim() ? 'Save note and finish' : 'Finish setup'}
+            </button>
+          </div>
+        )}
+
+        {/* ── Step: saving ── */}
+        {step === 'saving' && (
+          <div style={{ padding: '40px 8px', textAlign: 'center' }}>
+            <AgentTyping />
+            <div style={{ marginTop: 14, fontFamily: T.font.UI, fontSize: 12, color: T.color.SupportingText, fontStyle: 'italic' }}>
+              Saving your goals, projects, and preferences…
+            </div>
+          </div>
+        )}
+
+        {/* ── Step: error ── */}
         {step === 'error' && (
-          <div style={{
-            padding: '16px 18px', background: T.color.SecondarySurface, border: `1px solid ${T.color.EdgeLine}`,
-            borderRadius: 14, fontFamily: T.font.Reading, fontSize: 14, color: T.color.PrimaryText, marginBottom: 14,
-          }}>{errorMsg}</div>
+          <div>
+            <div style={{
+              padding: '16px 18px', background: T.color.SecondarySurface, border: `1px solid ${T.color.EdgeLine}`,
+              borderRadius: 14, fontFamily: T.font.Reading, fontSize: 14, color: T.color.PrimaryText, marginBottom: 14,
+            }}>{errorMsg}</div>
+            <button onClick={() => setStep('intro')} style={{ ...SETUP_BTN_GHOST }}>Start over</button>
+          </div>
         )}
       </div>
     </div>
