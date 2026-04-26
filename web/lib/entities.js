@@ -700,17 +700,6 @@ async function checkReviewDeferralToday() {
   return _parseDeferrals(data || []);
 }
 
-// ─── OAuth Connections ──────────────────────────────────────────────────────
-
-async function listOauthConnections() {
-  if (_isDemo()) return [];
-  const { data } = await _client()
-    .from('oauth_connections')
-    .select('provider')
-    .eq('user_id', (await _userId()));
-  return data || [];
-}
-
 // ─── Calendar Events ────────────────────────────────────────────────────────
 
 // List calendar events for the current user in a given time window.
@@ -731,6 +720,17 @@ async function listCalendarEvents({ from, to } = {}) {
     .lte('starts_at', timeMax)
     .order('starts_at', { ascending: true });
   if (error) _throw('listCalendarEvents', error);
+  return data || [];
+}
+
+// ─── OAuth Connections ──────────────────────────────────────────────────────
+
+async function listOauthConnections() {
+  if (_isDemo()) return [];
+  const { data } = await _client()
+    .from('oauth_connections')
+    .select('provider')
+    .eq('user_id', (await _userId()));
   return data || [];
 }
 

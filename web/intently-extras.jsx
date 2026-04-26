@@ -598,7 +598,7 @@ function ConnectorDots({ phase }) {
 }
 
 // ─── CONNECTIONS PAGE ────────────────────────────────────────────────
-function ConnectionsPage({ connected, onClose, onConnect, onDisconnect }) {
+function ConnectionsPage({ connected, onClose, onConnect, onDisconnect, onSync }) {
   // Group visible integrations
   const visible = INTEGRATIONS.filter(i => i.visible);
   const groups = {};
@@ -672,6 +672,7 @@ function ConnectionsPage({ connected, onClose, onConnect, onDisconnect }) {
                   isLast={i === groups[g].length - 1}
                   onConnect={() => onConnect(it)}
                   onDisconnect={() => onDisconnect(it.id)}
+                  onSync={onSync}
                 />
               ))}
             </div>
@@ -693,8 +694,44 @@ function ConnectionsPage({ connected, onClose, onConnect, onDisconnect }) {
   );
 }
 
-function IntegrationRow({ integration, isConnected, connection, isLast, onConnect, onDisconnect }) {
+function IntegrationRow({ integration, isConnected, connection, isLast, onConnect, onDisconnect, onSync }) {
   const M = integration.Mark;
+  const [syncing, setSyncing] = React.useState(false);
+  const [syncStatus, setSyncStatus] = React.useState(null); // 'ok' | 'err' | null
+
+  const handleSync = async () => {
+    if (!integration.provider) return;
+    setSyncing(true);
+    setSyncStatus(null);
+    try {
+      const cfg = window.INTENTLY_CONFIG || {};
+      if (!cfg.supabaseUrl) throw new Error('no supabaseUrl');
+      const sb = window.getSupabaseClient && window.getSupabaseClient();
+      if (!sb) throw new Error('no supabase client');
+      const { data: sess } = await sb.auth.getSession();
+      const accessToken = sess?.session?.access_token;
+      if (!accessToken) throw new Error('no session');
+      const syncFn = integration.provider === 'google_calendar' ? 'sync-calendar'
+                   : integration.provider === 'google_gmail'    ? 'sync-email'
+                   : null;
+      if (!syncFn) throw new Error('no sync fn for provider');
+      const res = await fetch(`${cfg.supabaseUrl}/functions/v1/${syncFn}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      if (!res.ok) throw new Error(`${res.status}`);
+      setSyncStatus('ok');
+      if (onSync) onSync(integration.id);
+    } catch (err) {
+      console.warn('[IntegrationRow] sync failed:', err && err.message);
+      setSyncStatus('err');
+    } finally {
+      setSyncing(false);
+      setTimeout(() => setSyncStatus(null), 3000);
+    }
+  };
+
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 12,
@@ -723,9 +760,30 @@ function IntegrationRow({ integration, isConnected, connection, isLast, onConnec
           display: 'flex', alignItems: 'center', gap: 6,
         }}>
           {isConnected && <span style={{ width: 6, height: 6, borderRadius: 999, background: T.color.TintSageDeep, flexShrink: 0 }} />}
-          {isConnected ? formatLastSync(connection) : integration.tagline}
+          {isConnected
+            ? (syncStatus === 'ok' ? 'Synced just now'
+               : syncStatus === 'err' ? 'Sync failed — try again'
+               : formatLastSync(connection))
+            : integration.tagline}
         </div>
       </div>
+      {/* Sync now button — only for connected Google providers */}
+      {isConnected && integration.provider && (
+        <button
+          onClick={handleSync}
+          disabled={syncing}
+          aria-label="Sync now"
+          style={{
+            padding: '7px 10px',
+            background: 'transparent',
+            color: syncing ? T.color.SubtleText : T.color.SupportingText,
+            border: `1px solid ${T.color.EdgeLine}`,
+            borderRadius: 999, cursor: syncing ? 'default' : 'pointer',
+            fontFamily: T.font.UI, fontSize: 12, fontWeight: 600, letterSpacing: 0.2,
+            flexShrink: 0,
+          }}
+        >{syncing ? '…' : 'Sync'}</button>
+      )}
       <button
         onClick={isConnected ? onDisconnect : onConnect}
         style={{

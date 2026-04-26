@@ -1974,7 +1974,7 @@ function PresentEmpty({ onStartBrief, onOpenConnections }) {
       }
       const todayEvents = (events || []).slice(0, 3);
       setCalCard({ state: todayEvents.length > 0 ? 'has-events' : 'synced-empty', events: todayEvents });
-    }).catch(() => { /* ignore — card stays hidden on error */ });
+    }).catch((_err) => { /* ignore — card stays hidden on error */ });
   }, []);
 
   return (

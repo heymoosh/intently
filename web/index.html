@@ -253,7 +253,7 @@
           }).catch(function (err) {
             console.warn('[oauth-return] ' + syncFn + ' backfill failed:', err && err.message);
           });
-        }).catch(function () {});
+        }).catch(function () { /* session unavailable — skip sync */ });
       })(connected);
       setTimeout(function () {
         window.dispatchEvent(new CustomEvent('intently:oauth-connected', {
