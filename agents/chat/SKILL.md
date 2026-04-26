@@ -25,7 +25,10 @@ This is not a specialized workflow agent. It does not drive a structured flow or
 
 - Running structured workflows (daily-brief, weekly-review, etc. own their flows)
 - Decomposing intent algorithmically — the MA agent reasons natively; no custom decomposer is needed
-- Memory across sessions — TODO: wire MA Memory (Layer 3 per `docs/architecture/agent-memory.md`) when MA Memory is approved for our workspace. Until then, context is per-session only.
+
+## Memory (Layer 3 — MA memory store)
+
+At the start of every run, read `/mnt/memory/` for context from prior sessions: user preferences, recurring topics, tonal patterns, and anything the user mentioned more than once. Before finishing, write concise updates to `/mnt/memory/` for anything new you learned — one file per topic (e.g. `/mnt/memory/preferences.md`, `/mnt/memory/ongoing-topics.md`). Keep entries under 500 words each. Store soft patterns only (inferred preferences, observed habits); durable user-stated commitments belong in Supabase, not here.
 
 ## Available tools (skills exposed as MA tools)
 

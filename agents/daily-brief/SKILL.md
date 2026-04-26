@@ -8,6 +8,10 @@ status: hackathon-mvp
 
 # Daily Brief
 
+## Memory (Layer 3 — MA memory store)
+
+At session start, check `/mnt/memory/yesterday-brief.md` for what you told the user yesterday — avoid repeating the same pacing note or highlights. Before finishing, write `/mnt/memory/yesterday-brief.md` with a 2–3 sentence summary of today's brief (pacing, P1 focus, key carry-forward). Overwrite the file each run; only yesterday matters.
+
 Work through the steps in order. Conventions from `agents/_shared/life-ops-conventions.md` apply.
 
 ## 1. Orient on the week and active state

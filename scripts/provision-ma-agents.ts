@@ -23,8 +23,22 @@ export const MVP_SKILLS = [
   'weekly-review',
   'monthly-review',
   'noticing',
+  'setup',
+  'update-tracker',
 ] as const;
 export type MvpSkill = (typeof MVP_SKILLS)[number];
+
+// Skills that receive MA memory stores. Subset of MVP_SKILLS.
+// monthly-review is excluded (cadence doesn't justify memory state yet).
+// reminders-classifier is excluded (stateless classification, no benefit).
+export const MEMORY_SKILLS: readonly string[] = [
+  'chat',
+  'daily-brief',
+  'daily-review',
+  'weekly-review',
+  'setup',
+  'update-tracker',
+] as const;
 
 export interface RawAgentConfig {
   name: string;
@@ -77,6 +91,23 @@ export interface ProvisionRunResult {
   message?: string;
 }
 
+export interface MemoryStoreSummary {
+  id: string;
+  name: string;
+}
+
+export interface MemoryStoreProvisionResult {
+  skill: string;
+  status: 'created' | 'exists' | 'would-create' | 'would-skip' | 'error';
+  storeId?: string;
+  message?: string;
+}
+
+export interface MemoryStoresClient {
+  list(params?: { include_archived?: boolean }): AsyncIterable<MemoryStoreSummary>;
+  create(params: { name: string; description: string }): Promise<MemoryStoreSummary>;
+}
+
 export interface ProvisionOpts {
   skills: readonly string[];
   configRoot: string;
@@ -85,7 +116,13 @@ export interface ProvisionOpts {
   // Default: false. When true, an agent that already exists by name has its
   // local config pushed to the live workspace via client.update.
   updateExisting?: boolean;
+  // Default: false. When true, provision a memory store for each memory-eligible
+  // skill and write MA_MEMORY_STORE_ID_<SKILL> to Supabase secrets.
+  withMemory?: boolean;
   client: AgentsClient;
+  // Raw fetch function for APIs not yet in the SDK (e.g. memory stores).
+  // Defaults to global fetch.
+  fetchFn?: typeof fetch;
   setSecret?: (name: string, value: string) => void;
   log?: (line: string) => void;
   warn?: (line: string) => void;
@@ -184,6 +221,157 @@ export function buildCreateParams(
 
 export function secretNameForSkill(skill: string): string {
   return `MA_AGENT_ID_${skill.toUpperCase().replace(/-/g, '_')}`;
+}
+
+export function memoryStoreSecretName(skill: string): string {
+  return `MA_MEMORY_STORE_ID_${skill.toUpperCase().replace(/-/g, '_')}`;
+}
+
+export function memoryStoreName(skill: string): string {
+  return `intently-${skill}-memory`;
+}
+
+export function memoryStoreDescription(skill: string): string {
+  const descriptions: Record<string, string> = {
+    chat: 'User preferences, ongoing topics, tonal patterns, and cross-session context for Intently chat.',
+    'daily-brief': "What was told to the user yesterday so today's brief doesn't repeat it.",
+    'daily-review': 'Recurring patterns the user has mentioned recently, for surface-in-review.',
+    'weekly-review': 'Multi-week patterns and insights for weekly compounding context.',
+    setup: 'Partial onboarding state so a user who walks away mid-setup can resume.',
+    'update-tracker':
+      'Projects the user has mentioned multiple times — signals for noticing-layer promotion.',
+  };
+  return descriptions[skill] ?? `Persistent memory for the Intently ${skill} skill.`;
+}
+
+// provisionMemoryStores provisions memory stores for memory-eligible skills via
+// the Anthropic MA API. The SDK v0.90 does not expose memoryStores, so this
+// function uses raw fetch against the same base URL.
+export async function provisionMemoryStores(
+  skills: readonly string[],
+  opts: {
+    apiKey: string;
+    dryRun: boolean;
+    writeSecrets: boolean;
+    setSecret?: (name: string, value: string) => void;
+    fetchFn?: typeof fetch;
+    log?: (line: string) => void;
+    warn?: (line: string) => void;
+  },
+): Promise<MemoryStoreProvisionResult[]> {
+  const log = opts.log ?? ((line: string) => console.log(line));
+  const warn = opts.warn ?? ((line: string) => console.warn(line));
+  const fetchFn = opts.fetchFn ?? fetch;
+  const baseUrl = 'https://api.anthropic.com/v1/memory_stores';
+  const headers = {
+    'x-api-key': opts.apiKey,
+    'anthropic-version': '2023-06-01',
+    'anthropic-beta': 'managed-agents-2026-04-01',
+    'Content-Type': 'application/json',
+  };
+
+  // Fetch existing stores.
+  let existingByName = new Map<string, MemoryStoreSummary>();
+  try {
+    const res = await fetchFn(baseUrl, { headers });
+    if (res.ok) {
+      const data = (await res.json()) as { data?: MemoryStoreSummary[] };
+      for (const s of data.data ?? []) {
+        if (s.name) existingByName.set(s.name, s);
+      }
+      log(`Found ${existingByName.size} existing memory store(s).`);
+    } else {
+      const text = await res.text();
+      warn(`Failed to list memory stores (${res.status}): ${text}`);
+    }
+  } catch (err) {
+    warn(`Error listing memory stores: ${(err as Error).message}`);
+  }
+
+  const results: MemoryStoreProvisionResult[] = [];
+  const memorySkills = skills.filter((s) => MEMORY_SKILLS.includes(s));
+
+  for (const skill of memorySkills) {
+    const name = memoryStoreName(skill);
+    const existing = existingByName.get(name);
+
+    if (existing) {
+      log(`✓ ${skill}: memory store '${name}' exists → ${existing.id}`);
+      const result: MemoryStoreProvisionResult = {
+        skill,
+        status: opts.dryRun ? 'would-skip' : 'exists',
+        storeId: existing.id,
+      };
+      if (opts.writeSecrets && !opts.dryRun) {
+        const ok = writeMemorySecret(skill, existing.id, opts, warn, log);
+        if (!ok) {
+          result.status = 'error';
+          result.message = 'failed to write supabase secret';
+        }
+      }
+      results.push(result);
+      continue;
+    }
+
+    if (opts.dryRun) {
+      log(`→ ${skill}: would create memory store '${name}'`);
+      results.push({ skill, status: 'would-create' });
+      continue;
+    }
+
+    try {
+      const res = await fetchFn(baseUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ name, description: memoryStoreDescription(skill) }),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        warn(`✗ ${skill}: create memory store failed (${res.status}): ${text}`);
+        results.push({ skill, status: 'error', message: `create failed: ${text}` });
+        continue;
+      }
+      const store = (await res.json()) as MemoryStoreSummary;
+      log(`✓ ${skill}: created memory store '${name}' → ${store.id}`);
+      const result: MemoryStoreProvisionResult = { skill, status: 'created', storeId: store.id };
+      if (opts.writeSecrets) {
+        const ok = writeMemorySecret(skill, store.id, opts, warn, log);
+        if (!ok) {
+          result.status = 'error';
+          result.message = 'failed to write supabase secret';
+        }
+      }
+      results.push(result);
+    } catch (err) {
+      const msg = (err as Error).message;
+      warn(`✗ ${skill}: create memory store error — ${msg}`);
+      results.push({ skill, status: 'error', message: msg });
+    }
+  }
+
+  return results;
+}
+
+function writeMemorySecret(
+  skill: string,
+  storeId: string,
+  opts: { setSecret?: (name: string, value: string) => void },
+  warn: (line: string) => void,
+  log: (line: string) => void,
+): boolean {
+  const name = memoryStoreSecretName(skill);
+  if (!opts.setSecret) {
+    warn(`[${skill}] --write-secrets set but no setSecret provided; skipping memory secret`);
+    return false;
+  }
+  try {
+    opts.setSecret(name, storeId);
+    log(`✓ ${skill}: ${name} written to Supabase`);
+    return true;
+  } catch (err) {
+    warn(`✗ ${skill}: failed to set ${name} — ${(err as Error).message}`);
+    return false;
+  }
 }
 
 async function collectAgents(client: AgentsClient): Promise<Map<string, AgentSummary>> {
@@ -386,6 +574,7 @@ interface CliFlags {
   dryRun: boolean;
   writeSecrets: boolean;
   updateExisting: boolean;
+  withMemory: boolean;
   envFile?: string;
   help: boolean;
 }
@@ -400,6 +589,10 @@ Flags:
   --update-existing    For agents that already exist by name, push the local
                        config to overwrite the live system prompt. Without this
                        flag, existing agents are left alone.
+  --with-memory        Also provision memory stores for memory-eligible skills
+                       (chat, daily-brief, daily-review, weekly-review, setup,
+                       update-tracker). Writes MA_MEMORY_STORE_ID_<SKILL> to
+                       Supabase secrets when --write-secrets is also set.
   --dry-run            List existing agents but never call create, update, or write secrets.
   --env-file <path>    Load ANTHROPIC_API_KEY from a .env file (default: .env.local if present).
   --help, -h           Show this help.
@@ -411,6 +604,7 @@ export function parseArgs(argv: readonly string[]): CliFlags {
     dryRun: false,
     writeSecrets: false,
     updateExisting: false,
+    withMemory: false,
     help: false,
   };
   const skills: string[] = [];
@@ -433,6 +627,9 @@ export function parseArgs(argv: readonly string[]): CliFlags {
         break;
       case '--update-existing':
         flags.updateExisting = true;
+        break;
+      case '--with-memory':
+        flags.withMemory = true;
         break;
       case '--dry-run':
         flags.dryRun = true;
@@ -555,6 +752,7 @@ async function main(argv: readonly string[]): Promise<number> {
     dryRun: flags.dryRun,
     writeSecrets: flags.writeSecrets,
     updateExisting: flags.updateExisting,
+    withMemory: flags.withMemory,
     client,
     setSecret: defaultSetSecret,
   });
@@ -562,7 +760,32 @@ async function main(argv: readonly string[]): Promise<number> {
   console.log('');
   console.log(formatSummary(results));
 
-  const errored = results.some((r) => r.status === 'error');
+  let errored = results.some((r) => r.status === 'error');
+
+  if (flags.withMemory) {
+    const memResults = await provisionMemoryStores(flags.skills, {
+      apiKey: process.env.ANTHROPIC_API_KEY!,
+      dryRun: flags.dryRun,
+      writeSecrets: flags.writeSecrets,
+      setSecret: defaultSetSecret,
+    });
+
+    if (memResults.length > 0) {
+      console.log('\nMemory stores:');
+      const memHeader = ['skill', 'status', 'store_id'];
+      const memRows: string[][] = memResults.map((r) => [r.skill, r.status, r.storeId ?? '']);
+      const memWidths = memHeader.map((h, i) =>
+        Math.max(h.length, ...memRows.map((row) => row[i]?.length ?? 0)),
+      );
+      const memFmt = (cols: string[]) =>
+        cols.map((c, i) => c.padEnd(memWidths[i] ?? c.length)).join('  ').trimEnd();
+      const memSep = memWidths.map((w) => '-'.repeat(w)).join('  ');
+      console.log([memFmt(memHeader), memSep, ...memRows.map(memFmt)].join('\n'));
+
+      if (memResults.some((r) => r.status === 'error')) errored = true;
+    }
+  }
+
   if (errored) {
     console.error('\nOne or more skills failed. See messages above.');
     return 1;
