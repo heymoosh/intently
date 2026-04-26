@@ -185,6 +185,25 @@ async function insertJournalEntry(text, date) {
   return data;
 }
 
+// Update an existing journal entry's text body. Used by reading-mode's
+// edit button (intently-reading.jsx) — JournalComposer in edit mode
+// calls this on save so we update the row instead of inserting a new
+// one. RLS + explicit user_id filter guarantees the row belongs to the
+// caller. Throws on FK / RLS / network failures so the caller can
+// surface a toast.
+async function updateJournalEntry(id, text) {
+  const { data, error } = await _client()
+    .from('entries')
+    .update({ body_markdown: text })
+    .eq('id', id)
+    .eq('user_id', (await _userId()))
+    .eq('kind', 'journal')
+    .select()
+    .single();
+  if (error) _throw('updateJournalEntry', error);
+  return data;
+}
+
 async function listJournalEntries(opts) {
   const limit = opts && typeof opts.limit === 'number' ? opts.limit : null;
   let q = _client()
@@ -253,6 +272,7 @@ Object.assign(window, {
   insertPlanItem,
   listPlanItems,
   insertJournalEntry,
+  updateJournalEntry,
   listJournalEntries,
   insertAdminReminder,
   listAdminReminders,

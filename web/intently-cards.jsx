@@ -357,4 +357,83 @@ function FeatureCard({ eyebrow, headline, body, cta, palette, children, compact 
   );
 }
 
-Object.assign(window, { TrackerCard, PlanCard, JournalCard, ConfirmationCard, FeatureCard, RingProgress, InputTrace, ConfidenceDot });
+// ─── AVATAR ──────────────────────────────────────────────────────────
+// Single avatar component for every identity surface (home-screen profile
+// button, profile-sheet hero, journal/chat byline). Reads displayName +
+// initial from `useUserProfile()` so the source of truth is one place;
+// surfaces don't pass display strings around individually.
+//
+// Variants (`variant`):
+//   • 'button' — round, gradient background, used as a tap target
+//   • 'hero'   — large (64px), gradient, used in profile sheet hero
+//   • 'inline' — small (28px), flat tinted background, used in bylines
+// `size` overrides default px size; pass when a variant default is wrong
+// for the slot. `onClick` (optional) makes the avatar a button rather
+// than a div. `style` merges in for absolute-position overrides on the
+// home-screen button.
+function Avatar({ variant = 'button', size, onClick, ariaLabel, style }) {
+  const profile = window.useUserProfile ? window.useUserProfile() : { initial: '?' };
+  const initial = profile.initial || '?';
+
+  const defaults = {
+    button: {
+      size: 44,
+      background: 'linear-gradient(135deg, #E8A25E 0%, #C66B3F 100%)',
+      color: '#FBF6EA',
+      fontFamily: T.font.Display,
+      fontSize: 18,
+      fontWeight: 600,
+      fontStyle: 'italic',
+      letterSpacing: -0.3,
+      shadow: '0 8px 24px rgba(31,27,21,0.18), 0 0 0 1px rgba(31,27,21,0.06)',
+    },
+    hero: {
+      size: 64,
+      background: 'linear-gradient(135deg, #E8A25E 0%, #C66B3F 100%)',
+      color: '#FBF6EA',
+      fontFamily: T.font.Display,
+      fontSize: 28,
+      fontWeight: 600,
+      fontStyle: 'italic',
+      letterSpacing: -0.4,
+      shadow: '0 6px 16px rgba(31,27,21,0.16)',
+    },
+    inline: {
+      size: 28,
+      background: T.color.TintSage,
+      color: '#FBF6EA',
+      fontFamily: T.font.Display,
+      fontSize: 13,
+      fontWeight: 600,
+      fontStyle: 'normal',
+      letterSpacing: 0,
+      shadow: 'none',
+    },
+  };
+  const v = defaults[variant] || defaults.button;
+  const px = size || v.size;
+  const baseStyle = {
+    width: px, height: px, borderRadius: 999,
+    background: v.background,
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    color: v.color,
+    fontFamily: v.fontFamily, fontSize: v.fontSize, fontWeight: v.fontWeight,
+    fontStyle: v.fontStyle, letterSpacing: v.letterSpacing,
+    boxShadow: v.shadow,
+    flexShrink: 0,
+    ...(style || {}),
+  };
+
+  if (onClick) {
+    return (
+      <button
+        onClick={onClick}
+        aria-label={ariaLabel || 'Profile'}
+        style={{ ...baseStyle, border: 'none', cursor: 'pointer' }}
+      >{initial}</button>
+    );
+  }
+  return <span style={baseStyle}>{initial}</span>;
+}
+
+Object.assign(window, { TrackerCard, PlanCard, JournalCard, ConfirmationCard, FeatureCard, RingProgress, InputTrace, ConfidenceDot, Avatar });

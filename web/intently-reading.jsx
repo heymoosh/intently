@@ -10,6 +10,9 @@
   const T = window.T;
   const { LandscapePanel } = window;
   const { Icon } = window;
+  // Avatar is defined in intently-cards.jsx (loaded earlier). Resolved per-
+  // render inside JournalReader so the destructure runs after cards.jsx has
+  // populated window.Avatar.
 
   // ─── Header chrome shared across all variants ──────────────────
   function ReadingHeader({ banner, eyebrow, onClose, onMore, onEdit }) {
@@ -65,15 +68,20 @@
   }
 
   // ─── Journal reading mode ──────────────────────────────────────
-  function JournalReader({ entry, onClose }) {
+  function JournalReader({ entry, onClose, onEdit }) {
+    // Pull display name from the shared profile context so the byline
+    // matches the rest of the app. Anonymous users → "—" rather than
+    // legacy hardcoded "Sam".
+    const profile = window.useUserProfile ? window.useUserProfile() : { displayName: null };
+    const byline = profile.displayName || '—';
+    const Avatar = window.Avatar;
     return (
       <>
         <ReadingHeader
           banner={<LandscapePanel mood={entry.mood || 'dusk'} style={{ height: 280 }} />}
           eyebrow={`Journal · ${entry.dayLabel || 'Today'}`}
           onClose={onClose}
-          // eslint-disable-next-line no-empty-function -- TODO: see .claude/handoffs/new-user-ux-and-auth.md (edit-button + brief-can't-open AC bullets)
-          onEdit={() => {}}
+          onEdit={onEdit}
           // eslint-disable-next-line no-empty-function -- TODO: see .claude/handoffs/new-user-ux-and-auth.md (avatar component + edit-button AC bullets)
           onMore={() => {}}
         />
@@ -96,12 +104,8 @@
             display: 'flex', alignItems: 'center', gap: 10, margin: '14px 0 22px',
             fontFamily: T.font.UI, fontSize: 12, color: T.color.SupportingText,
           }}>
-            <span style={{
-              width: 28, height: 28, borderRadius: 999, background: T.color.TintSage,
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              color: '#FBF6EA', fontFamily: T.font.Display, fontWeight: 600, fontSize: 13,
-            }}>S</span>
-            Sam · {entry.dateLabel || 'Today'}
+            {Avatar && <Avatar variant="inline" />}
+            {byline} · {entry.dateLabel || 'Today'}
           </div>
           {entry.body.map((block, i) => {
             if (block.kind === 'quote') {
@@ -340,7 +344,13 @@
   }
 
   // ─── Wrapping overlay — slides up, dim background ──────────────
-  function ReadingMode({ entry, onClose }) {
+  // `onEdit` is forwarded to JournalReader (only meaningful for journal
+  // entries; ChatReader / ReviewReader don't accept edits in this scope).
+  // Host wires `onEdit` to swap to JournalComposer in edit mode against
+  // the entry's id + body. Fixture-only entries (no id, e.g. ENTRY_DATA)
+  // can't be edited — host should pass `onEdit={undefined}` for those so
+  // the edit button doesn't render.
+  function ReadingMode({ entry, onClose, onEdit }) {
     React.useEffect(() => {
       const onKey = (e) => { if (e.key === 'Escape') onClose && onClose(); };
       window.addEventListener('keydown', onKey);
@@ -349,7 +359,7 @@
 
     let body = null;
     if (!entry) return null;
-    if (entry.kind === 'journal') body = <JournalReader entry={entry} onClose={onClose} />;
+    if (entry.kind === 'journal') body = <JournalReader entry={entry} onClose={onClose} onEdit={onEdit} />;
     else if (entry.kind === 'chat') body = <ChatReader entry={entry} onClose={onClose} />;
     else if (entry.kind === 'review') body = <ReviewReader entry={entry} onClose={onClose} />;
     else return null;

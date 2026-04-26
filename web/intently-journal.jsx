@@ -428,6 +428,11 @@ function DayView({ onBack, onPickEntry, date }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {entries.map((e, i) => {
           const k = kindMeta[e.kind];
+          // Tappable kinds are exactly the ones index.html's `dbEntry`
+          // resolver knows how to render (journal / chat / review).
+          // Briefs are intentionally non-tappable in the journal list —
+          // see `.claude/handoffs/new-user-ux-and-auth.md` (kind='brief'
+          // resolver AC bullet: gate, don't add a BriefReader for now).
           const tappable = e.kind === 'chat' || e.kind === 'review' || e.kind === 'journal';
           const Tag = tappable ? 'button' : 'article';
           return (
