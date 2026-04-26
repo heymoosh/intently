@@ -17,8 +17,9 @@ alter table public.entries
 
 -- GIN index for array containment queries: WHERE 'ant' = ANY(tags)
 create index if not exists entries_tags_gin on public.entries using gin (tags);
--- Composite GIN index scoped to user for: WHERE user_id=X AND 'ant' = ANY(tags)
-create index if not exists entries_user_tags_idx on public.entries using gin (user_id, tags);
+-- B-tree index on user_id for user-scoped tag queries (planner combines with entries_tags_gin)
+-- Note: composite GIN on (user_id, tags) is not valid — uuid has no GIN operator class.
+create index if not exists entries_user_id_idx on public.entries (user_id);
 
 -- V1.1 user_signals scaffold — schema only, full UX deferred to V1.2
 -- TODO(V1.2): build the UX surface for adding/editing user custom signals
