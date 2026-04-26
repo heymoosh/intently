@@ -1023,6 +1023,26 @@ function PrototypePhone({ dayState, setDayState, idx, setIdx }) {
   const m = useManualAdds();
   const conn = useConnections();
 
+  // On mount: check for an in-flight setup draft and auto-open SetupFlow so
+  // the user sees the "Welcome back, continue from Phase X?" resume prompt.
+  React.useEffect(() => {
+    if (!window.getSetupDraft || !window.getCurrentUserId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        // Ensure auth is initialised before reading the draft.
+        await window.getCurrentUserId();
+        const draft = await window.getSetupDraft();
+        if (!cancelled && draft && draft.phase >= 1) {
+          setShowSetup(true);
+        }
+      } catch (_) {
+        // Silently ignore — don't block app load.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   React.useEffect(() => {
     if (heroState === 'processing') {
       const id = setTimeout(() => setHeroState('idle'), 1800);

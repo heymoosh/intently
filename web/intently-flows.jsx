@@ -2283,6 +2283,17 @@ function SetupFlow({ onClose, onComplete }) {
     }
   };
 
+  // ── Phase 1 review → Phase 2: persist updated enriched data before advancing ─
+
+  const advanceToProjects = async () => {
+    // Re-save phase 1 with any user edits to monthly_slices before moving on.
+    try {
+      const titles = enriched.map((g) => g.title);
+      await window.saveSetupDraftPhase({ phase: 1, data: { goals: titles, enriched } });
+    } catch (_) { /* non-blocking */ }
+    setStep('projects');
+  };
+
   // ── Phase 2: advance to outcome + save draft ─────────────────────────────
 
   const advanceToOutcome = async () => {
@@ -2539,7 +2550,7 @@ function SetupFlow({ onClose, onComplete }) {
                 />
               </div>
             ))}
-            <button onClick={() => setStep('projects')} style={{ ...SETUP_BTN_PRIMARY, marginTop: 4 }}>
+            <button onClick={advanceToProjects} style={{ ...SETUP_BTN_PRIMARY, marginTop: 4 }}>
               Looks good — next: active projects →
             </button>
           </div>
