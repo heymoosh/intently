@@ -8,8 +8,8 @@
 
 (function () {
   const T = window.T;
-  const { LandscapePanel, MorningLight } = window;
-  const { Icon, Glyph } = window;
+  const { LandscapePanel } = window;
+  const { Icon } = window;
 
   // ─── Header chrome shared across all variants ──────────────────
   function ReadingHeader({ banner, eyebrow, onClose, onMore, onEdit }) {
@@ -72,7 +72,9 @@
           banner={<LandscapePanel mood={entry.mood || 'dusk'} style={{ height: 280 }} />}
           eyebrow={`Journal · ${entry.dayLabel || 'Today'}`}
           onClose={onClose}
+          // eslint-disable-next-line no-empty-function -- TODO: see .claude/handoffs/new-user-ux-and-auth.md (edit-button + brief-can't-open AC bullets)
           onEdit={() => {}}
+          // eslint-disable-next-line no-empty-function -- TODO: see .claude/handoffs/new-user-ux-and-auth.md (avatar component + edit-button AC bullets)
           onMore={() => {}}
         />
         <div style={{
@@ -147,6 +149,7 @@
           banner={<LandscapePanel mood="rain" style={{ height: 220 }} />}
           eyebrow={`Chat · ${entry.dayLabel || 'Today'}`}
           onClose={onClose}
+          // eslint-disable-next-line no-empty-function -- TODO: see .claude/handoffs/new-user-ux-and-auth.md (avatar component + reading-mode menu AC bullets)
           onMore={() => {}}
         />
         <div style={{
@@ -248,6 +251,7 @@
           </div>}
           eyebrow={`Review · ${entry.dayLabel || 'Today'}`}
           onClose={onClose}
+          // eslint-disable-next-line no-empty-function -- TODO: see .claude/handoffs/new-user-ux-and-auth.md (avatar component + reading-mode menu AC bullets)
           onMore={() => {}}
         />
         <div style={{

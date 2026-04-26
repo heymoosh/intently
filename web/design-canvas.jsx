@@ -88,6 +88,7 @@ function DesignCanvas({ children, minScale, maxScale, style }) {
         skipNextWrite.current = true;
         setState((s) => ({ ...s, sections: saved.sections }));
       })
+      // eslint-disable-next-line no-empty-function -- silent-fail by design (file may not exist on first read)
       .catch(() => {})
       .finally(() => { didRead.current = true; if (!off) setReady(true); });
     const t = setTimeout(() => { if (!off) setReady(true); }, 150);
@@ -98,6 +99,7 @@ function DesignCanvas({ children, minScale, maxScale, style }) {
     if (!didRead.current) return;
     if (skipNextWrite.current) { skipNextWrite.current = false; return; }
     const t = setTimeout(() => {
+      // eslint-disable-next-line no-empty-function -- silent-fail by design (omelette may be unavailable)
       window.omelette?.writeFile(DC_STATE_FILE, JSON.stringify({ sections: state.sections })).catch(() => {});
     }, 250);
     return () => clearTimeout(t);

@@ -27,6 +27,7 @@ const JOURNAL_DATA = (() => {
 })();
 
 const MONTH_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+// eslint-disable-next-line no-unused-vars -- kept alongside MONTH_SHORT for future "April 2026" headers
 const MONTH_FULL  = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DOW         = ['S','M','T','W','T','F','S'];
 const DOW_FULL    = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];

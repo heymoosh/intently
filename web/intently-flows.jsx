@@ -1872,6 +1872,7 @@ function WeeklyReviewFlow({ onClose, onComplete }) {
 function WeeklyReviewConfirmCard({ parsed, consulted = [], weekId, onAccept }) {
   const summary = (parsed && parsed.summary) || 'A solid week — the through-line is starting to form.';
   const outcomes = (parsed && parsed.outcomes) || [];
+  // eslint-disable-next-line no-unused-vars -- parsed by the model but rendered separately in the review reading-mode
   const keyMoments = (parsed && parsed.key_moments) || [];
   const nextWeek = (parsed && parsed.next_week_directions) || [];
   return (
