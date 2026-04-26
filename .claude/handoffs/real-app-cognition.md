@@ -78,3 +78,29 @@ Items 12+ (post-launch per `app-experience.md` "Out / deferred"):
 ## Anti-pattern to watch for
 
 Don't ship cognition-layer fixes that pile on more typed prompts ("now type your goals into this prompt too"). The whole point is the agent reads the user's existing data. If a fix makes the user repeat themselves, it's the wrong fix.
+
+## Decision: skipping prompt caching at current scale (#24)
+
+`#24 Anthropic prompt caching in ma-proxy` is **declined** — the math doesn't pencil out at our token budget.
+
+**The numbers (verified via the claude-api skill):**
+
+| Component | Size | Notes |
+|---|---|---|
+| daily-brief agent system prompt | ~10,880 chars / ~2,700 tokens | Lives on the agent, server-side |
+| Per-call `user.message` content (assembler output) | ~2,700 chars / ~700 tokens | Variable per call (user answers differ) |
+| **Combined request prefix** | **~3,400 tokens** | Below cache threshold |
+| **Anthropic prompt-caching minimum on Opus 4.7** | **4,096 tokens** | Hard requirement — silent miss below |
+
+Even if the user.message were split into stable (goals + projects + monthly slice ≈ 250 tokens) and variable blocks with `cache_control: ephemeral`, neither block individually nor the system+message combined hits 4K tokens. The cache silently won't fire (`cache_creation_input_tokens` reads 0).
+
+**Why we're not losing anything:** Managed Agents auto-caches what it can server-side (per `shared/managed-agents-core.md` § Built-in session features → Prompt caching). We're already getting any benefit available at this scale — no client-side change improves on it.
+
+**What would change the calculus:**
+1. **Larger system prompt** — push the agent's system over 4K tokens. But that increases input cost more than caching saves at single-user scale (~$0.005/brief × 1 brief/day ≈ $0.15/month — there's no expense to optimize against).
+2. **Larger stable assembler prefix** — include way more context (e.g., 30 days of journals, full project bodies, monthly goal narratives). Same trade-off: increases token spend in exchange for cache hits, only worth it at multi-user volume where many sessions share the same prefix.
+3. **Multi-user scale** — when many sessions share a stable prefix (e.g., a shared "Intently coaching framework" preamble), caching pays off because writes amortize across reads. Single-user dogfood doesn't generate that pattern.
+
+**Re-revisit when:** (a) we move past single-user, OR (b) the assembler grows past 4K tokens of stable prefix as a side-effect of richer cognition, OR (c) we measure per-call cost climbing past ~$0.05 for unrelated reasons.
+
+For now: ma-proxy stays as-is. The optimization isn't appropriate at our scale.
