@@ -697,8 +697,109 @@ Deno.serve(async (req: Request) => {
     return json({ disconnected: true, provider });
   }
 
+  // POST /oauth-google/refresh-profile -----------------------------------------
+  // Authenticated. Fetches Google userinfo using a stored refresh_token and
+  // backfills profiles.display_name for users who connected before PR #205 or
+  // whose profile row was never populated. Safe to call repeatedly — exits
+  // early if display_name is already set.
+  if (req.method === 'POST' && path.endsWith('/refresh-profile')) {
+    const userJwt = extractBearerToken(req);
+    if (!userJwt) return errResp(401, 'missing Authorization');
+    const userId = parseSubFromJwt(userJwt);
+    if (!userId) return errResp(401, 'jwt missing sub');
+
+    // 1. Exit early if display_name is already populated.
+    const profileUrl = new URL(`${env.supabaseUrl}/rest/v1/profiles`);
+    profileUrl.searchParams.set('id', `eq.${userId}`);
+    profileUrl.searchParams.set('select', 'display_name');
+    profileUrl.searchParams.set('limit', '1');
+    const profileRes = await fetch(profileUrl.toString(), {
+      headers: {
+        apikey: env.serviceRoleKey,
+        Authorization: `Bearer ${env.serviceRoleKey}`,
+      },
+    });
+    if (profileRes.ok) {
+      const rows = (await profileRes.json()) as any[];
+      if (rows[0]?.display_name) {
+        return json({ ok: true, skipped: true, reason: 'already_populated' });
+      }
+    }
+
+    // 2. Find a google oauth_connection for this user (try both providers).
+    const conn =
+      (await getOauthConnection(env, userJwt, 'google_calendar')) ??
+      (await getOauthConnection(env, userJwt, 'google_gmail'));
+    if (!conn?.vault_secret_id) return errResp(404, 'no google connection');
+
+    // 3. Read the stored refresh_token from vault.
+    const tokenJson = await vaultReadSecret(env, conn.vault_secret_id);
+    if (!tokenJson) return errResp(500, 'token not found in vault');
+    let refreshToken: string;
+    try {
+      const parsed = JSON.parse(tokenJson);
+      refreshToken = parsed?.refresh_token;
+      if (!refreshToken) throw new Error('no refresh_token field');
+    } catch {
+      // Legacy: raw token string stored without JSON wrapper.
+      refreshToken = tokenJson;
+    }
+
+    // 4. Exchange refresh_token for a fresh access_token.
+    const refreshRes = await fetch(GOOGLE_TOKEN_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: env.clientId,
+        client_secret: env.clientSecret,
+        refresh_token: refreshToken,
+        grant_type: 'refresh_token',
+      }).toString(),
+    });
+    if (!refreshRes.ok) {
+      const detail = await safeReadBody(refreshRes);
+      console.warn('[oauth-google] refresh-profile: token refresh failed:', refreshRes.status, detail);
+      return errResp(502, 'google token refresh failed');
+    }
+    const { access_token } = (await refreshRes.json()) as { access_token: string };
+    if (!access_token) return errResp(502, 'google token refresh returned no access_token');
+
+    // 5. Fetch userinfo.
+    const userinfoRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+      headers: { Authorization: `Bearer ${access_token}` },
+    });
+    if (!userinfoRes.ok) {
+      const detail = await safeReadBody(userinfoRes);
+      console.warn('[oauth-google] refresh-profile: userinfo failed:', userinfoRes.status, detail);
+      return errResp(502, 'google userinfo fetch failed');
+    }
+    const userinfo = (await userinfoRes.json()) as { name?: string; email?: string };
+
+    // 6. Upsert profile with display_name (service-role bypasses RLS).
+    const upsertRes = await fetch(`${env.supabaseUrl}/rest/v1/profiles`, {
+      method: 'POST',
+      headers: {
+        apikey: env.serviceRoleKey,
+        Authorization: `Bearer ${env.serviceRoleKey}`,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates,return=minimal',
+      },
+      body: JSON.stringify({
+        id: userId,
+        display_name: userinfo.name || null,
+      }),
+    });
+    if (!upsertRes.ok) {
+      const detail = await safeReadBody(upsertRes);
+      console.warn('[oauth-google] refresh-profile: profile upsert failed:', upsertRes.status, detail);
+      return errResp(500, 'profile upsert failed');
+    }
+
+    return json({ ok: true, name: userinfo.name ?? null, email: userinfo.email ?? null });
+  }
+
   return errResp(
     404,
-    'not found — try GET /oauth-google/start, GET /oauth-google/callback, or POST /oauth-google/disconnect',
+    'not found — try GET /oauth-google/start, GET /oauth-google/callback, POST /oauth-google/disconnect, or POST /oauth-google/refresh-profile',
   );
 });
