@@ -91,3 +91,61 @@
 **Status:** unknown
 
 **Last checked:** 2026-04-24
+
+---
+
+## Post-cognition supabase wiring (2026-04-25)
+
+**Context:** The CR-update-tracker-01 through ~CR-13 above were derived from the spec on 2026-04-22 when the state-of-truth was Markdown files (`Ops Plan.md`, `Tracker.md`, etc.). Post-cognition push (#136–#152), state-of-truth moved to Supabase rows per ADR 0001. The agent's prompt and behavior expectations are being re-anchored on Supabase. The original CRs above remain valid in *intent* but their *verification* needs to be re-stated against the Supabase model.
+
+The CRs below add the wiring requirements to make `update-tracker` operational against Supabase. They DO NOT supersede the original CRs; they extend them.
+
+**Source capture:** `git show 0df181f:.claude/inbox/2026-04-25T2134-update-tracker-wiring.md`.
+**Decision locked 2026-04-25:** option 1 (re-prompt to read/write Supabase) over option 2 (bridge via fake Markdown). Reason: no real benefit to Markdown-reading exists post-cognition; bridge would have the agent emit text claiming it updated files that don't exist.
+
+### CR-update-tracker-supabase-wiring-01: Agent prompt rewritten for Supabase
+
+**Behavior:** `agents/update-tracker/SKILL.md` and `agents/update-tracker/ma-agent-config.json` are rewritten so the agent reads/writes Supabase tables instead of Markdown vault files. The agent's instructions reference `goals`, `projects` (with `todos` JSONB), `entries`, `plan_items` — not `Ops Plan.md`, `Tracker.md`, `Strategy.md`, `life-ops-config.md`.
+
+**Verification:** Read the new prompt; confirm zero references to Markdown vault files. Confirm structured tool-use or output format that maps to Supabase row operations.
+
+**Demo blocker:** no
+
+### CR-update-tracker-supabase-wiring-02: Re-provisioned in MA console
+
+**Behavior:** `scripts/provision-ma-agents.ts --skill update-tracker --update-existing` runs successfully. The deployed MA agent reflects the new prompt.
+
+**Verification:** Re-run after the rewrite; confirm the deployed agent's `version` field bumps. Confirm a smoke call returns Supabase-shaped intent.
+
+**Demo blocker:** no
+
+### CR-update-tracker-supabase-wiring-03: At least one UI surface invokes the agent
+
+**Behavior:** A UI surface in `web/` invokes `update-tracker` via `callMaProxy({ skill: 'update-tracker', input: ... })`. Suggested options (decide during execution):
+- Voice-classifier branch in `web/lib/reminders.js`'s `classifyTranscript` that adds an `update_tracker` intent when the transcript matches "I finished / worked on / shipped" patterns
+- Dedicated affordance on the project sheet ("Log work")
+- Embedded in the chat thread when matching utterances appear
+
+**Verification:** From the deployed app, trigger the wired surface with a representative input; confirm `callMaProxy` is invoked with `skill: 'update-tracker'` (network tab); confirm the agent response is rendered.
+
+**Demo blocker:** no
+
+### CR-update-tracker-supabase-wiring-04: Writes verifiably land in correct Supabase rows
+
+**Behavior:** After a successful `update-tracker` invocation, the affected DB rows reflect the change. E.g., a "I finished the auth migration" utterance updates `projects.todos[i].done = true` for the matching todo, OR appends to `entries` with `kind='update'` (depending on how the agent's prompt specifies the write).
+
+**Verification:** Inspect `projects.todos` / `entries` / `goals` rows in Supabase Studio after a smoke invocation; confirm the row reflects the agent's stated action.
+
+**Demo blocker:** no
+
+### CR-update-tracker-supabase-wiring-05: Eval cases authored
+
+**Behavior:** `evals/datasets/update-tracker/cases.json` exists with at least one positive case (clear project-completion utterance → expected DB write) and one negative case (ambiguous/non-update utterance → no write expected).
+
+**Verification:** File exists; eval run against deployed agent passes both cases.
+
+**Demo blocker:** no
+
+### Sub-agent contract
+
+When dispatched, your final response MUST include CR-supabase-wiring-01 through 05 above with ✅/❌ + one-line evidence per criterion. If any criterion is ❌, surface the blocker — do NOT declare done. The orchestrator will verify against the actual diff + agent re-provisioning before merging. **Special:** CR-03 requires a UI design choice (voice-classifier branch vs dedicated affordance vs chat-embed) — make the call during implementation, document the choice in the PR description.
