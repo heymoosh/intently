@@ -58,6 +58,23 @@ const SKILL_ENV: Record<string, string> = {
   setup: 'MA_AGENT_ID_SETUP',
 };
 
+// Skill → memory store ID env var. Memory stores are provisioned once per skill
+// (per `scripts/provision-ma-agents.ts --with-memory`) and their IDs are stored
+// as Supabase secrets. Absence of a memory store ID is graceful — the session
+// creates fine but without persistent memory (degraded to per-session context only).
+// Per Anthropic MA docs: memory stores attach via `resources[]` at session-create;
+// the SDK v0.90 does not yet expose memoryStores, so we pass it as raw JSON in the
+// createSession body. The agent reads/writes the store via the standard
+// agent_toolset file tools, mounted at /mnt/memory/.
+const SKILL_MEMORY_ENV: Record<string, string> = {
+  chat: 'MA_MEMORY_STORE_ID_CHAT',
+  'daily-brief': 'MA_MEMORY_STORE_ID_DAILY_BRIEF',
+  'daily-review': 'MA_MEMORY_STORE_ID_DAILY_REVIEW',
+  'weekly-review': 'MA_MEMORY_STORE_ID_WEEKLY_REVIEW',
+  setup: 'MA_MEMORY_STORE_ID_SETUP',
+  'update-tracker': 'MA_MEMORY_STORE_ID_UPDATE_TRACKER',
+};
+
 // Required shared environment ID. Per the demo workflow doc, one environment
 // per use case. Anthropic API empirically requires it on create-session — a
 // missing value returns `environment_id: Field required`. Set via:
@@ -110,7 +127,12 @@ function anthropicHeaders(apiKey: string): Record<string, string> {
 
 // ---------- upstream calls ----------
 
-async function createSession(apiKey: string, agentId: string, environmentId: string) {
+async function createSession(
+  apiKey: string,
+  agentId: string,
+  environmentId: string,
+  memoryStoreId?: string | null,
+) {
   // Anthropic MA `POST /v1/sessions` field names (empirical, 2026-04-24):
   //   - `agent`        — identifier WITHOUT _id suffix
   //   - `environment_id` — identifier WITH _id suffix, AND required
@@ -123,6 +145,23 @@ async function createSession(apiKey: string, agentId: string, environmentId: str
     agent: agentId,
     environment_id: environmentId,
   };
+
+  // Attach memory store when available. The SDK v0.90 does not yet expose
+  // memoryStores, so we pass it as raw JSON. The Anthropic MA API accepts
+  // resources of type "memory_store" per the public docs (2026-04-26).
+  // Absence of a store ID is graceful — session still creates, just no
+  // persistent memory across runs.
+  if (memoryStoreId) {
+    body.resources = [
+      {
+        type: 'memory_store',
+        memory_store_id: memoryStoreId,
+        access: 'read_write',
+        instructions:
+          'Read /mnt/memory/ at the start of every run for context from prior sessions. Write summaries of new user patterns, preferences, and key decisions to /mnt/memory/ before finishing. Keep entries concise — one file per topic, under 500 words each.',
+      },
+    ];
+  }
 
   const res = await fetch(`${ANTHROPIC_API_BASE}${SESSIONS_PATH}`, {
     method: 'POST',
@@ -381,11 +420,15 @@ Deno.serve(async (req: Request) => {
     );
   }
 
+  // Resolve memory store ID for this skill (optional — graceful when absent).
+  const memoryEnvVar = parsed.skill ? SKILL_MEMORY_ENV[parsed.skill] : undefined;
+  const memoryStoreId = memoryEnvVar ? (Deno.env.get(memoryEnvVar) ?? null) : null;
+
   // Orchestrate: create (or resume) session, send user.message, collect until idle.
   try {
     const sessionId = parsed.sessionId
       ? parsed.sessionId
-      : await createSession(apiKey, agentId!, environmentId!);
+      : await createSession(apiKey, agentId!, environmentId!, memoryStoreId);
 
     await sendUserMessage(apiKey, sessionId, parsed.input);
 
