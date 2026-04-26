@@ -175,6 +175,65 @@ async function seedSamIfEmpty() {
   return summary;
 }
 
+// Independent gate for calendar_events + email_flags. Runs even when the
+// goals seed has already happened — covers the case where migration 0006
+// was applied AFTER the user was first seeded (the happy path during this
+// project's rollout). Idempotent: only seeds if the user has no calendar
+// rows AND no email rows.
+async function seedSamCalendarEmailIfEmpty() {
+  if (!window.getSupabaseClient || !window.getCurrentUserId) {
+    return { skipped: true, reason: 'libs not loaded' };
+  }
+  if (!window.SAM_CALENDAR_TODAY || !window.SAM_EMAIL_FLAGS) {
+    return { skipped: true, reason: 'sam-seed-data not loaded' };
+  }
+  const sb = window.getSupabaseClient();
+  const userId = await window.getCurrentUserId();
+  const today = new Date();
+  const summary = { inserted: {}, skipped: false };
+
+  const { data: existingCal, error: calCheckErr } = await sb
+    .from('calendar_events').select('id').eq('user_id', userId).limit(1);
+  if (calCheckErr) {
+    return { skipped: true, reason: `calendar_events table missing: ${calCheckErr.message}` };
+  }
+  if (existingCal.length === 0) {
+    const calRows = window.SAM_CALENDAR_TODAY.map((c) => {
+      const start = new Date(today.getTime() + (c.hours_from_now || 0) * 3600_000);
+      const end = c.duration_min
+        ? new Date(start.getTime() + c.duration_min * 60_000)
+        : null;
+      return {
+        user_id: userId,
+        starts_at: start.toISOString(),
+        ends_at: end ? end.toISOString() : null,
+        title: c.title,
+        source: c.source || 'seed',
+      };
+    });
+    const { error } = await sb.from('calendar_events').insert(calRows);
+    if (!error) summary.inserted.calendar_events = calRows.length;
+  }
+
+  const { data: existingEmail } = await sb
+    .from('email_flags').select('id').eq('user_id', userId).limit(1);
+  if (existingEmail && existingEmail.length === 0) {
+    const emailRows = window.SAM_EMAIL_FLAGS.map((e) => ({
+      user_id: userId,
+      sender: e.sender,
+      subject: e.subject,
+      received_at: new Date(today.getTime() - (e.hours_ago || 0) * 3600_000).toISOString(),
+      is_urgent: !!e.is_urgent,
+      awaiting_reply: !!e.awaiting_reply,
+      source: 'seed',
+    }));
+    const { error } = await sb.from('email_flags').insert(emailRows);
+    if (!error) summary.inserted.email_flags = emailRows.length;
+  }
+
+  return summary;
+}
+
 // Wipe all of the current user's seeded data — used when re-seeding cleanly
 // or resetting demo state. Only deletes the current user's rows (RLS enforces).
 async function clearAllUserData() {
@@ -191,4 +250,4 @@ async function clearAllUserData() {
   await sb.from('goals').delete().neq('id', '00000000-0000-0000-0000-000000000000');
 }
 
-Object.assign(window, { seedSamIfEmpty, clearAllUserData });
+Object.assign(window, { seedSamIfEmpty, seedSamCalendarEmailIfEmpty, clearAllUserData });

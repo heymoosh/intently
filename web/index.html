@@ -453,7 +453,44 @@ function FutureWithGoalTap(props) {
 
 // Forked Future with tappable goal cards.
 function FutureScreenProtoTappable({ adds, onOpenProject, onOpenGoal, onAddGoal, onAddProject, onAddAdminReminder, onToggleAdminReminder }) {
-  const goals = window.GOAL_DATA;
+  // Hydrate goals + projects from Supabase. Falls back to GOAL_DATA / PROJECT_DATA
+  // fixtures when the user has no DB rows (so the demo is never empty).
+  const [dbGoals, setDbGoals] = React.useState(null);
+  const [dbProjects, setDbProjects] = React.useState(null);
+  React.useEffect(() => {
+    if (!window.listGoals || !window.listProjects) return;
+    let cancelled = false;
+    Promise.all([
+      window.listGoals().catch(() => []),
+      window.listProjects().catch(() => []),
+    ]).then(([gs, ps]) => {
+      if (cancelled) return;
+      // Map DB goal row → fixture shape (title/month/glyph/pal).
+      if (gs.length > 0) {
+        setDbGoals(gs.map((g) => ({
+          id: g.id,
+          title: g.title,
+          month: g.monthly_slice || '',
+          glyph: g.glyph || 'leaf',
+          pal: g.palette || ['#A8C0E0', '#D4C4F0', '#F0E0C0', '#F5E8D0'],
+        })));
+      }
+      if (ps.length > 0) {
+        setDbProjects(ps.filter((p) => !p.is_admin).map((p) => ({
+          id: p.id,
+          title: p.title,
+          status: p.status,
+          // ProjectCard reads p.title; goal_id passed through for navigation
+          goal_id: p.goal_id,
+          todos: Array.isArray(p.todos) ? p.todos : [],
+        })));
+      }
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  const goals = dbGoals || window.GOAL_DATA;
+  const projects = dbProjects || window.PROJECT_DATA;
   const addedGoals = (adds && adds.goals) || [];
   const addedProjects = (adds && adds.projects) || [];
   const admin = (adds && adds.adminReminders) || [];
@@ -507,10 +544,10 @@ function FutureScreenProtoTappable({ adds, onOpenProject, onOpenGoal, onAddGoal,
         <div style={{ marginTop: 26 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 }}>
             <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', color: T.color.SupportingText }}>Projects</div>
-            <div style={{ fontFamily: T.font.UI, fontSize: 11, color: T.color.SubtleText }}>{PROJECT_DATA.length + addedProjects.length} active</div>
+            <div style={{ fontFamily: T.font.UI, fontSize: 11, color: T.color.SubtleText }}>{projects.length + addedProjects.length} active</div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            {PROJECT_DATA.map(p => <ProjectCard key={p.id} p={p} onOpen={() => onOpenProject && onOpenProject(p)} />)}
+            {projects.map(p => <ProjectCard key={p.id} p={p} onOpen={() => onOpenProject && onOpenProject(p)} />)}
             {addedProjects.map((p) => (
               <div key={p.id} style={{
                 background: T.color.SecondarySurface,
@@ -745,7 +782,66 @@ function PrototypePhone({ dayState, setDayState }) {
       ],
     },
   }), []);
-  const currentEntry = openEntry ? ENTRY_DATA[openEntry] : null;
+  // Reading-mode entry resolution. First try fixture lookup; if openEntry is
+  // a UUID (DB row), fetch on demand and adapt to the reading-mode shape.
+  const [dbEntry, setDbEntry] = React.useState(null);
+  React.useEffect(() => {
+    if (!openEntry) { setDbEntry(null); return; }
+    if (ENTRY_DATA[openEntry]) { setDbEntry(null); return; } // fixture wins
+    if (!window.getSupabaseClient || !window.getCurrentUserId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const sb = window.getSupabaseClient();
+        const userId = await window.getCurrentUserId();
+        const { data, error } = await sb.from('entries').select('*')
+          .eq('id', openEntry).eq('user_id', userId).maybeSingle();
+        if (cancelled || error || !data) return;
+        const at = new Date(data.at);
+        const dayLabel = at.toLocaleString('en-US', { weekday: 'long' });
+        const dateLabel = at.toLocaleString('en-US', { month: 'long', day: 'numeric' });
+        const time = `${at.getHours()}:${String(at.getMinutes()).padStart(2, '0')}`;
+        const body = (data.body_markdown || '').replace(/```json[\s\S]*$/, '').trim();
+        if (data.kind === 'journal') {
+          setDbEntry({
+            kind: 'journal',
+            mood: data.mood || 'dusk',
+            dayLabel, dateLabel,
+            eyebrow: `${dayLabel} · ${dateLabel}`,
+            title: body.split('\n')[0].slice(0, 80) || 'Journal entry',
+            readMin: Math.max(1, Math.round(body.length / 800)),
+            body: body.split(/\n\n+/).map((p, i) => ({ kind: i === 0 ? 'p-drop' : 'p', text: p })),
+          });
+        } else if (data.kind === 'review') {
+          // Try to parse the JSON tail for richer review reading.
+          let tail = null;
+          const jsonMatch = (data.body_markdown || '').match(/```json\s*([\s\S]*?)\s*```\s*$/);
+          if (jsonMatch) { try { tail = JSON.parse(jsonMatch[1]); } catch {} }
+          setDbEntry({
+            kind: 'review',
+            dayLabel, timeLabel: time,
+            title: (tail && tail.journal_text) || body.split('\n')[0].slice(0, 80),
+            highlight: (tail && tail.journal_text) || body,
+            friction: tail && tail.friction && tail.friction[0] ? (tail.friction[0].text || '') : '',
+            tomorrow: tail && tail.tomorrow && tail.tomorrow[0] ? (tail.tomorrow[0].text || '') : '',
+            calendar: [],
+          });
+        } else if (data.kind === 'chat') {
+          setDbEntry({
+            kind: 'chat',
+            dayLabel, timeLabel: time,
+            title: body.slice(0, 60) || 'Chat',
+            summary: body,
+            messages: [],
+          });
+        }
+      } catch (err) {
+        console.warn('[reading-mode] DB fetch failed:', err && err.message);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [openEntry, ENTRY_DATA]);
+  const currentEntry = openEntry ? (ENTRY_DATA[openEntry] || dbEntry) : null;
 
   return (
     <Phone>
