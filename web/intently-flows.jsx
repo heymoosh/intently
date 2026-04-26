@@ -2040,10 +2040,251 @@ function UndoToast() {
   );
 }
 
+// ─── SETUP FLOW (first-run onboarding) ─────────────────────────────────
+// Captures the user's 3 long-term goals via 3 text inputs, then asks the
+// setup MA agent to draft a monthly_slice + pick a glyph for each. User
+// reviews / edits, accepts. On accept: wipes any prior seeded data
+// (Sam) for the current auth.uid(), then inserts the 3 new goals.
+//
+// Trigger: 'Set up Intently as me' button on the Profile sheet — visible
+// when the user has any goals (covers the case where Sam was seeded).
+//
+// Default palettes per goal index, since the user doesn't pick colors.
+const SETUP_DEFAULT_PALETTES = [
+  ['#5B4A82', '#9B7AB8', '#C4A5DC', '#F0DCC4'], // dusk lilac
+  ['#5B7A4A', '#82A86F', '#B8D0BE', '#F0EBC4'], // forest sage
+  ['#7A4A5B', '#B87A82', '#DCBEC4', '#F0DCC4'], // peach
+];
+
+function SetupFlow({ onClose, onComplete }) {
+  const [step, setStep] = React.useState('intro'); // intro | input | drafting | review | error | saving
+  const [goalDrafts, setGoalDrafts] = React.useState(['', '', '']);
+  const [enriched, setEnriched] = React.useState([]); // [{title, monthly_slice, glyph}]
+  const [errorMsg, setErrorMsg] = React.useState('');
+
+  const updateGoal = (i, v) => setGoalDrafts((g) => g.map((x, j) => j === i ? v : x));
+
+  const draftWithAgent = async () => {
+    const titles = goalDrafts.map((g) => g.trim()).filter(Boolean);
+    if (titles.length === 0) {
+      setErrorMsg('Add at least one goal first.'); return;
+    }
+    setStep('drafting');
+    try {
+      const ctx = window.assembleSetupContext(titles);
+      const r = await window.callMaProxy({ skill: 'setup', input: ctx.input });
+      const text = (r && r.finalText) || '';
+      const parsed = window.parseSetupResponse(text);
+      if (!parsed || !parsed.slices || parsed.slices.length === 0) {
+        // Fallback: empty slices, agent failed — let user fill in manually.
+        setEnriched(titles.map((t) => ({ title: t, monthly_slice: '', glyph: 'leaf' })));
+      } else {
+        setEnriched(titles.map((t, i) => {
+          const match = parsed.slices.find((s) => s.goal_index === i) || parsed.slices[i];
+          return {
+            title: t,
+            monthly_slice: (match && match.monthly_slice) || '',
+            glyph: (match && match.glyph) || 'leaf',
+          };
+        }));
+      }
+      setStep('review');
+    } catch (e) {
+      setErrorMsg((e && e.message) || 'setup call failed');
+      setStep('error');
+    }
+  };
+
+  const updateSlice = (i, v) => setEnriched((e) => e.map((x, j) => j === i ? { ...x, monthly_slice: v } : x));
+
+  const acceptAndPersist = async () => {
+    setStep('saving');
+    try {
+      // Wipe prior data so the user starts clean (Sam's seed gets removed).
+      if (window.clearAllUserData) {
+        await window.clearAllUserData();
+      }
+      const sb = window.getSupabaseClient();
+      const userId = await window.getCurrentUserId();
+      const rows = enriched.map((g, i) => ({
+        user_id: userId,
+        title: g.title,
+        monthly_slice: g.monthly_slice,
+        glyph: g.glyph || 'leaf',
+        palette: SETUP_DEFAULT_PALETTES[i] || SETUP_DEFAULT_PALETTES[0],
+        position: i,
+      }));
+      await sb.from('goals').insert(rows);
+      // Also insert an Admin project so the AddZone admin band has a target.
+      await sb.from('projects').insert([{
+        user_id: userId,
+        title: 'Admin',
+        body_markdown: 'Catch-all for misc reminders.',
+        status: 'active',
+        is_admin: true,
+      }]);
+      if (window.showUndoToast) {
+        window.showUndoToast({
+          message: `Set up ${enriched.length} goals — fresh start`,
+          // No undo for setup — wiping is part of the deal; user expects fresh.
+        });
+      }
+      if (onComplete) onComplete({ goals: enriched.length });
+    } catch (e) {
+      setErrorMsg((e && e.message) || 'persist failed');
+      setStep('error');
+    }
+  };
+
+  return (
+    <div style={{
+      position: 'absolute', inset: 0, zIndex: 70,
+      background: `linear-gradient(180deg, ${T.color.PrimarySurface} 0%, #F5EBD6 60%, #F0D9B5 100%)`,
+      display: 'flex', flexDirection: 'column',
+    }}>
+      <div style={{ flexShrink: 0, padding: '14px 18px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          <Icon.Sparkles size={14} color={T.color.FocusObject} />
+          <span style={{ fontFamily: T.font.UI, fontSize: 11, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', color: T.color.FocusObject }}>
+            Set up Intently
+          </span>
+        </div>
+        <button onClick={onClose} aria-label="Close" style={{
+          width: 32, height: 32, borderRadius: 999, background: 'rgba(31,27,21,0.06)',
+          border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Icon.X size={16} color={T.color.PrimaryText} />
+        </button>
+      </div>
+
+      <div style={{ flex: 1, overflowY: 'auto', padding: '8px 22px 28px' }}>
+        {step === 'intro' && (
+          <div>
+            <div style={{ fontFamily: T.font.Display, fontSize: 28, lineHeight: '34px', fontStyle: 'italic', fontWeight: 500, color: T.color.PrimaryText, letterSpacing: -0.5, marginBottom: 14 }}>
+              Three long-term things that matter most to you.
+            </div>
+            <div style={{ fontFamily: T.font.Reading, fontSize: 15, lineHeight: '22px', color: T.color.SupportingText, marginBottom: 22 }}>
+              Not goals as KPIs — goals as directions. The agent will draft a concrete this-month slice for each one. Edit anything before saving.
+            </div>
+            <div style={{ background: '#FBF6EA88', border: `1px dashed ${T.color.EdgeLine}`, borderRadius: 14, padding: '14px 16px', marginBottom: 18, fontFamily: T.font.Reading, fontSize: 13, lineHeight: '19px', color: T.color.SupportingText, fontStyle: 'italic' }}>
+              Heads up: this wipes any seeded sample data for your session and replaces it with these goals. Daily brief tomorrow morning will be from-scratch.
+            </div>
+            <button onClick={() => setStep('input')} style={{
+              padding: '12px 22px', background: T.color.PrimaryText, color: '#FBF6EA',
+              border: 'none', borderRadius: 999, cursor: 'pointer',
+              fontFamily: T.font.UI, fontSize: 14, fontWeight: 600, letterSpacing: 0.2,
+            }}>Start</button>
+          </div>
+        )}
+
+        {step === 'input' && (
+          <div>
+            <div style={{ marginBottom: 16, fontFamily: T.font.Display, fontSize: 22, lineHeight: '28px', fontStyle: 'italic', fontWeight: 500, color: T.color.PrimaryText, letterSpacing: -0.3 }}>
+              Name your three goals.
+            </div>
+            {[0, 1, 2].map((i) => (
+              <div key={i} style={{ marginBottom: 12 }}>
+                <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: T.color.SubtleText, marginBottom: 6 }}>Goal {i + 1}</div>
+                <textarea
+                  value={goalDrafts[i]}
+                  onChange={(e) => updateGoal(i, e.target.value)}
+                  rows={2}
+                  placeholder="e.g. Ship something people rely on daily"
+                  style={{
+                    width: '100%', padding: '12px 14px', resize: 'vertical', minHeight: 56,
+                    border: `1px solid ${T.color.EdgeLine}`, borderRadius: 12,
+                    background: 'rgba(255,255,255,0.7)', boxSizing: 'border-box',
+                    fontFamily: T.font.Reading, fontSize: 15, lineHeight: '21px', color: T.color.PrimaryText,
+                    outline: 'none',
+                  }}
+                />
+              </div>
+            ))}
+            <button onClick={draftWithAgent} style={{
+              marginTop: 8, width: '100%', padding: '12px 18px',
+              background: T.color.PrimaryText, color: '#FBF6EA',
+              border: 'none', borderRadius: 999, cursor: 'pointer',
+              fontFamily: T.font.UI, fontSize: 14, fontWeight: 600, letterSpacing: 0.2,
+            }}>
+              Draft monthly slices →
+            </button>
+          </div>
+        )}
+
+        {step === 'drafting' && (
+          <div style={{ padding: '40px 8px', textAlign: 'center' }}>
+            <AgentTyping />
+            <div style={{ marginTop: 14, fontFamily: T.font.UI, fontSize: 12, color: T.color.SupportingText, fontStyle: 'italic' }}>
+              Drafting this-month slices for each goal…
+            </div>
+          </div>
+        )}
+
+        {step === 'review' && (
+          <div>
+            <div style={{ marginBottom: 14, fontFamily: T.font.Display, fontSize: 22, lineHeight: '28px', fontStyle: 'italic', fontWeight: 500, color: T.color.PrimaryText, letterSpacing: -0.3 }}>
+              Edit anything that doesn't sound like you.
+            </div>
+            {enriched.map((g, i) => (
+              <div key={i} style={{
+                padding: '14px 16px', marginBottom: 12,
+                background: T.color.ConfirmationCardSurface,
+                border: `1px solid ${T.color.EdgeLine}`,
+                borderRadius: 14, boxShadow: '0 4px 14px rgba(31,27,21,0.05)',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                  <Glyph name={g.glyph || 'leaf'} size={20} color={T.color.PrimaryText} stroke={1.75} />
+                  <div style={{ flex: 1, fontFamily: T.font.Display, fontSize: 16, lineHeight: '21px', fontStyle: 'italic', fontWeight: 500, color: T.color.PrimaryText, letterSpacing: -0.2 }}>{g.title}</div>
+                </div>
+                <div style={{ marginBottom: 6, fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: T.color.SubtleText }}>This month</div>
+                <textarea
+                  value={g.monthly_slice}
+                  onChange={(e) => updateSlice(i, e.target.value)}
+                  rows={3}
+                  style={{
+                    width: '100%', resize: 'vertical', minHeight: 60,
+                    padding: '10px 12px', border: `1px solid ${T.color.EdgeLine}`,
+                    borderRadius: 10, background: 'rgba(255,255,255,0.6)', boxSizing: 'border-box',
+                    fontFamily: T.font.Reading, fontSize: 14, lineHeight: '20px', color: T.color.PrimaryText, outline: 'none',
+                  }}
+                />
+              </div>
+            ))}
+            <button onClick={acceptAndPersist} style={{
+              marginTop: 8, width: '100%', padding: '12px 18px',
+              background: T.color.PrimaryText, color: '#FBF6EA',
+              border: 'none', borderRadius: 999, cursor: 'pointer',
+              fontFamily: T.font.UI, fontSize: 14, fontWeight: 600, letterSpacing: 0.2,
+            }}>
+              Save and start fresh
+            </button>
+          </div>
+        )}
+
+        {step === 'saving' && (
+          <div style={{ padding: '40px 8px', textAlign: 'center' }}>
+            <AgentTyping />
+            <div style={{ marginTop: 14, fontFamily: T.font.UI, fontSize: 12, color: T.color.SupportingText, fontStyle: 'italic' }}>
+              Wiping seed data and saving your goals…
+            </div>
+          </div>
+        )}
+
+        {step === 'error' && (
+          <div style={{
+            padding: '16px 18px', background: T.color.SecondarySurface, border: `1px solid ${T.color.EdgeLine}`,
+            borderRadius: 14, fontFamily: T.font.Reading, fontSize: 14, color: T.color.PrimaryText, marginBottom: 14,
+          }}>{errorMsg}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 Object.assign(window, {
   GOAL_DATA, PROJECT_EXTRAS,
   GoalDetail, ProjectDetailV2,
-  BriefFlow, ReviewFlow, WeeklyReviewFlow, MonthlyRefreshFlow,
+  BriefFlow, ReviewFlow, WeeklyReviewFlow, MonthlyRefreshFlow, SetupFlow,
   PresentEmpty, PresentClosed, UndoToast,
   usePopulate, MOCK_PLAN,
   showUndoToast,

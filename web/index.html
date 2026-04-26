@@ -672,6 +672,7 @@ function PrototypePhone({ dayState, setDayState }) {
   const [liveReview, setLiveReview] = React.useState(null); // agent-driven review summary from latest ReviewFlow accept
   const [showWeeklyReview, setShowWeeklyReview] = React.useState(false);
   const [showMonthlyRefresh, setShowMonthlyRefresh] = React.useState(false);
+  const [showSetup, setShowSetup] = React.useState(false);
   const [showJournal, setShowJournal] = React.useState(false);
   const [showConnections, setShowConnections] = React.useState(false);
   const [profileView, setProfileView] = React.useState(null); // null | 'sheet' | 'account' | 'preferences' | 'help'
@@ -941,11 +942,20 @@ function PrototypePhone({ dayState, setDayState }) {
         />
       )}
 
+      {/* First-run setup overlay — opens from Profile → "Set up Intently as
+          me". Wipes seed data and replaces with the user's own goals. */}
+      {showSetup && (
+        <SetupFlow
+          onClose={() => setShowSetup(false)}
+          onComplete={() => { setShowSetup(false); window.location.reload(); }}
+        />
+      )}
+
       {/* Global Undo toast — fires from any flow's persist via window.showUndoToast. */}
       <UndoToast />
 
       {/* Profile button — bottom-left, persistent across all tenses */}
-      {dayState !== 'brief' && dayState !== 'review' && !showWeeklyReview && !showMonthlyRefresh && !openGoal && !openProject && !showJournal && !showConnections && !profileView && !openEntry && (
+      {dayState !== 'brief' && dayState !== 'review' && !showWeeklyReview && !showMonthlyRefresh && !showSetup && !openGoal && !openProject && !showJournal && !showConnections && !profileView && !openEntry && (
         <ProfileButton onClick={() => setProfileView('sheet')} dim={micDim} />
       )}
 
@@ -970,6 +980,7 @@ function PrototypePhone({ dayState, setDayState }) {
           onOpenPreferences={() => setProfileView('preferences')}
           onOpenHelp={() => setProfileView('help')}
           onSignOut={() => setProfileView(null)}
+          onStartSetup={() => { setProfileView(null); setShowSetup(true); }}
         />
       )}
       {profileView === 'account' && (
@@ -1007,7 +1018,7 @@ function PrototypePhone({ dayState, setDayState }) {
       )}
 
       {/* Chrome: tense nav + hero — hidden during brief/review chat / overlays */}
-      {dayState !== 'brief' && dayState !== 'review' && !showWeeklyReview && !showMonthlyRefresh && !openGoal && !openProject && !showJournal && !showConnections && !profileView && !openEntry && (
+      {dayState !== 'brief' && dayState !== 'review' && !showWeeklyReview && !showMonthlyRefresh && !showSetup && !openGoal && !openProject && !showJournal && !showConnections && !profileView && !openEntry && (
         <>
           <TenseNav index={idx} onIndex={setIdx} dim={micDim} />
           <HeroAffordance
@@ -1026,7 +1037,7 @@ function PrototypePhone({ dayState, setDayState }) {
           />
         </>
       )}
-      {(openGoal || openProject) && dayState !== 'brief' && dayState !== 'review' && !showWeeklyReview && !showMonthlyRefresh && !showJournal && !showConnections && !profileView && (
+      {(openGoal || openProject) && dayState !== 'brief' && dayState !== 'review' && !showWeeklyReview && !showMonthlyRefresh && !showSetup && !showJournal && !showConnections && !profileView && (
         <HeroAffordance
           state={heroState}
           onChange={onHeroChange}
