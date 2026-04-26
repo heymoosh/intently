@@ -275,25 +275,23 @@ function WeekView({ onPickDay, onStartWeeklyReview }) {
 // (wiring-audit Gap #9).
 function DayView({ onBack, onPickEntry, date, refreshKey }) {
   const dayDate = date || new Date();
-  // Fallback used while DB load is pending OR when the user has no entries
-  // for the picked day — keeps the screen looking real instead of empty.
-  const FALLBACK_ENTRIES = [
-    { id: 'brief-7-14', time: '7:14', kind: 'brief', title: 'Daily brief', body: 'A quieter one than yesterday. Morning for deep work.' },
-    { id: 'journal-10-32', time: '10:32', kind: 'journal', title: 'On the data slide', body: 'Rewrote the opening — it was too defensive. The new frame is: here is what we learned; here is what it implies; here is what we are doing about it. Three beats. Anya will push back on beat two.' },
-    { id: 'chat-14-50', time: '14:50', kind: 'chat', title: 'Chat — walk timing', body: 'Moved walk to after dinner per your note.' },
-    { id: 'review-21-06', time: '21:06', kind: 'review', title: 'End-of-day review', body: 'Shipped the slide. Declined Raj. Walked. Good day.' },
-  ];
 
-  const [entries, setEntries] = React.useState(FALLBACK_ENTRIES);
-  const [archive, setArchive] = React.useState([
-    { id: 'archive-mar-2', date: 'Mar 2', t: "Named the thing about the ops hire.", glyph: 'footprints' },
-    { id: 'archive-feb-14', date: 'Feb 14', t: 'First pitch rewrite — still too defensive.', glyph: 'pen' },
-  ]);
+  // Start empty — fixtures must never show for real users.
+  // demo mode (?demo=1) is handled upstream: entities.js _isDemo() makes
+  // the Supabase client return SAM_JOURNAL rows, so the same render path works.
+  const [entries, setEntries] = React.useState([]);
+  const [archive, setArchive] = React.useState([]);
+  // loaded becomes true after the first DB round-trip completes (success or
+  // failure). While false we show nothing; after false+empty we show the
+  // empty-state hint instead of fixture data.
+  const [loaded, setLoaded] = React.useState(false);
 
-  // Hydrate today's entries from Supabase. Falls back to FALLBACK_ENTRIES if
-  // the user has no entries today, so the demo never looks empty.
+  // Hydrate today's entries from Supabase.
   React.useEffect(() => {
-    if (!window.getSupabaseClient || !window.getCurrentUserId) return;
+    if (!window.getSupabaseClient || !window.getCurrentUserId) {
+      setLoaded(true);
+      return;
+    }
     let cancelled = false;
     (async () => {
       try {
@@ -319,38 +317,36 @@ function DayView({ onBack, onPickEntry, date, refreshKey }) {
         ]);
         if (cancelled) return;
 
-        if (todayEntries.length > 0) {
-          setEntries(todayEntries.map((e) => {
-            const at = new Date(e.at);
-            const hh = at.getHours();
-            const mm = at.getMinutes();
-            const time = `${hh}:${String(mm).padStart(2, '0')}`;
-            // Title: first sentence or first 60 chars of body.
-            const body = e.body_markdown || '';
-            const sentenceMatch = body.match(/^[^.!?]+[.!?]/);
-            const title = (sentenceMatch ? sentenceMatch[0] : body).trim().slice(0, 80);
-            const kindTitle = { brief: 'Daily brief', review: 'End-of-day review', chat: 'Chat', journal: title }[e.kind] || title;
-            return {
-              id: e.id,
-              time,
-              kind: e.kind,
-              title: kindTitle,
-              body: body.replace(/```json[\s\S]*$/, '').trim() || '—',
-            };
-          }));
-        }
+        setEntries(todayEntries.map((e) => {
+          const at = new Date(e.at);
+          const hh = at.getHours();
+          const mm = at.getMinutes();
+          const time = `${hh}:${String(mm).padStart(2, '0')}`;
+          // Title: first sentence or first 60 chars of body.
+          const body = e.body_markdown || '';
+          const sentenceMatch = body.match(/^[^.!?]+[.!?]/);
+          const title = (sentenceMatch ? sentenceMatch[0] : body).trim().slice(0, 80);
+          const kindTitle = { brief: 'Daily brief', review: 'End-of-day review', chat: 'Chat', journal: title }[e.kind] || title;
+          return {
+            id: e.id,
+            time,
+            kind: e.kind,
+            title: kindTitle,
+            body: body.replace(/```json[\s\S]*$/, '').trim() || '—',
+          };
+        }));
 
-        if (olderEntries.length > 0) {
-          setArchive(olderEntries.map((e) => {
-            const at = new Date(e.at);
-            const date = at.toLocaleString('en-US', { month: 'short', day: 'numeric' });
-            const body = e.body_markdown || '';
-            const t = body.split('\n')[0].slice(0, 80);
-            return { id: e.id, date, t, glyph: e.glyph || 'pen' };
-          }));
-        }
+        setArchive(olderEntries.map((e) => {
+          const at = new Date(e.at);
+          const date = at.toLocaleString('en-US', { month: 'short', day: 'numeric' });
+          const body = e.body_markdown || '';
+          const t = body.split('\n')[0].slice(0, 80);
+          return { id: e.id, date, t, glyph: e.glyph || 'pen' };
+        }));
       } catch (err) {
         console.warn('[DayView] hydrate failed:', err && err.message);
+      } finally {
+        if (!cancelled) setLoaded(true);
       }
     })();
     return () => { cancelled = true; };
@@ -364,80 +360,83 @@ function DayView({ onBack, onPickEntry, date, refreshKey }) {
     chat:    { tint: T.color.TintMint,   label: 'Chat',    glyph: 'message' },
     review:  { tint: T.color.TintPeachSoft, label: 'Review', glyph: 'moon' },
   };
-  // Hero tap target: prefer the first DB-backed journal entry (UUID) so the
-  // edit button appears in ReadingMode. Falls back to the fixture key only
-  // when today has no DB journal entries (e.g. FALLBACK_ENTRIES in play).
-  // Fixture-keyed entries (ids like 'journal-10-32') have no DB row → onEdit
-  // is undefined → edit button intentionally hidden (no row to update).
-  const heroEntryId = (() => {
-    const dbJournal = entries.find(
-      (e) => e.kind === 'journal' && e.id && !e.id.startsWith('journal-') && !e.id.startsWith('brief-') && !e.id.startsWith('chat-') && !e.id.startsWith('review-') && !e.id.startsWith('archive-')
-    );
-    return dbJournal ? dbJournal.id : 'journal-10-32';
-  })();
+  // Hero journal entry: first DB-backed journal entry with a real UUID.
+  const heroJournal = entries.find(
+    (e) => e.kind === 'journal' && e.id && !e.id.startsWith('journal-') && !e.id.startsWith('brief-') && !e.id.startsWith('chat-') && !e.id.startsWith('review-') && !e.id.startsWith('archive-')
+  ) || null;
+  const dayLabel = dayDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px 140px' }}>
-      {/* Hero — the day's marquee journal entry, presented like a reading-mode
-          preview. Banner image, italic title, tap to open the full reader.
-          Uses the first DB-backed journal UUID when available so ReadingMode
-          shows the edit button; falls back to the 'journal-10-32' fixture key
-          (edit button hidden — fixture entries have no DB row to update). */}
-      <button
-        onClick={() => onPickEntry && onPickEntry(heroEntryId)}
-        style={{
-          all: 'unset', display: 'block', width: '100%',
-          borderRadius: 18, overflow: 'hidden',
-          boxShadow: T.shadow.Raised, marginBottom: 22,
-          cursor: 'pointer', position: 'relative',
-        }}
-      >
-        <div style={{ position: 'relative', height: 180 }}>
-          <LandscapePanel mood="dusk" style={{ position: 'absolute', inset: 0 }} />
+      {/* Hero — the day's marquee journal entry. Only rendered when a real
+          DB-backed journal entry exists for this day. Hidden for users with
+          no entries; never falls back to fixtures. */}
+      {heroJournal ? (
+        <button
+          onClick={() => onPickEntry && onPickEntry(heroJournal.id)}
+          style={{
+            all: 'unset', display: 'block', width: '100%',
+            borderRadius: 18, overflow: 'hidden',
+            boxShadow: T.shadow.Raised, marginBottom: 22,
+            cursor: 'pointer', position: 'relative',
+          }}
+        >
+          <div style={{ position: 'relative', height: 180 }}>
+            <LandscapePanel mood="dusk" style={{ position: 'absolute', inset: 0 }} />
+            <div style={{
+              position: 'absolute', inset: 0,
+              background: 'linear-gradient(180deg, rgba(43,33,24,0.05) 0%, rgba(43,33,24,0) 35%, rgba(43,33,24,0.45) 100%)',
+            }} />
+            <div style={{
+              position: 'absolute', left: 18, right: 18, bottom: 14,
+              display: 'flex', alignItems: 'flex-end', gap: 12,
+            }}>
+              <div style={{
+                fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2,
+                textTransform: 'uppercase', color: '#FBF6EA', opacity: 0.92,
+                position: 'absolute', top: -156, left: 0,
+              }}>{dayLabel}</div>
+              <div style={{
+                flex: 1, fontFamily: T.font.Display, fontSize: 26, lineHeight: '32px',
+                fontStyle: 'italic', fontWeight: 500, letterSpacing: -0.4,
+                color: '#FBF6EA', textWrap: 'pretty',
+              }}>{heroJournal.title}</div>
+              <span style={{
+                width: 36, height: 36, borderRadius: 999,
+                background: 'rgba(251,246,234,0.92)',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0,
+              }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T.color.PrimaryText} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+              </span>
+            </div>
+          </div>
           <div style={{
-            position: 'absolute', inset: 0,
-            background: 'linear-gradient(180deg, rgba(43,33,24,0.05) 0%, rgba(43,33,24,0) 35%, rgba(43,33,24,0.45) 100%)',
-          }} />
-          <div style={{
-            position: 'absolute', left: 18, right: 18, bottom: 14,
-            display: 'flex', alignItems: 'flex-end', gap: 12,
+            padding: '14px 18px 16px',
+            background: T.color.SecondarySurface,
+            borderTop: `1px solid ${T.color.EdgeLine}`,
           }}>
             <div style={{
               fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2,
-              textTransform: 'uppercase', color: '#FBF6EA', opacity: 0.92,
-              position: 'absolute', top: -156, left: 0,
-            }}>Thursday · April 23</div>
+              textTransform: 'uppercase', color: T.color.TintClay, marginBottom: 4,
+            }}>Journal · {heroJournal.time}</div>
             <div style={{
-              flex: 1, fontFamily: T.font.Display, fontSize: 26, lineHeight: '32px',
-              fontStyle: 'italic', fontWeight: 500, letterSpacing: -0.4,
-              color: '#FBF6EA', textWrap: 'pretty',
-            }}>On the data slide.</div>
-            <span style={{
-              width: 36, height: 36, borderRadius: 999,
-              background: 'rgba(251,246,234,0.92)',
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              flexShrink: 0,
-            }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T.color.PrimaryText} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
-            </span>
+              fontFamily: T.font.Reading, fontSize: 14, lineHeight: '22px',
+              color: T.color.PrimaryText, fontStyle: 'italic', opacity: 0.84,
+              display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+            }}>"{heroJournal.body}"</div>
           </div>
-        </div>
+        </button>
+      ) : loaded && (
         <div style={{
-          padding: '14px 18px 16px',
-          background: T.color.SecondarySurface,
-          borderTop: `1px solid ${T.color.EdgeLine}`,
+          padding: '28px 20px', borderRadius: 18, marginBottom: 22,
+          background: T.color.SecondarySurface, border: `1px dashed ${T.color.EdgeLine}`,
+          textAlign: 'center',
         }}>
-          <div style={{
-            fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2,
-            textTransform: 'uppercase', color: T.color.TintClay, marginBottom: 4,
-          }}>Journal · 10:32 · 2 min read</div>
-          <div style={{
-            fontFamily: T.font.Reading, fontSize: 14, lineHeight: '22px',
-            color: T.color.PrimaryText, fontStyle: 'italic', opacity: 0.84,
-            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-            overflow: 'hidden',
-          }}>"Rewrote the opening — it was too defensive. The new frame is: here is what we learned; here is what it implies…"</div>
+          <div style={{ fontFamily: T.font.Display, fontSize: 20, fontStyle: 'italic', color: T.color.SubtleText, marginBottom: 6 }}>Nothing logged yet today.</div>
+          <div style={{ fontFamily: T.font.UI, fontSize: 12, color: T.color.SubtleText, opacity: 0.7 }}>Your entries will appear here as you add them.</div>
         </div>
-      </button>
+      )}
 
       {/* Chronological entries, text wrapping around kind glyph */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -493,30 +492,32 @@ function DayView({ onBack, onPickEntry, date, refreshKey }) {
         })}
       </div>
 
-      {/* From your archive — resonant older entries */}
-      <div style={{ marginTop: 26, padding: 16, background: T.color.SecondarySurface, borderRadius: 14, border: `1px dashed ${T.color.EdgeLine}` }}>
-        <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: T.color.SupportingText, marginBottom: 10 }}>From your archive</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {archive.map((a, i) => (
-            <button
-              key={a.id || i}
-              onClick={() => onPickEntry && onPickEntry(a.id)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px',
-                background: 'transparent', border: 'none', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
-              }}
-            >
-              <span style={{ width: 32, height: 32, borderRadius: 10, background: T.color.PrimarySurface, border: `1px solid ${T.color.EdgeLine}`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Glyph name={a.glyph} size={16} color={T.color.PrimaryText} stroke={1.75} />
-              </span>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', color: T.color.SubtleText }}>{a.date}</div>
-                <div style={{ fontFamily: T.font.Reading, fontSize: 14, lineHeight: '20px', color: T.color.PrimaryText, fontStyle: 'italic' }}>"{a.t}"</div>
-              </div>
-            </button>
-          ))}
+      {/* From your archive — resonant older entries. Hidden when no archive rows. */}
+      {archive.length > 0 && (
+        <div style={{ marginTop: 26, padding: 16, background: T.color.SecondarySurface, borderRadius: 14, border: `1px dashed ${T.color.EdgeLine}` }}>
+          <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: T.color.SupportingText, marginBottom: 10 }}>From your archive</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {archive.map((a, i) => (
+              <button
+                key={a.id || i}
+                onClick={() => onPickEntry && onPickEntry(a.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px',
+                  background: 'transparent', border: 'none', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+                }}
+              >
+                <span style={{ width: 32, height: 32, borderRadius: 10, background: T.color.PrimarySurface, border: `1px solid ${T.color.EdgeLine}`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Glyph name={a.glyph} size={16} color={T.color.PrimaryText} stroke={1.75} />
+                </span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', color: T.color.SubtleText }}>{a.date}</div>
+                  <div style={{ fontFamily: T.font.Reading, fontSize: 14, lineHeight: '20px', color: T.color.PrimaryText, fontStyle: 'italic' }}>"{a.t}"</div>
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
