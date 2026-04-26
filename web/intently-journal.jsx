@@ -244,9 +244,17 @@ function WeekView({ onPickDay, onStartWeeklyReview }) {
         </ul>
       </div>
 
-      {/* Weekly-review CTA — opens WeeklyReviewFlow overlay. Naturally surfaces
-          on Sundays in production; here it's available any day for testing. */}
-      {onStartWeeklyReview && (
+      {/* Weekly-review CTA. Surfaces on the user's configured weekly review day
+          (Profile → Preferences → Weekly review day, default Sunday). Always
+          visible in dev mode so the flow can be tested any day. */}
+      {onStartWeeklyReview && (() => {
+        const dev = typeof window !== 'undefined' && !!window.INTENTLY_DEV;
+        const preferred = (typeof window !== 'undefined' && window.getPref) ? window.getPref('weeklyReviewDay', 'Sunday') : 'Sunday';
+        const _DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const todayName = _DAYS[new Date().getDay()];
+        const inWindow = dev || todayName === preferred;
+        return inWindow;
+      })() && (
         <div style={{ marginTop: 8, marginBottom: 8, display: 'flex', justifyContent: 'center' }}>
           <button onClick={onStartWeeklyReview} style={{
             padding: '12px 22px',
@@ -507,28 +515,9 @@ function PastJournal({ initialZoom = 'Week', onStartWeeklyReview }) {
 // Three-dot tense indicator. Tap to jump; dots also act as a position indicator.
 // On mobile, swipe is the primary nav. On desktop (≥ 900px viewport), arrow buttons appear too.
 function TenseNav({ index = 1, onIndex, dim = false }) {
-  const [wide, setWide] = React.useState(typeof window !== 'undefined' && window.innerWidth >= 900);
-  React.useEffect(() => {
-    const onR = () => setWide(window.innerWidth >= 900);
-    window.addEventListener('resize', onR);
-    return () => window.removeEventListener('resize', onR);
-  }, []);
-  const go = (dir) => {
-    const next = Math.max(0, Math.min(2, index + dir));
-    if (next !== index && onIndex) onIndex(next);
-  };
-  const ArrowBtn = ({ dir, disabled }) => (
-    <button onClick={() => !disabled && go(dir)} disabled={disabled} style={{
-      width: 36, height: 36, borderRadius: 999, border: 'none', background: 'transparent',
-      cursor: disabled ? 'default' : 'pointer', display: 'inline-flex',
-      alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.25 : 0.85,
-      color: T.color.PrimaryText, padding: 0,
-    }}>
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: dir < 0 ? 'none' : 'scaleX(-1)' }}>
-        <path d="M19 12H5" /><path d="m12 19-7-7 7-7" />
-      </svg>
-    </button>
-  );
+  // Dots-only inside the phone frame. Desktop step-arrows live OUTSIDE the
+  // device frame as prototype chrome (rendered separately by the app shell)
+  // so the mobile screen stays clean of dev affordances.
   return (
     <div style={{
       position: 'absolute', left: 0, right: 0, bottom: 0,
@@ -536,12 +525,11 @@ function TenseNav({ index = 1, onIndex, dim = false }) {
       opacity: dim ? 0.2 : 1, transition: `opacity 200ms ${T.motion.Standard}`, zIndex: 30,
     }}>
       <div style={{
-        display: 'inline-flex', alignItems: 'center', gap: 6, padding: wide ? '4px 10px' : '8px 14px',
+        display: 'inline-flex', alignItems: 'center', padding: '8px 14px',
         background: 'rgba(251,246,234,0.88)', backdropFilter: 'blur(12px)',
         border: `1px solid ${T.color.EdgeLine}`, borderRadius: 999,
         boxShadow: '0 8px 24px rgba(31,27,21,0.1)',
       }}>
-        {wide && <ArrowBtn dir={-1} disabled={index === 0} />}
         <div style={{ display: 'inline-flex', gap: 8, padding: '0 6px' }}>
           {[0, 1, 2].map(i => {
             const on = i === index;
@@ -555,10 +543,46 @@ function TenseNav({ index = 1, onIndex, dim = false }) {
             );
           })}
         </div>
-        {wide && <ArrowBtn dir={+1} disabled={index === 2} />}
       </div>
     </div>
   );
 }
 
-Object.assign(window, { PastJournal, YearView, MonthView, WeekView, DayView, JournalHeader, TenseNav });
+// Desktop-only step arrows that live OUTSIDE the phone frame as prototype
+// chrome (alongside the dev panel). On narrow screens (<900px) it renders
+// nothing — touch users swipe between tenses.
+function TenseNavArrows({ index = 1, onIndex }) {
+  const [wide, setWide] = React.useState(typeof window !== 'undefined' && window.innerWidth >= 900);
+  React.useEffect(() => {
+    const onR = () => setWide(window.innerWidth >= 900);
+    window.addEventListener('resize', onR);
+    return () => window.removeEventListener('resize', onR);
+  }, []);
+  if (!wide) return null;
+  const go = (dir) => {
+    const next = Math.max(0, Math.min(2, index + dir));
+    if (next !== index && onIndex) onIndex(next);
+  };
+  const Arrow = ({ dir, disabled }) => (
+    <button onClick={() => !disabled && go(dir)} disabled={disabled} aria-label={dir < 0 ? 'Previous tense' : 'Next tense'} style={{
+      width: 44, height: 44, borderRadius: 999, border: `1px solid ${T.color.EdgeLine}`,
+      background: T.color.SecondarySurface,
+      cursor: disabled ? 'default' : 'pointer', display: 'inline-flex',
+      alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.25 : 0.85,
+      color: T.color.PrimaryText, padding: 0,
+      boxShadow: '0 2px 6px rgba(31,27,21,0.06)',
+    }}>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: dir < 0 ? 'none' : 'scaleX(-1)' }}>
+        <path d="M19 12H5" /><path d="m12 19-7-7 7-7" />
+      </svg>
+    </button>
+  );
+  return (
+    <div className="tense-nav-arrows" style={{ display: 'inline-flex', gap: 8 }}>
+      <Arrow dir={-1} disabled={index === 0} />
+      <Arrow dir={+1} disabled={index === 2} />
+    </div>
+  );
+}
+
+Object.assign(window, { PastJournal, YearView, MonthView, WeekView, DayView, JournalHeader, TenseNav, TenseNavArrows });

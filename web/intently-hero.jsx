@@ -367,34 +367,61 @@ function HeroChat({ onDone, onMic, seedTranscript = '', onTranscriptConsumed }) 
   const scrollRef = React.useRef(null);
   const seededRef = React.useRef(false);
 
-  // Render an agent reply based on the classify-and-store response shape.
-  const replyForClassify = React.useCallback((res) => {
-    if (!res) return "Got it — I'll keep that in mind.";
-    if (res.classified === true && res.reminder) {
-      const when = res.reminder.remind_on || 'soon';
-      return `Got it. I'll surface "${res.reminder.text}" on ${when}.`;
-    }
-    if (res.classified === false) {
-      return "Noted — I didn't pin it to a date, but I'll keep it in context for the next brief.";
-    }
-    return "Got it — I'll keep that in mind.";
+  // Build a chat-mode input for callMaProxy. Wraps the user's question with a
+  // short instruction so the daily-brief agent (which has full user context)
+  // responds conversationally instead of drafting a plan. Includes a few
+  // recent turns so it feels like a real thread, not single-shot prompts.
+  const buildChatInput = React.useCallback((userText, history) => {
+    const recent = (history || []).slice(-6).map((m) => {
+      const role = m.kind === 'user' ? 'User' : (m.kind === 'agent' ? 'You' : null);
+      return role ? `${role}: ${m.t}` : null;
+    }).filter(Boolean).join('\n');
+    return [
+      "The user is chatting with you outside the brief / review flow — this is an ad-hoc conversation, not a planning session.",
+      "Respond naturally in 1-3 sentences. Speak directly to them. Use what you know about their goals/projects/today's plan when it's relevant; otherwise just answer the question.",
+      "Do not generate a daily plan, do not emit a JSON tail, do not propose a brief. Just talk.",
+      '',
+      recent ? `Recent conversation:\n${recent}\n` : '',
+      `User just said: "${userText}"`,
+    ].filter(Boolean).join('\n');
   }, []);
 
-  // Send a user utterance through classify-and-store, append both turns.
+  // Send a user utterance: classify-as-reminder first (cheap edge function),
+  // then if not a reminder, fan out to a real LLM turn via daily-brief in
+  // chat mode. Appends both turns to the thread; falls back to a generic
+  // acknowledgement only if BOTH the classify call AND the LLM call fail.
   const sendUtterance = React.useCallback(async (text) => {
     const trimmed = (text || '').trim();
     if (!trimmed) return;
     setThread((prev) => [...prev, { kind: 'user', t: trimmed }]);
     setPending(true);
     try {
-      const res = window.classifyTranscript ? await window.classifyTranscript(trimmed) : null;
-      setThread((prev) => [...prev, { kind: 'agent', t: replyForClassify(res) }]);
-    } catch {
-      setThread((prev) => [...prev, { kind: 'agent', t: "Got it — I'll keep that in mind." }]);
+      const cls = window.classifyTranscript ? await window.classifyTranscript(trimmed) : null;
+      if (cls && cls.classified === true && cls.reminder) {
+        const when = cls.reminder.remind_on || 'soon';
+        setThread((prev) => [...prev, { kind: 'agent', t: `Got it. I'll surface "${cls.reminder.text}" on ${when}.` }]);
+      } else if (window.callMaProxy) {
+        // Live LLM turn. Single-turn for now — recent-thread history can be
+        // added via a session id once the proxy + agent support persistence.
+        const input = buildChatInput(trimmed, []);
+        try {
+          const r = await window.callMaProxy({ skill: 'daily-brief', input });
+          let reply = (r && r.finalText) || '';
+          // Strip any JSON tail that the brief agent might still emit (it's
+          // contract-bound to the brief Output shape, even when prompted to chat).
+          reply = reply.replace(/```json[\s\S]*?```\s*$/, '').trim();
+          if (!reply) reply = "I'm here. Say more?";
+          setThread((prev) => [...prev, { kind: 'agent', t: reply }]);
+        } catch (e) {
+          setThread((prev) => [...prev, { kind: 'agent', t: "I couldn't reach the model just now. Try again in a moment." }]);
+        }
+      } else {
+        setThread((prev) => [...prev, { kind: 'agent', t: "I'm here in chat-only mode (the model proxy isn't loaded). Try again from a deployed build." }]);
+      }
     } finally {
       setPending(false);
     }
-  }, [replyForClassify]);
+  }, [buildChatInput]);
 
   // Seed the thread from a voice capture the user just finished, exactly once.
   React.useEffect(() => {

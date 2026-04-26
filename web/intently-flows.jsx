@@ -117,19 +117,32 @@ const PROJECT_EXTRAS = {
 };
 
 // ─── GOAL DETAIL SCREEN ─────────────────────────────────────────────
-function GoalDetail({ goal, onBack, onOpenProject }) {
-  const projects = goal.projectIds
-    .map(id => {
-      const p = (typeof PROJECT_DATA !== 'undefined' && PROJECT_DATA.find(x => x.id === id)) || null;
-      if (p) return p;
-      // Fallback stub for visa/japanese (not in original PROJECT_DATA)
-      const stubs = {
-        visa:      { id: 'visa',     name: 'Visa paperwork',      blurb: 'HSP track. Passport renewal is the open blocker.',        tint: T.color.TintPeachSoft, glyph: 'alarm', count: 8, done: 6, tracker: [], markdown: [] },
-        japanese:  { id: 'japanese', name: 'Japanese — N4 by landing', blurb: '20 min/day. N5 feels close. N4 is the real target.',     tint: T.color.TintButter,    glyph: 'book',  count: 4, done: 1, tracker: [], markdown: [] },
-      };
-      return stubs[id];
-    })
-    .filter(Boolean);
+function GoalDetail({ goal, onBack, onOpenProject, dbProjects }) {
+  // Resolve projects from (1) the live DB list (preferred), (2) PROJECT_DATA
+  // fixtures, (3) hard-coded stubs for the demo journey. Goals from Supabase
+  // expose projectIds as actual UUIDs; fixture goals use kebab keys like 'visa'.
+  const lookupProject = (id) => {
+    if (Array.isArray(dbProjects)) {
+      const hit = dbProjects.find((x) => x.id === id);
+      if (hit) return hit;
+    }
+    if (typeof PROJECT_DATA !== 'undefined') {
+      const hit = PROJECT_DATA.find((x) => x.id === id);
+      if (hit) return hit;
+    }
+    const stubs = {
+      visa:      { id: 'visa',     name: 'Visa paperwork',      blurb: 'HSP track. Passport renewal is the open blocker.',        tint: T.color.TintPeachSoft, glyph: 'alarm', count: 8, done: 6, tracker: [], markdown: [] },
+      japanese:  { id: 'japanese', name: 'Japanese — N4 by landing', blurb: '20 min/day. N5 feels close. N4 is the real target.',     tint: T.color.TintButter,    glyph: 'book',  count: 4, done: 1, tracker: [], markdown: [] },
+    };
+    return stubs[id] || null;
+  };
+  const projects = (goal.projectIds || []).map(lookupProject).filter(Boolean);
+  const milestones = Array.isArray(goal.milestones) ? goal.milestones : [];
+  const reflections = Array.isArray(goal.reflections) ? goal.reflections : [];
+  const intention = (goal.intention || '').trim();
+  const monthSlice = (goal.month || '').trim();
+  const monthNarr = (goal.monthNarrative || '').trim();
+  const showMonthSection = !!(monthSlice || monthNarr);
 
   return (
     <div style={{ height: '100%', background: T.color.PrimarySurface, display: 'flex', flexDirection: 'column', overflow: 'hidden', }}>
@@ -163,33 +176,47 @@ function GoalDetail({ goal, onBack, onOpenProject }) {
 
       {/* Scroll */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '18px 22px 140px' }}>
-        {/* Intention — the original why */}
-        <Section label="Intention">
-          <p style={readingP}>{goal.intention}</p>
-        </Section>
+        {/* Intention — the original why. Hidden for newly-added goals until the
+            user authors one (placeholder shown so the section is discoverable). */}
+        {intention ? (
+          <Section label="Intention">
+            <p style={readingP}>{intention}</p>
+          </Section>
+        ) : (
+          <Section label="Intention" sub="not written yet">
+            <p style={{ ...readingP, color: T.color.SubtleText, fontStyle: 'italic' }}>Tap the mic to dictate the why behind this goal.</p>
+          </Section>
+        )}
 
         {/* This month — the agent's monthly review narrative */}
-        <Section label="This month" sub="from your monthly review">
-          <div style={{
-            background: T.color.TintSage + '33',
-            border: `1px solid ${T.color.TintSage}88`,
-            borderRadius: 12, padding: '14px 16px',
-          }}>
-            <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: T.color.TintSageDeep, marginBottom: 6 }}>April · focus</div>
-            <div style={{ fontFamily: T.font.Reading, fontSize: 15, lineHeight: '23px', color: T.color.PrimaryText, fontStyle: 'italic', marginBottom: 10 }}>
-              "{goal.month.replace(/^April:\s*/, '')}"
+        {showMonthSection && (
+          <Section label="This month" sub="from your monthly review">
+            <div style={{
+              background: T.color.TintSage + '33',
+              border: `1px solid ${T.color.TintSage}88`,
+              borderRadius: 12, padding: '14px 16px',
+            }}>
+              <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: T.color.TintSageDeep, marginBottom: 6 }}>This month</div>
+              {monthSlice && (
+                <div style={{ fontFamily: T.font.Reading, fontSize: 15, lineHeight: '23px', color: T.color.PrimaryText, fontStyle: 'italic', marginBottom: monthNarr ? 10 : 0 }}>
+                  "{monthSlice.replace(/^[A-Z][a-z]+:\s*/, '')}"
+                </div>
+              )}
+              {monthNarr && (
+                <div style={{ fontFamily: T.font.Reading, fontSize: 14, lineHeight: '22px', color: T.color.SupportingText }}>
+                  {monthNarr}
+                </div>
+              )}
             </div>
-            <div style={{ fontFamily: T.font.Reading, fontSize: 14, lineHeight: '22px', color: T.color.SupportingText }}>
-              {goal.monthNarrative}
-            </div>
-          </div>
-        </Section>
+          </Section>
+        )}
 
-        {/* Milestones — target months, not dates */}
-        <Section label="Milestones" sub="the higher-level beats">
+        {/* Milestones — target months, not dates. Hidden when none authored. */}
+        {milestones.length > 0 && (
+          <Section label="Milestones" sub="the higher-level beats">
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {goal.milestones.map((m, i) => {
-              const isLast = i === goal.milestones.length - 1;
+            {milestones.map((m, i) => {
+              const isLast = i === milestones.length - 1;
               const dotColor = m.status === 'done' ? T.color.TintSageDeep
                              : m.status === 'doing' ? T.color.FocusObject
                              : T.color.SubtleText;
@@ -228,19 +255,26 @@ function GoalDetail({ goal, onBack, onOpenProject }) {
             })}
           </div>
         </Section>
+        )}
 
         {/* Projects under this goal */}
-        <Section label="Projects" sub={`${projects.length} under this goal`}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            {projects.map(p => <ProjectCard key={p.id} p={p} onOpen={() => onOpenProject && onOpenProject(p)} />)}
-          </div>
+        <Section label="Projects" sub={projects.length === 0 ? 'none yet' : `${projects.length} under this goal`}>
+          {projects.length === 0 ? (
+            <div style={{ padding: '12px 14px', borderRadius: 10, background: T.color.SecondarySurface, border: `1px solid ${T.color.EdgeLine}`, fontFamily: T.font.Reading, fontSize: 13, lineHeight: '19px', color: T.color.SubtleText, fontStyle: 'italic' }}>
+              No projects under this goal yet. Add one from Future.
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              {projects.map(p => <ProjectCard key={p.id} p={p} onOpen={() => onOpenProject && onOpenProject(p)} />)}
+            </div>
+          )}
         </Section>
 
         {/* Reflections — pulled journal quotes */}
-        {goal.reflections && goal.reflections.length > 0 && (
+        {reflections.length > 0 && (
           <Section label="Reflections" sub="pulled from your journal">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {goal.reflections.map((r, i) => (
+              {reflections.map((r, i) => (
                 <div key={i} style={{
                   padding: '14px 16px',
                   background: T.color.TintLilac + '2a',
@@ -278,19 +312,25 @@ const readingP = { fontFamily: T.font.Reading, fontSize: 15, lineHeight: '24px',
 // Impact, and a tight one-line Status. Also a proper X close button in
 // the hero.
 function ProjectDetailV2({ p, adds, onBack, onAddProjectTodo, onToggleProjectTodo, onOpenGoal }) {
-  const extras = PROJECT_EXTRAS[p.id] || { goalId: null, intention: null, impact: null, status: null };
-  const goal = extras.goalId && GOAL_DATA.find(g => g.id === extras.goalId);
+  // Defensive across both fixture (PROJECT_DATA) and DB-hydrated project shapes.
+  const extras = (typeof PROJECT_EXTRAS !== 'undefined' && PROJECT_EXTRAS[p.id]) || { goalId: null, intention: null, impact: null, status: null };
+  const goal = extras.goalId && (typeof GOAL_DATA !== 'undefined') && GOAL_DATA.find(g => g.id === extras.goalId);
   const addedTodos = (adds && adds.projectTodos && adds.projectTodos[p.id]) || [];
+  const tracker = Array.isArray(p.tracker) ? p.tracker : [];
+  const markdown = Array.isArray(p.markdown) ? p.markdown : [];
+  const projectName = p.name || p.title || 'Project';
+  const projectGlyph = p.glyph || 'leaf';
+  const projectTint = p.tint || T.color.TintSage;
 
   // Derive a tight status — use the extras.status if present, otherwise fall back to first status-y paragraph from markdown.
   const statusText = extras.status
-    || (p.markdown && p.markdown.find(b => b.kind === 'p' && /^(lease|draft|status|held)/i.test(b.text))?.text)
+    || (markdown.find(b => b.kind === 'p' && /^(lease|draft|status|held)/i.test(b.text))?.text)
     || p.blurb;
 
   return (
     <div style={{ height: '100%', background: T.color.PrimarySurface, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* Cover */}
-      <div style={{ position: 'relative', padding: '14px 18px 20px', background: p.tint, overflow: 'hidden', flexShrink: 0 }}>
+      <div style={{ position: 'relative', padding: '14px 18px 20px', background: projectTint, overflow: 'hidden', flexShrink: 0 }}>
         <div className="intently-grain" style={{ opacity: 0.25 }} />
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
           <button onClick={onBack} aria-label="Back" style={{
@@ -312,7 +352,7 @@ function ProjectDetailV2({ p, adds, onBack, onAddProjectTodo, onToggleProjectTod
         <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-end', gap: 12, marginTop: 18 }}>
           <div style={{ flex: 1 }}>
             <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: T.color.TintMoss, opacity: 0.8 }}>Project</div>
-            <div style={{ fontFamily: T.font.Display, fontSize: 26, lineHeight: '30px', fontStyle: 'italic', fontWeight: 500, color: T.color.TintMoss, letterSpacing: -0.4, marginTop: 2 }}>{p.name}</div>
+            <div style={{ fontFamily: T.font.Display, fontSize: 26, lineHeight: '30px', fontStyle: 'italic', fontWeight: 500, color: T.color.TintMoss, letterSpacing: -0.4, marginTop: 2 }}>{projectName}</div>
             {goal && (
               <button onClick={() => onOpenGoal && onOpenGoal(goal)} style={{
                 marginTop: 10,
@@ -329,7 +369,7 @@ function ProjectDetailV2({ p, adds, onBack, onAddProjectTodo, onToggleProjectTod
             )}
           </div>
           <span style={{ width: 48, height: 48, borderRadius: 12, background: 'rgba(43,33,24,0.12)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <Glyph name={p.glyph} size={26} color={T.color.TintMoss} stroke={1.75} />
+            <Glyph name={projectGlyph} size={26} color={T.color.TintMoss} stroke={1.75} />
           </span>
         </div>
       </div>
@@ -360,9 +400,9 @@ function ProjectDetailV2({ p, adds, onBack, onAddProjectTodo, onToggleProjectTod
         )}
 
         {/* Tracker */}
-        <Section label="Tracker">
+        <Section label="Tracker" sub={tracker.length === 0 && addedTodos.length === 0 ? 'add a todo to start tracking' : undefined}>
           <div style={{ background: T.color.SecondarySurface, border: `1px solid ${T.color.EdgeLine}`, borderRadius: 12, overflow: 'hidden' }}>
-            {p.tracker.map((r, i) => {
+            {tracker.map((r, i) => {
               const dot = { done: T.color.TintSageDeep, doing: T.color.TintDusk, todo: T.color.SubtleText }[r.status];
               return (
                 <div key={i} style={{
@@ -538,12 +578,39 @@ function BriefFlow({ onClose, onComplete }) {
   const showConfirm = s && s.confirm && !agentTyping && liveBriefReady;
   const showBriefThinking = s && s.confirm && !agentTyping && briefLoading;
 
-  const submit = (text) => {
+  // Per-turn ack — mirror of the ReviewFlow pattern. Lets the morning brief
+  // agent react to what the user actually said before queuing the next
+  // scripted prompt. ~3-6s latency is hidden behind the agent-typing dots.
+  const ackUserTurn = React.useCallback(async (userText) => {
+    if (!window.callMaProxy) return;
+    setAgentTyping(true);
+    try {
+      const ackInput = [
+        "You are partway through the user's morning brief. They just answered the previous prompt.",
+        `User said: "${userText}"`,
+        "",
+        "Reply with ONE short sentence (max 18 words) that shows you actually heard them — reflect a specific word or beat from what they said. Do NOT summarize, do NOT give advice, do NOT propose a plan, do NOT ask the next brief question (that's pre-scripted and will follow). If their answer was off-topic / a test / a meta comment, gently acknowledge that and invite them to say more.",
+        "Do not emit a JSON tail.",
+      ].join('\n');
+      const r = await window.callMaProxy({ skill: 'daily-brief', input: ackInput });
+      let reply = (r && r.finalText) || '';
+      reply = reply.replace(/```json[\s\S]*?```\s*$/, '').trim();
+      if (reply) setMessages(m => [...m, { role: 'agent', text: reply }]);
+    } catch (e) { /* fail silently */ }
+    setAgentTyping(false);
+  }, []);
+
+  const submit = async (text) => {
     const t = (text && text.trim()) || (s.userDefault || '');
     if (!t) return;
     setMessages(m => [...m, { role: 'user', text: t }]);
     setDraft('');
-    setTimeout(() => setStep(step + 1), 260);
+    const nextStep = step + 1;
+    const nextS = BRIEF_SCRIPT[nextStep];
+    if (nextS && !nextS.confirm) {
+      await ackUserTurn(t);
+    }
+    setStep(nextStep);
   };
 
   return (
@@ -575,11 +642,14 @@ function BriefFlow({ onClose, onComplete }) {
           {agentTyping && <AgentTyping />}
           {/* Live daily-brief from ma-proxy — appears before the confirm card */}
           {showBriefThinking && <AgentTyping />}
-          {liveBrief && <ChatBubble role="agent" text={liveBrief} />}
+          {liveBrief && <ChatBubble role="agent" text={(parseAgentPlan(liveBrief, MOCK_PLAN).proseBody) || liveBrief} />}
           {briefError && <ChatBubble role="agent" text="(I couldn't reach the brief generator just now — here's your day shape anyway.)" />}
           {showConfirm && <BriefConfirmCard plan={parseAgentPlan(liveBrief, MOCK_PLAN)} consulted={consulted} onAccept={async () => {
-            // Persist the brief response as entries.kind='brief' + fire undo toast.
+            // Persist the brief response as entries.kind='brief' AND insert one
+            // plan_items row per band item so the populated plan survives a
+            // refresh. Undo rolls back both the entry and the plan_items rows.
             let insertedId = null;
+            const insertedPlanIds = [];
             if (liveBrief && window.getSupabaseClient && window.getCurrentUserId) {
               try {
                 const sb = window.getSupabaseClient();
@@ -591,13 +661,36 @@ function BriefFlow({ onClose, onComplete }) {
                 if (data) insertedId = data.id;
               } catch (e) { console.warn('[brief] persist failed:', e && e.message); }
             }
+            // Plan items: one row per agent-suggested band item. We don't
+            // dedupe against existing today rows — the brief is the
+            // authoritative shape of "today's intent" at accept time.
+            try {
+              const parsed = parseAgentPlan(liveBrief, MOCK_PLAN);
+              if (parsed && Array.isArray(parsed.bands) && window.insertPlanItem) {
+                const today = new Date().toISOString().slice(0, 10);
+                for (const band of parsed.bands) {
+                  const bandKey = String(band.when || '').toLowerCase();
+                  if (!['morning', 'afternoon', 'evening'].includes(bandKey)) continue;
+                  for (const it of (band.items || [])) {
+                    if (!it || !it.t) continue;
+                    try {
+                      const row = await window.insertPlanItem(today, bandKey, it.t, it.tier || null, it.duration_min || null);
+                      if (row && row.id) insertedPlanIds.push(row.id);
+                    } catch (e) { console.warn('[brief] plan_item insert failed:', e && e.message); }
+                  }
+                }
+              }
+            } catch (e) { console.warn('[brief] parse-for-plan failed:', e && e.message); }
             if (insertedId && window.showUndoToast) {
               window.showUndoToast({
-                message: "Saved today's brief",
+                message: `Saved today's brief${insertedPlanIds.length ? ` + ${insertedPlanIds.length} plan items` : ''}`,
                 onUndo: async () => {
                   const sb = window.getSupabaseClient();
                   const userId = await window.getCurrentUserId();
                   await sb.from('entries').delete().eq('id', insertedId).eq('user_id', userId);
+                  if (insertedPlanIds.length) {
+                    await sb.from('plan_items').delete().in('id', insertedPlanIds).eq('user_id', userId);
+                  }
                 },
               });
             }
@@ -756,6 +849,8 @@ function parseAgentPlan(prose, fallback) {
           items: (b.items || []).map((it) => ({
             g: glyphForTier(it.tier),
             t: it.text || '',
+            tier: it.tier || null,
+            duration_min: it.duration_min || null,
           })),
         }));
       }
@@ -1043,12 +1138,43 @@ function ReviewFlow({ onClose, onComplete }) {
   const showConfirm = s && s.confirm && !agentTyping && liveReviewReady;
   const showReviewThinking = s && s.confirm && !agentTyping && reviewLoading;
 
-  const submit = (text) => {
+  // Per-turn acknowledgement: the agent responds to what the user just said
+  // before the script advances to the next prompt. Without this beat the flow
+  // feels like a form (collect answer → next question) instead of a
+  // conversation (hear answer → react → ask next thing). Latency cost is real
+  // (~3-6s) — the agent-typing indicator covers it.
+  const ackUserTurn = React.useCallback(async (userText) => {
+    if (!window.callMaProxy) return;
+    setAgentTyping(true);
+    try {
+      const ackInput = [
+        "You are partway through the user's daily review. They just answered the previous prompt.",
+        `User said: "${userText}"`,
+        "",
+        "Reply with ONE short sentence (max 18 words) that shows you actually heard them — reflect a specific word or beat from what they said. Do NOT summarize, do NOT give advice, do NOT ask the next review question (that's pre-scripted and will follow). If their answer was off-topic / a test / a meta comment, gently acknowledge that and invite them to say more.",
+        "Do not emit a JSON tail.",
+      ].join('\n');
+      const r = await window.callMaProxy({ skill: 'daily-review', input: ackInput });
+      let reply = (r && r.finalText) || '';
+      reply = reply.replace(/```json[\s\S]*?```\s*$/, '').trim();
+      if (reply) setMessages(m => [...m, { role: 'agent', text: reply }]);
+    } catch (e) { /* fail silently — keep the flow moving */ }
+    setAgentTyping(false);
+  }, []);
+
+  const submit = async (text) => {
     const t = (text && text.trim()) || (s.userDefault || '');
     if (!t) return;
     setMessages(m => [...m, { role: 'user', text: t }]);
     setDraft('');
-    setTimeout(() => setStep(step + 1), 260);
+    // Per-turn LLM ack BEFORE advancing the script. We don't ack the final
+    // confirm step — the review summary card itself is the agent's response.
+    const nextStep = step + 1;
+    const nextS = REVIEW_SCRIPT[nextStep];
+    if (nextS && !nextS.confirm) {
+      await ackUserTurn(t);
+    }
+    setStep(nextStep);
   };
 
   return (
@@ -1084,7 +1210,7 @@ function ReviewFlow({ onClose, onComplete }) {
           {agentTyping && <AgentTypingDark />}
           {/* Live daily-review from ma-proxy — appears before the confirm card */}
           {showReviewThinking && <AgentTypingDark />}
-          {liveReview && <ChatBubbleDark role="agent" text={liveReview} />}
+          {liveReview && <ChatBubbleDark role="agent" text={(window.parseAgentReview && window.parseAgentReview(liveReview) && window.parseAgentReview(liveReview).proseBody) || liveReview} />}
           {reviewError && <ChatBubbleDark role="agent" text="(I couldn't reach the review generator just now — saving what you said anyway.)" />}
           {showConfirm && (() => {
             const parsed = liveReview ? (window.parseAgentReview && window.parseAgentReview(liveReview)) : null;
@@ -1254,9 +1380,27 @@ function AutoCheckList({ items, checkedIndex }) {
 }
 
 function ReviewConfirmCard({ parsed, onAccept, consulted = [] }) {
-  const journal  = (parsed && parsed.journal)  || 'The dry run actually went well. I walked in present.';
-  const friction = (parsed && parsed.friction) || 'Over-polishing the data slide — twice this week.';
-  const tomorrow = (parsed && parsed.tomorrow) || 'Write the job pitch before opening Slack.';
+  // Normalize across two shapes:
+  //   - JSON-tail (current): { journalText, friction:[{text,tag}], tomorrow:[{text,tier}], calendar:[{text}] }
+  //   - Prose-only fallback: { journal, friction, tomorrow } as strings
+  const _toText = (v) => {
+    if (!v) return '';
+    if (typeof v === 'string') return v;
+    if (Array.isArray(v)) {
+      return v.map((it) => (typeof it === 'string' ? it : (it && it.text) || '')).filter(Boolean).join(' • ');
+    }
+    return '';
+  };
+  const journal  = (parsed && (parsed.journalText || parsed.journal)) || 'The dry run actually went well. I walked in present.';
+  const friction = _toText(parsed && parsed.friction) || 'Over-polishing the data slide — twice this week.';
+  const tomorrow = _toText(parsed && parsed.tomorrow) || 'Write the job pitch before opening Slack.';
+  const calendarItems = (parsed && Array.isArray(parsed.calendar) && parsed.calendar.length > 0)
+    ? parsed.calendar.map((c) => ({ t: c.time || '', body: (typeof c === 'string' ? c : c.text) || '' })).filter(c => c.body)
+    : [
+        { t: '9:30 AM', body: 'Anya — pitch follow-up' },
+        { t: '12:00 PM', body: 'Lunch w/ Jordan (finally)' },
+        { t: '4:00 PM', body: 'Hackathon retro' },
+      ];
   return (
     <div style={{ marginTop: 4 }}>
       <div style={{
@@ -1313,11 +1457,7 @@ function ReviewConfirmCard({ parsed, onAccept, consulted = [] }) {
             marginBottom: 6,
           }}>What's on the calendar</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {[
-              { t: '9:30 AM', body: 'Anya — pitch follow-up' },
-              { t: '12:00 PM', body: 'Lunch w/ Jordan (finally)' },
-              { t: '4:00 PM', body: 'Hackathon retro' },
-            ].map((e, i) => (
+            {calendarItems.map((e, i) => (
               <div key={i} style={{
                 display: 'flex', gap: 10, alignItems: 'baseline',
                 fontFamily: T.font.Reading, fontSize: 13, lineHeight: '18px',
@@ -1591,12 +1731,37 @@ function WeeklyReviewFlow({ onClose, onComplete }) {
   const showConfirm = s && s.confirm && !agentTyping && liveReviewReady;
   const showThinking = s && s.confirm && !agentTyping && reviewLoading;
 
-  const submit = (text) => {
+  // Per-turn ack — same pattern as ReviewFlow / BriefFlow.
+  const ackUserTurn = React.useCallback(async (userText) => {
+    if (!window.callMaProxy) return;
+    setAgentTyping(true);
+    try {
+      const ackInput = [
+        "You are partway through the user's weekly review. They just answered the previous prompt.",
+        `User said: "${userText}"`,
+        "",
+        "Reply with ONE short sentence (max 18 words) that shows you actually heard them — reflect a specific word or beat from what they said. Do NOT summarize the week, do NOT give advice, do NOT ask the next weekly question (that's pre-scripted and will follow). If their answer was off-topic / a test / a meta comment, gently acknowledge that and invite them to say more.",
+        "Do not emit a JSON tail.",
+      ].join('\n');
+      const r = await window.callMaProxy({ skill: 'weekly-review', input: ackInput });
+      let reply = (r && r.finalText) || '';
+      reply = reply.replace(/```json[\s\S]*?```\s*$/, '').trim();
+      if (reply) setMessages(m => [...m, { role: 'agent', text: reply }]);
+    } catch (e) { /* fail silently */ }
+    setAgentTyping(false);
+  }, []);
+
+  const submit = async (text) => {
     const t = (text && text.trim()) || (s.userDefault || '');
     if (!t) return;
     setMessages(m => [...m, { role: 'user', text: t }]);
     setDraft('');
-    setTimeout(() => setStep(step + 1), 260);
+    const nextStep = step + 1;
+    const nextS = WEEKLY_REVIEW_SCRIPT[nextStep];
+    if (nextS && !nextS.confirm) {
+      await ackUserTurn(t);
+    }
+    setStep(nextStep);
   };
 
   // Persist weekly review entry on accept. Insert into `entries` with
@@ -1663,7 +1828,7 @@ function WeeklyReviewFlow({ onClose, onComplete }) {
           {messages.map((m, i) => <ChatBubbleDark key={i} role={m.role} text={m.text} sub={m.sub} />)}
           {agentTyping && <AgentTypingDark />}
           {showThinking && <AgentTypingDark />}
-          {liveReview && <ChatBubbleDark role="agent" text={liveReview} />}
+          {liveReview && <ChatBubbleDark role="agent" text={(window.parseAgentWeeklyReview && window.parseAgentWeeklyReview(liveReview) && window.parseAgentWeeklyReview(liveReview).proseBody) || liveReview} />}
           {reviewError && <ChatBubbleDark role="agent" text="(I couldn't reach the weekly-review generator just now — saving what you said anyway.)" />}
           {showConfirm && (() => {
             const parsed = liveReview && window.parseAgentWeeklyReview

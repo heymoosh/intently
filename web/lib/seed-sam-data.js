@@ -140,6 +140,53 @@ const SAM_YESTERDAY_REVIEW = {
   },
 };
 
+// Today's daily brief — entries kind='brief' at ~7am today. Body carries the
+// agent prose plus a JSON tail per the daily-brief Output contract so the
+// Past→Day view AND any context assembler reading recent briefs see real data.
+const SAM_TODAY_BRIEF = {
+  hour: 7,
+  body_markdown: 'Morning, Sam. Yesterday closed clean — /next-tracks landed and you held the AM block. Today is hackathon day 4: seed data is the AM block, single focus, no Slack until 11. Friday\'s strength session is still open — make a call this weekend so the sprint doesn\'t drop the 3x habit.\n\nPacing: balanced. The seed data PR is the unlock for tomorrow\'s wiring.',
+  glyph: 'sun',
+  mood: 'morning',
+  json_tail: {
+    pacing: 'balanced',
+    flags: [{ kind: 'time-sensitive', text: 'Hackathon submission deadline today 8pm EDT' }],
+    bands: [
+      { when: 'morning',   items: [{ tier: 'P1', text: 'Seed data files (all 13) — single focus, no Slack', duration_min: 180 }] },
+      { when: 'afternoon', items: [
+        { tier: 'P2', text: 'Wire agent runner to Supabase', duration_min: 90 },
+        { tier: 'P2', text: 'Apply tokens to daily-brief + daily-review', duration_min: 60 },
+      ]},
+      { when: 'evening',   items: [{ tier: 'P3', text: 'Verify daily-brief reads right files', duration_min: 30 }] },
+    ],
+    parked: [{ text: 'Rewrite landing page copy', reason: 'rabbit hole user named' }],
+    today_one_line: 'Ship the seed data PR; protect the AM block.',
+    carrying_into_tomorrow: 'Friday strength session — make a call this weekend.',
+  },
+};
+
+// Last week's review (Sunday-evening summary). Drives Past→Week's outcomes
+// list AND seeds Present morning's "This week" bullets via the assembler.
+// links.scope='week' is the convention the assembler filters on.
+const SAM_WEEKLY_REVIEW = {
+  body_markdown: 'Week 17 (Apr 13-19): the focus was on /next-tracks dispatcher and seed data prep. Both moved. The dispatcher merged Wednesday — bigger unlock than expected. Seed data is fully scoped now, ready to write.\n\nPattern: AM blocks held when single-focus; afternoons drifted when I tried to mix spec writing and code. Carry into next week: write seed data first thing each morning, code in the afternoons.\n\nOutcomes for next week: ship V1 seed-data PR, wire agent runner to Supabase, hold 3x strength sessions despite hackathon crunch.',
+  glyph: 'moon',
+  mood: 'night',
+  json_tail: {
+    summary: 'Dispatcher landed; seed data scoped. Mix-mode afternoons cost an hour twice.',
+    outcomes: [
+      { text: 'Ship V1 seed-data PR', status: 'doing' },
+      { text: 'Wire agent runner to Supabase (markdown_files reads)', status: 'todo' },
+      { text: 'Hold 3x strength sessions through hackathon week', status: 'doing' },
+    ],
+    key_moments: [
+      { glyph: 'rocket', text: '/next-tracks dispatcher merged' },
+      { glyph: 'pen', text: 'Seed data scope locked' },
+    ],
+    next_week_directions: [{ text: 'Single-focus AM blocks; spec/code never in the same session.' }],
+  },
+};
+
 // This week's plan items (Thursday — today). Each row mapped to morning/afternoon/evening band.
 // From seed/Daily Log.md Thursday entry.
 const SAM_TODAY_PLAN = [
@@ -174,6 +221,8 @@ Object.assign(window, {
   SAM_PROJECTS,
   SAM_JOURNAL,
   SAM_YESTERDAY_REVIEW,
+  SAM_TODAY_BRIEF,
+  SAM_WEEKLY_REVIEW,
   SAM_TODAY_PLAN,
   SAM_REMINDERS,
   SAM_CALENDAR_TODAY,

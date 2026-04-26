@@ -22,10 +22,11 @@
 
 ## Status
 
-**Phase:** Post-hackathon — re-targeted at the **real working app** bar (per `launch-plan.md` rewrite). Hackathon "1 flow done well" is historical; current bar = every interactive element wired or explicitly deferred, every visible state has model + binding + reuse story, anon-first onboarding for real users with `linkIdentity()` upgrade, Sam embedded as the landing-page demo.
-**Last:** Capture session 2026-04-25 evening — 6 new handoffs + 13 inbox items groomed; launch-plan rewritten; new-user-ux-and-auth handoff folded in identity-component + reading-mode amendments.
-**Next:** § Next queue below — top is Bug 3 (chat reminders → wrong user_id; silent data loss).
-**Last updated:** 2026-04-25 (post-capture groom).
+**Phase:** Post-hackathon + post-functional-quality-pass — re-targeted at the **real working app** bar (per `launch-plan.md` rewrite). Hackathon "1 flow done well" framing is historical; current bar = every interactive element wired or explicitly deferred, every visible state has model + binding + reuse story, anon-first onboarding for real users with `linkIdentity()` upgrade, Sam embedded as the landing-page demo.
+**Status:** 🟢 live. PR #157 just shipped a 20-story Playwright-walk functional-quality pass (11 bugs caught + fixed — see Log 2026-04-25). PR #158 (chat-reminder JWT passthrough + UTC fix) and PR #159 (build-watchdog ESLint teeth) opened as the post-groom execution wave.
+**Last:** Capture + groom session 2026-04-25 evening — 6 new handoffs + 13 inbox items groomed; launch-plan rewritten; new-user-ux-and-auth handoff folded in identity-component + reading-mode amendments. PR #157 merged on main during the session.
+**Next:** § Next queue below — top is Bug 3 (chat reminders → wrong user_id, silent data loss), which PR #158 fixes pending Edge Function deploy.
+**Last updated:** 2026-04-25 (post-capture groom, post PR #157 merge).
 
 ## Active handoffs
 
@@ -56,6 +57,7 @@ Top of queue — `/work-next` picks from the top. Items 1+2 are paired (run as p
 5. **Hero press-pattern redesign.** Long-press opens the menu sticky-style; tap-to-select instead of release-to-select. AC: `docs/product/acceptance-criteria/hero-press-pattern.md`.
 6. **Update-tracker UI wiring (option 1 — re-prompt to Supabase, locked 2026-04-25).** Rewrite agent prompt for Supabase reads/writes; wire at least one UI surface; eval cases. AC: appended in `docs/product/acceptance-criteria/update-tracker.md` (CR-update-tracker-supabase-wiring-01..).
 7. **Babysit-prs known issues.** Diagnose what 1900 flagged; fix or remove the loop. AC: `docs/product/acceptance-criteria/babysit-prs-diagnosis.md`.
+8. **Build dedicated `chat` MA skill agent.** HeroChat + per-turn flow acks currently piggyback on `daily-brief` (PR #157 swapped canned replies for live LLM via daily-brief). Purpose-built chat agent: own system prompt, no planning-pull. Spec: `agents/chat/SKILL.md` + `ma-agent-config.json` + add `chat` to SKILL_ENV in `supabase/functions/ma-proxy/index.ts` + provision via `scripts/provision-ma-agents.ts` + set `MA_AGENT_ID_CHAT` secret. AC at `docs/product/acceptance-criteria/chat.md` to be authored when this item starts (per matrix: touches MA skill → per-skill AC file).
 
 ## Critical items (post-launch reconciliation)
 
@@ -77,10 +79,15 @@ Top of queue — `/work-next` picks from the top. Items 1+2 are paired (run as p
 - **(Optional)** Re-provision live `weekly-review` agent with Output contract durably in system prompt: `cd app && bws run -- npx tsx ../scripts/provision-ma-agents.ts --skill weekly-review --update-existing`.
 - **Apply pg_cron migration** (`supabase/migrations/0002_schedules.sql`) — covered by `scheduled-agent-dispatch` handoff but the manual `supabase db push` is user-only.
 - **Stewards leave working-tree mods uncommitted.** Auto-commit to `auto/steward/*` branches + draft PR.
-- **Post-first-live-run baseline floor.** Run daily-brief against `evals/datasets/daily-brief/cases.json` once, raise per-axis `minScores`. Folded into `cognition-verification-harness` AC.
+- **Post-first-live-run baseline floor.** Folded into `cognition-verification-harness` AC.
 - **Wire `decision-drift-check` to launchd.** Add `com.intently.decision-drift.plist` matching the existing pack, daily evening.
 - **Stale `session-handoff.md` reference sweep.** Doc-only. Stale pointers in `docs/Claude Code Repo-Ready Blueprint.md`, `docs/design/claude-code-implementation.md`, `docs/process/acceptance-criteria.md`, `docs/process/session-prompt-seed-data-v1.md`.
 - **Post-merge hook refusing commits on `main`** — prevent recurrence of accidental direct-to-main commits.
+
+PR #157 added three follow-ups that have been folded into handoffs/§ Next instead of duplicating here:
+- *Build dedicated `chat` skill agent* → § Next #8 (with full spec preserved there).
+- *Author rich `SAM_GOALS` content (intention prose, milestones, reflections)* → folded into `sam-demo-on-landing-page` handoff Sam-data-completeness AC.
+- *Stand up Playwright regression suite* → folded into `cognition-verification-harness` handoff (Playwright walk is the cheaper pre-cursor; the harness is the fuller fresh-user + time-travel approach).
 - **Fix `--clean` squash-merge false-positive** in `scripts/intently-track.sh`. Replace `git cherry` with `git diff --quiet main HEAD`.
 
 ## Lost files (user-only decision)
@@ -111,10 +118,11 @@ Read in order: `launch-plan.md`, this file, `CLAUDE.md`. If Critical items has e
 
 ## Log
 
-- **2026-04-25 evening — capture + groom session.** Distilled post-hackathon roadmap into 6 new handoffs (`wiring-audit`, `cognition-verification-harness`, `new-user-ux-and-auth`, `sam-demo-on-landing-page`, `oauth-calendar-email`, `scheduled-agent-dispatch`) and 13 inbox items, then groomed all 13 to TRACKER. `agent-noticing-layer` promoted from V1.1-deferred to active. `launch-plan.md` rewritten to "real working app" bar. Inbox drained. § Next ordered with chat-reminder Bug 3 (silent data loss) at top. PR #157 (review-crash + JSON-tail-leak fix) merged on main during the session.
-- **2026-04-26 — cognition layer + real-app shell.** 13 PRs (#136–#152). Closed 11-item cognition backlog + 9-item real-app shell. Live deployed prototype now satisfies the original UX vision end-to-end.
-- **2026-04-25 evening — web/ live-wiring sprint.** 5 PRs (#111–#115) wired voice + brief/review.
-- **2026-04-25 — MA agents complete + editing-workflow revision.** All 6 agents provisioned.
-- **2026-04-24 — web pivot + live MA end-to-end.** 12 PRs.
-- **2026-04-23 — parallel-tracks workflow + infra.** ~27 PRs.
+- **2026-04-25 evening — capture + groom session.** Distilled post-hackathon roadmap into 6 new handoffs (`wiring-audit`, `cognition-verification-harness`, `new-user-ux-and-auth`, `sam-demo-on-landing-page`, `oauth-calendar-email`, `scheduled-agent-dispatch`) and 13 inbox items, then groomed all 13 to TRACKER. `agent-noticing-layer` promoted from V1.1-deferred to active. `launch-plan.md` rewritten to "real working app" bar. Inbox drained. § Next ordered with chat-reminder Bug 3 (silent data loss) at top. PR #158 (chat-reminders JWT/timezone fix) and PR #159 (build-watchdog ESLint teeth) opened as the parallel sub-agent execution wave.
+- **2026-04-25 — functional-quality pass (PR #157, 7 commits).** (1) review-confirm crash fix (objects-as-React-children when agent emits structured `friction:[{text,tag}]`) + JSON-tail leak in chat bubbles; (2) brief plan now persists to `plan_items` on accept + adds SAM_TODAY_BRIEF + SAM_WEEKLY_REVIEW seeds for cross-day cognition on first load; (3) goals capped to top 3 by max(projects.updated_at) + dedupe Just-added vs DB-hydrated + expand toggle; (4) tense step-arrows lifted out of phone frame to `.tense-nav-outside` slot; (5) Weekly review CTA gated on configurable Profile pref (Sunday default) + dropped Weekly summary email toggle; (6) DB-aware GoalDetail/ProjectDetail + JSONB-todo toggle persistence (`toggleProjectTodo`, `markAdminReminderDone`); (7) per-turn LLM ack across BriefFlow/ReviewFlow/WeeklyReviewFlow + HeroChat routes non-reminder text to live LLM (was canned). Method: empirical 20-story Playwright walk on production caught bugs prior smoke missed.
+- **2026-04-26 — cognition layer + real-app shell.** 13 PRs (#136–#152). Closed the 11-item cognition backlog from `.claude/handoffs/real-app-cognition.md` plus the 9-item real-app shell backlog. Live deployed prototype now satisfies the original UX vision end-to-end (voice/brief/review/weekly/monthly/setup/persistence/hydration/traces/undo, all with cross-day cognition).
+- **2026-04-25 evening — web/ live-wiring sprint.** 5 PRs (#111–#115) wired voice + brief/review against the inherited prototype.
+- **2026-04-25 — MA agents complete + editing-workflow revision.** All 6 agents provisioned. Anthropic key consolidated/rotated twice.
+- **2026-04-24 — web pivot + live MA end-to-end.** 12 PRs. Expo Web → Vercel deploy → first live Opus 4.7 brief.
+- **2026-04-23 — parallel-tracks workflow + infra.** ~27 PRs. Agent-runner base, evals, design tokens, seed data.
 - **2026-04-22 — Supabase schema + Expo scaffold + ADRs 0001/0002/0003.**
