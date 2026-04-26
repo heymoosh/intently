@@ -2135,9 +2135,12 @@ const SETUP_BTN_GHOST = {
 // ─── SetupFlow ────────────────────────────────────────────────────────────────
 
 function SetupFlow({ onClose, onComplete }) {
-  // Steps: intro | goals_input | drafting | goals_review | projects | outcome | prefs | journal_prompt | saving | error
+  // Steps: intro | resume_prompt | goals_input | drafting | goals_review | projects | outcome | prefs | journal_prompt | saving | error
   const [step, setStep] = React.useState('intro');
   const [errorMsg, setErrorMsg] = React.useState('');
+
+  // Draft resume state
+  const [resumeDraft, setResumeDraft] = React.useState(null); // raw draft from DB, set while on resume_prompt
 
   // Phase 1 — goals
   const [goalDrafts, setGoalDrafts] = React.useState(['', '', '']);
@@ -2162,6 +2165,76 @@ function SetupFlow({ onClose, onComplete }) {
   // Phase 5 — journal seed
   const [journalText, setJournalText] = React.useState('');
 
+  // ── On mount: check for an existing setup draft ───────────────────────────
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const draft = await window.getSetupDraft();
+        if (cancelled) return;
+        if (draft && draft.phase >= 1) {
+          setResumeDraft(draft);
+          setStep('resume_prompt');
+        }
+      } catch (_) {
+        // If the check fails, just start normally — don't block setup.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // ── Resume draft into state ───────────────────────────────────────────────
+
+  const loadDraftIntoState = (draft) => {
+    if (!draft) return;
+    // Restore goals (raw drafts and enriched if present)
+    if (Array.isArray(draft.goals) && draft.goals.length > 0) {
+      const titles = draft.goals.map((g) => (typeof g === 'string' ? g : g.title) || '');
+      setGoalDrafts(titles.length >= 3 ? titles : [...titles, ...Array(3 - titles.length).fill('')]);
+      // Enriched goals (post-agent review)
+      if (Array.isArray(draft.enriched) && draft.enriched.length > 0) {
+        setEnriched(draft.enriched);
+        if (draft.enriched[0] && draft.enriched[0].title) {
+          setPrefs((p) => ({ ...p, focus_area: draft.enriched[0].title }));
+        }
+      }
+    }
+    // Restore projects
+    if (Array.isArray(draft.projects) && draft.projects.length > 0) {
+      setProjects(draft.projects);
+    }
+    // Restore week outcome
+    if (draft.outcome) setWeekOutcome(draft.outcome);
+    // Restore preferences
+    if (draft.preferences && typeof draft.preferences === 'object') {
+      setPrefs((p) => ({ ...p, ...draft.preferences }));
+    }
+  };
+
+  // ── Resume: advance to the correct next step based on last completed phase ─
+
+  const stepForPhase = (phase) => {
+    if (phase >= 4) return 'journal_prompt';
+    if (phase >= 3) return 'prefs';
+    if (phase >= 2) return 'outcome';
+    if (phase >= 1) return 'projects';
+    return 'goals_input';
+  };
+
+  const handleResume = () => {
+    if (!resumeDraft) return;
+    loadDraftIntoState(resumeDraft);
+    setStep(stepForPhase(resumeDraft.phase));
+    setResumeDraft(null);
+  };
+
+  const handleStartOver = async () => {
+    try { await window.clearSetupDraft(); } catch (_) { /* best-effort */ }
+    setResumeDraft(null);
+    setStep('goals_input');
+  };
+
   // ── helpers ──────────────────────────────────────────────────────────────
 
   const updateGoal = (i, v) => setGoalDrafts((g) => g.map((x, j) => j === i ? v : x));
@@ -2183,25 +2256,50 @@ function SetupFlow({ onClose, onComplete }) {
       const r = await window.callMaProxy({ skill: 'setup', input: ctx.input });
       const text = (r && r.finalText) || '';
       const parsed = window.parseSetupResponse(text);
+      let enrichedGoals;
       if (!parsed || !parsed.slices || parsed.slices.length === 0) {
-        setEnriched(titles.map((t) => ({ title: t, monthly_slice: '', glyph: 'leaf' })));
+        enrichedGoals = titles.map((t) => ({ title: t, monthly_slice: '', glyph: 'leaf' }));
       } else {
-        setEnriched(titles.map((t, i) => {
+        enrichedGoals = titles.map((t, i) => {
           const match = parsed.slices.find((s) => s.goal_index === i) || parsed.slices[i];
           return {
             title: t,
             monthly_slice: (match && match.monthly_slice) || '',
             glyph: (match && match.glyph) || 'leaf',
           };
-        }));
+        });
       }
+      setEnriched(enrichedGoals);
       // Pre-fill focus_area from first goal title
       if (titles[0]) setPrefs((p) => ({ ...p, focus_area: titles[0] }));
+      // Persist Phase 1 draft (best-effort — don't block on failure).
+      try {
+        await window.saveSetupDraftPhase({ phase: 1, data: { goals: titles, enriched: enrichedGoals } });
+      } catch (_) { /* non-blocking */ }
       setStep('goals_review');
     } catch (e) {
       setErrorMsg((e && e.message) || 'setup agent call failed');
       setStep('error');
     }
+  };
+
+  // ── Phase 2: advance to outcome + save draft ─────────────────────────────
+
+  const advanceToOutcome = async () => {
+    const activeProjects = projects.filter((p) => p.title && p.title.trim());
+    try {
+      await window.saveSetupDraftPhase({ phase: 2, data: { projects: activeProjects.length > 0 ? projects : [] } });
+    } catch (_) { /* non-blocking */ }
+    setStep('outcome');
+  };
+
+  // ── Phase 3: advance to prefs + save draft ───────────────────────────────
+
+  const advanceToPrefs = async () => {
+    try {
+      await window.saveSetupDraftPhase({ phase: 3, data: { outcome: weekOutcome.trim() } });
+    } catch (_) { /* non-blocking */ }
+    setStep('prefs');
   };
 
   // ── Final persist ─────────────────────────────────────────────────────────
@@ -2263,6 +2361,9 @@ function SetupFlow({ onClose, onComplete }) {
         await window.insertJournalEntry(journalText.trim());
       }
 
+      // Clear the setup draft now that we've fully committed.
+      try { await window.clearSetupDraft(); } catch (_) { /* non-blocking */ }
+
       if (window.showUndoToast) {
         window.showUndoToast({ message: `Set up ${enriched.length} goal${enriched.length !== 1 ? 's' : ''} — fresh start` });
       }
@@ -2275,7 +2376,13 @@ function SetupFlow({ onClose, onComplete }) {
 
   // ── Phase 4 confirm → Phase 5 ─────────────────────────────────────────────
 
-  const confirmPrefs = () => setStep('journal_prompt');
+  const confirmPrefs = async () => {
+    // Save Phase 4 draft in case user refreshes on the journal step.
+    try {
+      await window.saveSetupDraftPhase({ phase: 4, data: { preferences: prefs } });
+    } catch (_) { /* non-blocking */ }
+    setStep('journal_prompt');
+  };
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -2316,6 +2423,43 @@ function SetupFlow({ onClose, onComplete }) {
               This wipes any sample data and replaces it with yours. Daily brief tomorrow morning will be from your goals.
             </div>
             <button onClick={() => setStep('goals_input')} style={{ ...SETUP_BTN_PRIMARY }}>Start</button>
+          </div>
+        )}
+
+        {/* ── Step: resume_prompt ── */}
+        {step === 'resume_prompt' && resumeDraft && (
+          <div>
+            <div style={{ ...SETUP_SECTION_HEADING, marginBottom: 10 }}>
+              Welcome back.
+            </div>
+            <div style={{
+              background: 'rgba(255,255,255,0.6)',
+              border: `1px solid ${T.color.EdgeLine}`,
+              borderRadius: 14,
+              padding: '16px 18px',
+              marginBottom: 20,
+              fontFamily: T.font.Reading,
+              fontSize: 15,
+              lineHeight: '22px',
+              color: T.color.SupportingText,
+            }}>
+              You started setup{resumeDraft.started_at ? (() => {
+                const diffMs = Date.now() - new Date(resumeDraft.started_at).getTime();
+                const diffH = Math.round(diffMs / (1000 * 60 * 60));
+                const diffM = Math.round(diffMs / (1000 * 60));
+                if (diffH >= 1) return ` ${diffH} hour${diffH !== 1 ? 's' : ''} ago`;
+                if (diffM >= 1) return ` ${diffM} minute${diffM !== 1 ? 's' : ''} ago`;
+                return ' just now';
+              })() : ''}. Continue from <strong>Phase {resumeDraft.phase + 1}</strong>?
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <button onClick={handleResume} style={{ ...SETUP_BTN_PRIMARY }}>
+                Continue from Phase {resumeDraft.phase + 1} →
+              </button>
+              <button onClick={handleStartOver} style={{ ...SETUP_BTN_GHOST }}>
+                Start over
+              </button>
+            </div>
           </div>
         )}
 
@@ -2457,10 +2601,10 @@ function SetupFlow({ onClose, onComplete }) {
               disabled={projects.length >= 10}
             >+ Add another project</button>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={() => setStep('outcome')} style={{ ...SETUP_BTN_GHOST, flex: '0 0 auto', width: 'auto', padding: '11px 18px' }}>
+              <button onClick={advanceToOutcome} style={{ ...SETUP_BTN_GHOST, flex: '0 0 auto', width: 'auto', padding: '11px 18px' }}>
                 Skip this step
               </button>
-              <button onClick={() => setStep('outcome')} style={{ ...SETUP_BTN_PRIMARY }}>
+              <button onClick={advanceToOutcome} style={{ ...SETUP_BTN_PRIMARY }}>
                 Next: this week →
               </button>
             </div>
@@ -2487,10 +2631,10 @@ function SetupFlow({ onClose, onComplete }) {
               style={{ ...SETUP_INPUT_STYLE, minHeight: 72, marginBottom: 14 }}
             />
             <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={() => setStep('prefs')} style={{ ...SETUP_BTN_GHOST, flex: '0 0 auto', width: 'auto', padding: '11px 18px' }}>
+              <button onClick={advanceToPrefs} style={{ ...SETUP_BTN_GHOST, flex: '0 0 auto', width: 'auto', padding: '11px 18px' }}>
                 Skip
               </button>
-              <button onClick={() => setStep('prefs')} style={{ ...SETUP_BTN_PRIMARY }}>
+              <button onClick={advanceToPrefs} style={{ ...SETUP_BTN_PRIMARY }}>
                 Next: preferences →
               </button>
             </div>
