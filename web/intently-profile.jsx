@@ -291,76 +291,6 @@ Object.assign(window, { getPref, setPref, getAllPrefs });
 
 const _DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-// SelectRow — tap to cycle through options. For the small option sets here
-// (week-day pickers) cycling is faster than opening a sheet/select.
-function SelectRow({ label, sub, prefKey, options, defaultValue, last }) {
-  const [value, setValue] = React.useState(() => getPref(prefKey, defaultValue));
-  const cycle = () => {
-    const i = options.indexOf(value);
-    const next = options[(i + 1) % options.length];
-    setValue(next);
-    setPref(prefKey, next);
-  };
-  return (
-    <button onClick={cycle} style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      width: '100%', padding: '14px 16px',
-      borderBottom: last ? 'none' : `1px solid ${T.color.EdgeLine}`,
-      minHeight: 52, gap: 12,
-      background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left',
-    }}>
-      <span style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ display: 'block', fontFamily: T.font.UI, fontSize: 14, fontWeight: 500, color: T.color.PrimaryText }}>{label}</span>
-        {sub && <span style={{ display: 'block', marginTop: 2, fontFamily: T.font.Reading, fontSize: 12, color: T.color.SupportingText }}>{sub}</span>}
-      </span>
-      <span style={{ fontFamily: T.font.UI, fontSize: 13, color: T.color.SupportingText, textAlign: 'right' }}>{value}</span>
-    </button>
-  );
-}
-
-// ToggleRow — same persistence pattern as SelectRow (getPref/setPref against
-// localStorage `intently:prefs`). Each instance MUST pass a stable `prefKey`
-// string (declared at call sites, not derived from labels) so that copy edits
-// to `label` don't orphan saved values. See Pref keys block above PreferencesPage.
-function ToggleRow({ label, sub, prefKey, defaultOn = false, last }) {
-  const [on, setOn] = React.useState(() => getPref(prefKey, defaultOn));
-  const toggle = () => {
-    setOn(prev => {
-      const next = !prev;
-      setPref(prefKey, next);
-      return next;
-    });
-  };
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 12,
-      padding: '14px 16px',
-      borderBottom: last ? 'none' : `1px solid ${T.color.EdgeLine}`,
-      minHeight: 52,
-    }}>
-      <span style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ display: 'block', fontFamily: T.font.UI, fontSize: 14, fontWeight: 500, color: T.color.PrimaryText }}>{label}</span>
-        {sub && <span style={{ display: 'block', marginTop: 2, fontFamily: T.font.Reading, fontSize: 12, color: T.color.SupportingText }}>{sub}</span>}
-      </span>
-      <button onClick={toggle} aria-pressed={on} style={{
-        width: 44, height: 26, borderRadius: 999,
-        background: on ? T.color.PrimaryText : T.color.Stone300,
-        border: 'none', cursor: 'pointer', flexShrink: 0,
-        position: 'relative', padding: 0,
-        transition: 'background 180ms ease',
-      }}>
-        <span style={{
-          position: 'absolute', top: 3, left: on ? 21 : 3,
-          width: 20, height: 20, borderRadius: 999,
-          background: '#FBF6EA',
-          boxShadow: '0 2px 4px rgba(31,27,21,0.2)',
-          transition: 'left 180ms ease',
-        }} />
-      </button>
-    </div>
-  );
-}
-
 // ─── SAVE ACCOUNT CTA + MODAL ────────────────────────────────────────
 function SaveAccountCta({ onClick }) {
   return (
@@ -594,7 +524,7 @@ function PreferencesPage({ onBack }) {
   const [rhythmConfig, setRhythmConfig] = React.useState({});
   React.useEffect(() => {
     if (window.getLifeOpsConfig) {
-      window.getLifeOpsConfig().then(cfg => setRhythmConfig(cfg || {})).catch(() => {});
+      window.getLifeOpsConfig().then(cfg => setRhythmConfig(cfg || {})).catch(_e => setRhythmConfig({}));
     }
   }, []);
   return (
