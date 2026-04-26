@@ -45,17 +45,17 @@ We use **pg_cron + pg_net + a `dispatch-skill` Supabase Edge Function**.
 
 ## Manual follow-ups (one-time, post-merge)
 
-> **Note:** Steps 4–5 below were the original 0007 instructions. They fail on Supabase hosted Postgres — the `postgres` role cannot register custom GUCs. Migration 0009 replaces them with Vault. See § Followup: Vault, not GUC below.
+> **Note:** Steps 4–5 below were the original 0007 instructions. They fail on Supabase hosted Postgres — the `postgres` role cannot register custom GUCs. Migration 0010 replaces them with Vault. See § Followup: Vault, not GUC below.
 
 ```
-1. supabase db push                                    # apply 0007 + 0009
+1. supabase db push                                    # apply 0007 + 0010
 2. Studio → Database → Extensions → enable pg_net
 3. supabase functions deploy dispatch-skill
-4. ~~ALTER DATABASE postgres SET app.settings.dispatch_skill_url = '...'~~   # BLOCKED — see 0009
-5. ~~ALTER DATABASE postgres SET app.settings.dispatch_skill_auth = '...'~~  # BLOCKED — see 0009
+4. ~~ALTER DATABASE postgres SET app.settings.dispatch_skill_url = '...'~~   # BLOCKED — see 0010
+5. ~~ALTER DATABASE postgres SET app.settings.dispatch_skill_auth = '...'~~  # BLOCKED — see 0010
 ```
 
-After applying 0009, run these in Supabase SQL Editor instead of the `ALTER DATABASE` commands:
+After applying 0010, run these in Supabase SQL Editor instead of the `ALTER DATABASE` commands:
 
 ```sql
 select vault.create_secret('https://cjlktjrossrzmswrayfz.supabase.co/functions/v1/dispatch-skill', 'dispatch_skill_url');
@@ -72,6 +72,6 @@ The `ALTER DATABASE postgres SET app.settings.*` commands from this ADR's origin
 permission denied to set parameter "app.settings.dispatch_skill_url"
 ```
 
-Root cause: Supabase's `postgres` role is not a true superuser and cannot register custom GUC namespaces. Migration **0009** (`0009_dispatch_via_vault.sql`) supersedes 0007's GUC approach by switching `tick_skills()` to read `dispatch_skill_url` and `dispatch_skill_auth` from `vault.decrypted_secrets`, which is accessible to the `postgres` role.
+Root cause: Supabase's `postgres` role is not a true superuser and cannot register custom GUC namespaces. Migration **0010** (`0010_dispatch_via_vault.sql`) supersedes 0007's GUC approach by switching `tick_skills()` to read `dispatch_skill_url` and `dispatch_skill_auth` from `vault.decrypted_secrets`, which is accessible to the `postgres` role.
 
 The architecture decision (pg_cron + pg_net + Edge Function) is unchanged. Only the secret delivery mechanism changes: Supabase Vault instead of database-level GUCs.

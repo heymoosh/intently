@@ -1,4 +1,4 @@
--- 0009_dispatch_via_vault.sql — switch tick_skills() to read dispatch URL/auth
+-- 0010_dispatch_via_vault.sql — switch tick_skills() to read dispatch URL/auth
 -- from Supabase Vault instead of custom GUCs (app.settings.*).
 --
 -- Why this exists:

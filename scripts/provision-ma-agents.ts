@@ -22,6 +22,7 @@ export const MVP_SKILLS = [
   'daily-review',
   'weekly-review',
   'monthly-review',
+  'noticing',
 ] as const;
 export type MvpSkill = (typeof MVP_SKILLS)[number];
 
