@@ -928,6 +928,305 @@ async function inferAutoCheckItems() {
   }
 }
 
+// ─── SHARED SKILL CONVERSATION HELPER ───────────────────────────────
+// Mirrors BriefFlow's pattern for review skills.
+// On mount: fires callMaProxy with the skill + assembled kickoff context.
+// Agent's first reply starts the conversation; user can reply freely.
+
+function buildSkillThreadInput(skill, messages, userReply) {
+  const lines = [
+    `You are in a ${skill} conversation. Continue from where you left off.`,
+    'Prior conversation:',
+  ];
+  for (const m of messages) {
+    lines.push(`${m.role === 'user' ? 'User' : 'Agent'}: ${m.text}`);
+  }
+  if (userReply) lines.push(`User: ${userReply}`);
+  lines.push('Continue the conversation naturally.');
+  return lines.join('\n');
+}
+
+function SkillConversationFlow({ skill, kickoff, label, icon, background, onClose, onComplete, persistEntry }) {
+  const [messages, setMessages] = React.useState([]);
+  const [agentTyping, setAgentTyping] = React.useState(false);
+  const [draft, setDraft] = React.useState('');
+  const [inputDisabled, setInputDisabled] = React.useState(false);
+  const kickedOffRef = React.useRef(false);
+  const scrollRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [messages, agentTyping]);
+
+  React.useEffect(() => {
+    if (kickedOffRef.current) return;
+    kickedOffRef.current = true;
+    if (!window.callMaProxy) {
+      setTimeout(() => {
+        setMessages([{ role: 'agent', text: "Let's get started. What's on your mind?" }]);
+      }, 600);
+      return;
+    }
+    setAgentTyping(true);
+    setInputDisabled(true);
+    window.callMaProxy({ skill, input: kickoff })
+      .then(r => {
+        const reply = (r && r.finalText && r.finalText.trim()) || "Let's get started.";
+        setMessages([{ role: 'agent', text: reply }]);
+        setAgentTyping(false);
+        setInputDisabled(false);
+      })
+      .catch(() => {
+        setMessages([{ role: 'agent', text: "Let's get started. What's on your mind?" }]);
+        setAgentTyping(false);
+        setInputDisabled(false);
+      });
+  }, []);
+
+  const submit = React.useCallback((text) => {
+    const t = (text || draft).trim();
+    if (!t || inputDisabled) return;
+    setDraft('');
+    const nextMessages = [...messages, { role: 'user', text: t }];
+    setMessages(nextMessages);
+    setAgentTyping(true);
+    setInputDisabled(true);
+    const doCall = window.callMaProxy
+      ? window.callMaProxy({ skill, input: buildSkillThreadInput(skill, messages, t) })
+      : Promise.reject(new Error('callMaProxy unavailable'));
+    doCall
+      .then(r => {
+        const reply = (r && r.finalText && r.finalText.trim()) || "Got it. Keep going.";
+        setMessages(m => [...m, { role: 'agent', text: reply }]);
+        setAgentTyping(false);
+        setInputDisabled(false);
+        const done = /```json[\s\S]*?```\s*$/.test(reply) || /\[DONE\]/i.test(reply);
+        if (done && persistEntry) {
+          persistEntry(reply).then(() => onComplete && onComplete(reply));
+        }
+      })
+      .catch(() => {
+        setMessages(m => [...m, { role: 'agent', text: "Got it. Anything else?" }]);
+        setAgentTyping(false);
+        setInputDisabled(false);
+      });
+  }, [draft, messages, inputDisabled, skill, persistEntry, onComplete]);
+
+  const isDark = background && background.includes('#1F1B35');
+  const textColor = isDark ? '#FBF6EA' : T.color.PrimaryText;
+  const inputBg = isDark ? 'rgba(31,27,53,0.55)' : T.color.SecondarySurface;
+  const inputBorder = isDark ? 'rgba(251,246,234,0.12)' : T.color.EdgeLine;
+  const inputFieldBg = isDark ? 'rgba(251,246,234,0.08)' : T.color.PrimarySurface;
+  const inputFieldBorder = isDark ? 'rgba(251,246,234,0.16)' : T.color.EdgeLine;
+
+  return (
+    <div style={{
+      position: 'absolute', inset: 0, zIndex: 60,
+      background: background || `linear-gradient(180deg, ${T.color.PrimarySurface} 0%, #F5EBD6 60%, #F0D9B5 100%)`,
+      display: 'flex', flexDirection: 'column', color: textColor,
+    }}>
+      <div style={{ flexShrink: 0, padding: '14px 18px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          {icon}
+          <span style={{ fontFamily: T.font.UI, fontSize: 11, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', color: isDark ? '#E6DFF5' : T.color.FocusObject }}>{label}</span>
+        </div>
+        <button onClick={onClose} aria-label="Close" style={{
+          width: 32, height: 32, borderRadius: 999,
+          background: isDark ? 'rgba(251,246,234,0.1)' : 'rgba(31,27,21,0.06)',
+          border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Icon.X size={16} color={textColor} />
+        </button>
+      </div>
+
+      <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '8px 20px 20px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {messages.map((m, i) =>
+            isDark
+              ? <ChatBubbleDark key={i} role={m.role} text={m.text} sub={m.sub} />
+              : <ChatBubble key={i} role={m.role} text={m.text} sub={m.sub} />
+          )}
+          {agentTyping && (isDark ? <AgentTypingDark /> : <AgentTyping />)}
+        </div>
+      </div>
+
+      <div style={{ flexShrink: 0, padding: '10px 16px 20px', background: inputBg, backdropFilter: 'blur(12px)', borderTop: `1px solid ${inputBorder}` }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          background: inputFieldBg, border: `1px solid ${inputFieldBorder}`,
+          borderRadius: 999, padding: '8px 8px 8px 16px',
+        }}>
+          <input
+            value={draft}
+            disabled={inputDisabled}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && submit(draft)}
+            placeholder="Reply…"
+            style={{
+              flex: 1, border: 'none', outline: 'none', background: 'transparent',
+              fontFamily: T.font.Reading, fontSize: 14,
+              color: isDark ? '#FBF6EA' : T.color.PrimaryText,
+              opacity: inputDisabled ? 0.5 : 1,
+            }}
+          />
+          <button onClick={() => submit(draft)} disabled={inputDisabled} aria-label="Send" style={{
+            width: 34, height: 34, borderRadius: 999,
+            background: isDark ? '#E6DFF5' : T.color.FocusObject, color: isDark ? '#2A2348' : '#FBF6EA',
+            border: 'none',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: inputDisabled ? 'default' : 'pointer',
+            opacity: inputDisabled ? 0.4 : 1,
+          }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Thin wrappers — each provides skill-specific context + persistence,
+// then delegates rendering to SkillConversationFlow.
+
+function DailyReviewConversationFlow({ onClose, onComplete }) {
+  const [kickoff, setKickoff] = React.useState("Let's review today.");
+  React.useEffect(() => {
+    if (window.assembleReviewContext) {
+      window.assembleReviewContext([], []).then(({ input }) => setKickoff(input)).catch((err) => { console.debug('[daily-review] context fallback', err && err.message); });
+    }
+  }, []);
+
+  const persistEntry = async (text) => {
+    if (!text || !window.getSupabaseClient || !window.getCurrentUserId) return;
+    try {
+      const sb = window.getSupabaseClient();
+      const userId = await window.getCurrentUserId();
+      const { data } = await sb.from('entries').insert([{
+        user_id: userId, kind: 'review', body_markdown: text,
+        source: 'text', mood: 'night',
+      }]).select().single();
+      if (data && window.showUndoToast) {
+        window.showUndoToast({
+          message: "Saved today's review",
+          onUndo: async () => {
+            const sb2 = window.getSupabaseClient();
+            const uid = await window.getCurrentUserId();
+            await sb2.from('entries').delete().eq('id', data.id).eq('user_id', uid);
+          },
+        });
+      }
+    } catch (e) { console.warn('[daily-review] persist failed:', e && e.message); }
+  };
+
+  return (
+    <SkillConversationFlow
+      skill="daily-review"
+      kickoff={kickoff}
+      label="Daily review"
+      icon={<Icon.Moon size={14} color={T.color.FocusObject} />}
+      background={`linear-gradient(180deg, ${T.color.PrimarySurface} 0%, #F5EBD6 60%, #F0D9B5 100%)`}
+      onClose={onClose}
+      onComplete={onComplete}
+      persistEntry={persistEntry}
+    />
+  );
+}
+
+function WeeklyReviewConversationFlow({ onClose, onComplete }) {
+  const [kickoff, setKickoff] = React.useState("Let's review this week.");
+  React.useEffect(() => {
+    if (window.assembleWeeklyReviewContext) {
+      window.assembleWeeklyReviewContext([]).then(({ input }) => setKickoff(input)).catch((err) => { console.debug('[weekly-review] context fallback', err && err.message); });
+    }
+  }, []);
+
+  const persistEntry = async (text) => {
+    if (!text || !window.getSupabaseClient || !window.getCurrentUserId) return;
+    try {
+      const sb = window.getSupabaseClient();
+      const userId = await window.getCurrentUserId();
+      const weekId = window.getCurrentWeekId ? window.getCurrentWeekId() : null;
+      const { data } = await sb.from('entries').insert([{
+        user_id: userId, kind: 'review', body_markdown: text,
+        source: 'text', mood: 'dusk',
+        links: weekId ? { scope: 'week', week_id: weekId } : undefined,
+      }]).select().single();
+      if (data && window.showUndoToast) {
+        window.showUndoToast({
+          message: `Saved this week's review${weekId ? ` (${weekId})` : ''}`,
+          onUndo: async () => {
+            const sb2 = window.getSupabaseClient();
+            const uid = await window.getCurrentUserId();
+            await sb2.from('entries').delete().eq('id', data.id).eq('user_id', uid);
+          },
+        });
+      }
+    } catch (e) { console.warn('[weekly-review] persist failed:', e && e.message); }
+  };
+
+  return (
+    <SkillConversationFlow
+      skill="weekly-review"
+      kickoff={kickoff}
+      label="Weekly review"
+      icon={<Icon.Moon size={14} color="#E6DFF5" />}
+      background="linear-gradient(180deg, #1F1B35 0%, #2E274A 50%, #46386A 100%)"
+      onClose={onClose}
+      onComplete={onComplete}
+      persistEntry={persistEntry}
+    />
+  );
+}
+
+function MonthlyReviewConversationFlow({ onClose, onComplete }) {
+  const [kickoff, setKickoff] = React.useState("Let's review this month.");
+  React.useEffect(() => {
+    if (window.assembleMonthlyRefreshContext) {
+      window.assembleMonthlyRefreshContext().then((ctx) => {
+        if (ctx && ctx.input) setKickoff(ctx.input);
+      }).catch((err) => { console.debug('[monthly-review] context fallback', err && err.message); });
+    }
+  }, []);
+
+  const persistEntry = async (text) => {
+    if (!text || !window.getSupabaseClient || !window.getCurrentUserId) return;
+    try {
+      const sb = window.getSupabaseClient();
+      const userId = await window.getCurrentUserId();
+      const { data } = await sb.from('entries').insert([{
+        user_id: userId, kind: 'review', body_markdown: text,
+        source: 'text', mood: 'dusk',
+        links: { scope: 'month' },
+      }]).select().single();
+      if (data && window.showUndoToast) {
+        window.showUndoToast({
+          message: "Saved this month's review",
+          onUndo: async () => {
+            const sb2 = window.getSupabaseClient();
+            const uid = await window.getCurrentUserId();
+            await sb2.from('entries').delete().eq('id', data.id).eq('user_id', uid);
+          },
+        });
+      }
+    } catch (e) { console.warn('[monthly-review] persist failed:', e && e.message); }
+  };
+
+  return (
+    <SkillConversationFlow
+      skill="monthly-review"
+      kickoff={kickoff}
+      label="Monthly review"
+      icon={<Icon.Moon size={14} color="#E6DFF5" />}
+      background="linear-gradient(180deg, #1A1035 0%, #2A1F50 50%, #3D2E70 100%)"
+      onClose={onClose}
+      onComplete={onComplete}
+      persistEntry={persistEntry}
+    />
+  );
+}
+
+// ─── END-OF-DAY REVIEW FLOW (scripted, kept for reference) ──────────────────
 function ReviewFlow({ onClose, onComplete }) {
   const [step, setStep] = React.useState(0);
   const [messages, setMessages] = React.useState([]);
@@ -2776,6 +3075,7 @@ Object.assign(window, {
   GOAL_DATA, PROJECT_EXTRAS,
   GoalDetail, ProjectDetailV2,
   BriefFlow, ReviewFlow, WeeklyReviewFlow, MonthlyRefreshFlow, SetupFlow,
+  SkillConversationFlow, DailyReviewConversationFlow, WeeklyReviewConversationFlow, MonthlyReviewConversationFlow,
   PresentEmpty, PresentClosed, UndoToast,
   usePopulate, MOCK_PLAN,
   showUndoToast,

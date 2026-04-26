@@ -1302,27 +1302,27 @@ function PrototypePhone({ dayState, setDayState, idx, setIdx }) {
         />
       )}
 
-      {/* Review flow overlay */}
+      {/* Review flow overlay — conversational, mirrors daily-brief pattern */}
       {dayState === 'review' && (
-        <ReviewFlow
+        <DailyReviewConversationFlow
           onClose={() => setDayState('evening')}
           onComplete={onReviewComplete}
         />
       )}
 
       {/* Weekly review flow overlay — opens from Past → Week → "Start weekly
-          review" CTA. Persists to entries.kind='review' with links.scope='week'. */}
+          review" CTA. Conversational, mirrors daily-brief pattern. */}
       {showWeeklyReview && (
-        <WeeklyReviewFlow
+        <WeeklyReviewConversationFlow
           onClose={() => setShowWeeklyReview(false)}
           onComplete={() => setShowWeeklyReview(false)}
         />
       )}
 
-      {/* Monthly slice refresh overlay — opens from Future → "Refresh monthly
-          slices" CTA. Persists each accepted slice to goals.monthly_slice. */}
+      {/* Monthly review overlay — opens from Future → "Refresh monthly slices"
+          CTA. Conversational, mirrors daily-brief pattern. */}
       {showMonthlyRefresh && (
-        <MonthlyRefreshFlow
+        <MonthlyReviewConversationFlow
           onClose={() => setShowMonthlyRefresh(false)}
           onComplete={() => setShowMonthlyRefresh(false)}
         />
