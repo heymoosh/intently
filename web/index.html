@@ -144,6 +144,43 @@
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Sentry web DSN — public-by-design (shipped in browser bundle per Sentry's security model). -->
+<script>window.INTENTLY_SENTRY_DSN = 'https://71a790f2e2cf55a8b4e2e57abf290ccb@o4510602677256192.ingest.us.sentry.io/4511287286169600';</script>
+<script src="https://browser.sentry-cdn.com/8.55.0/bundle.min.js" crossorigin="anonymous"></script>
+
+<!-- Sentry browser error monitoring. No-op when SENTRY_DSN_WEB is absent.
+     DSN is injected by Vercel at build time as NEXT_PUBLIC_SENTRY_DSN_WEB or
+     set directly on window before this script runs via a Vercel Edge Config
+     or injected env. For a Babel-standalone (no-build) app we rely on the
+     server injecting window.INTENTLY_SENTRY_DSN at runtime, OR on the Vercel
+     environment variable SENTRY_DSN_WEB surfaced via a server-side injection
+     snippet. Until that plumbing lands, set window.INTENTLY_SENTRY_DSN
+     manually in a deployment-specific snippet. No DSN literal must appear in
+     this file. -->
+<script>
+  (function () {
+    try {
+      // Accept DSN from an inline server-injection snippet (Vercel Edge Middleware
+      // or a tiny SSR wrapper can set this before the bundle loads).
+      var dsn = (window.INTENTLY_SENTRY_DSN) || null;
+      if (!dsn) return; // no DSN → Sentry stays completely silent
+      if (typeof Sentry === 'undefined') return; // CDN failed to load
+      Sentry.init({
+        dsn: dsn,
+        // V1: errors only — no performance, replay, or session tracking.
+        integrations: [],
+        tracesSampleRate: 0,
+        replaysSessionSampleRate: 0,
+        replaysOnErrorSampleRate: 0,
+        environment: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+          ? 'development'
+          : 'production',
+      });
+    } catch (e) {
+      // Never let Sentry init crash the app.
+    }
+  })();
+</script>
 
 <!-- Runtime config. Supabase URL + publishable key are intentionally safe to
      commit (RLS gates reads; secret key lives in BWS only). See app/.env.example. -->

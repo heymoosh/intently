@@ -30,6 +30,18 @@
 
 // deno-lint-ignore-file no-explicit-any
 
+// Sentry error monitoring — no-op when SENTRY_DSN is unset.
+import * as Sentry from 'https://esm.sh/@sentry/deno@8';
+
+const _sentryDsn = Deno.env.get('SENTRY_DSN_EDGE');
+if (_sentryDsn) {
+  Sentry.init({
+    dsn: _sentryDsn,
+    // V1: errors only — no performance or replay.
+    tracesSampleRate: 0,
+  });
+}
+
 const ANTHROPIC_API_BASE = 'https://api.anthropic.com';
 const ANTHROPIC_MODEL = 'claude-haiku-4-5-20251001';
 
@@ -310,6 +322,7 @@ Deno.serve(async (req: Request) => {
       return json({ date, reminders: rows });
     } catch (err) {
       console.error('[reminders] /due error', err);
+      if (_sentryDsn) { Sentry.captureException(err); await Sentry.flush(2000); }
       return errResp(502, 'failed to read reminders', err instanceof Error ? err.message : String(err));
     }
   }
@@ -359,6 +372,7 @@ Deno.serve(async (req: Request) => {
       return json({ classified: true, reminder });
     } catch (err) {
       console.error('[reminders] classify-and-store error', err);
+      if (_sentryDsn) { Sentry.captureException(err); await Sentry.flush(2000); }
       return errResp(502, 'classify-and-store failed', err instanceof Error ? err.message : String(err));
     }
   }
