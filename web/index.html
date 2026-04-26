@@ -31,6 +31,10 @@
   .intro-note p { font-family: "Source Serif 4", Georgia, serif; font-size: 14px; line-height: 21px; color: #6E604D; margin: 0 0 6px; }
   .phone-stage { display: flex; justify-content: center; align-items: flex-start; gap: 24px; padding: 20px 20px 80px; }
   html:not(.dev-mode) .phone-stage { padding-top: 40px; }
+  /* Desktop step-arrows live OUTSIDE the phone frame so the device chrome
+     stays clean of dev/prototype affordances. Hidden on narrow viewports. */
+  .tense-nav-outside { position: sticky; top: 50%; align-self: center; }
+  @media (max-width: 880px) { .tense-nav-outside { display: none; } }
 
   /* Dev toggle — outside phone frame */
   .dev-panel {
@@ -231,7 +235,7 @@ function PastJournalProto({ adds, onAddJournal, onPickEntry, onStartWeeklyReview
 
 // Planned-phase Present, with optional populate-animation and optional evening CTA.
 // `plan` (optional) is the agent-driven plan from BriefFlow; falls back to PLAN_DATA seed.
-function PresentPlanProtoAnimated({ phase, adds, onAddPlan, onAddJournal, animate, onStartReview, plan }) {
+function PresentPlanProtoAnimated({ phase, adds, onAddPlan, onAddJournal, onPickEntry, animate, onStartReview, plan }) {
   const activePlan = plan || PLAN_DATA;
   const populated = window.usePopulate(activePlan.bands);
   const total = activePlan.bands.reduce((a, b) => a + b.items.length, 0);
@@ -253,6 +257,7 @@ function PresentPlanProtoAnimated({ phase, adds, onAddPlan, onAddJournal, animat
       adds={adds}
       onAddPlan={onAddPlan}
       onAddJournal={onAddJournal}
+      onPickEntry={onPickEntry}
       bands={visibleBands}
       hideFlags={animate && populated < 2}
       onStartReview={onStartReview}
@@ -264,7 +269,7 @@ function PresentPlanProtoAnimated({ phase, adds, onAddPlan, onAddJournal, animat
 
 // Shell copy of PresentPlanProto but accepts a bands override. Keeps add-zones
 // hidden until animation completes.
-function PresentPlanShell({ phase, adds, onAddPlan, onAddJournal, bands, hideFlags, onStartReview, addZonesReady, plan = PLAN_DATA }) {
+function PresentPlanShell({ phase, adds, onAddPlan, onAddJournal, onPickEntry, bands, hideFlags, onStartReview, addZonesReady, plan = PLAN_DATA }) {
   const isEvening = phase === 'evening';
   const done = {
     'Hackathon build — light touch. One trial run for the demo.': true,
@@ -392,16 +397,24 @@ function PresentPlanShell({ phase, adds, onAddPlan, onAddJournal, bands, hideFla
               helper="Saves to today in Past · no AI"
               onCommit={(v) => onAddJournal && onAddJournal('today', v)}
             />
-            {(adds && adds.journal && adds.journal.today || []).slice().reverse().map((j) => (
-              <div key={j.id} style={{
-                marginTop: 8, padding: '10px 12px',
-                background: T.color.TintLilac + '22',
-                border: `1px solid ${T.color.TintLilac}55`,
-                borderRadius: 10,
-                fontFamily: T.font.Reading, fontSize: 14, lineHeight: '20px', color: T.color.PrimaryText,
-                fontStyle: 'italic',
-              }}>"{j.text}"</div>
-            ))}
+            {(adds && adds.journal && adds.journal.today || []).slice().reverse().map((j) => {
+              const entry = {
+                id: j.id, time: '', kind: 'journal',
+                title: (j.text || '').split('\n')[0].slice(0, 60) || 'Journal entry',
+                body: j.text || '',
+              };
+              return (
+                <button key={j.id} onClick={() => onPickEntry && onPickEntry(entry)} style={{
+                  display: 'block', width: '100%', textAlign: 'left',
+                  marginTop: 8, padding: '10px 12px',
+                  background: T.color.TintLilac + '22',
+                  border: `1px solid ${T.color.TintLilac}55`,
+                  borderRadius: 10, cursor: 'pointer',
+                  fontFamily: T.font.Reading, fontSize: 14, lineHeight: '20px', color: T.color.PrimaryText,
+                  fontStyle: 'italic',
+                }}>"{j.text}"</button>
+              );
+            })}
           </div>
         )}
 
@@ -457,6 +470,10 @@ function FutureScreenProtoTappable({ adds, onOpenProject, onOpenGoal, onAddGoal,
   // fixtures when the user has no DB rows (so the demo is never empty).
   const [dbGoals, setDbGoals] = React.useState(null);
   const [dbProjects, setDbProjects] = React.useState(null);
+  // Track per-goal "most recent activity" — max(updated_at) across that goal's
+  // projects. Drives the "top 3 by recent activity" cap on the goals band.
+  const [goalActivity, setGoalActivity] = React.useState({});
+  const [showAllGoals, setShowAllGoals] = React.useState(false);
   React.useEffect(() => {
     if (!window.listGoals || !window.listProjects) return;
     let cancelled = false;
@@ -465,41 +482,112 @@ function FutureScreenProtoTappable({ adds, onOpenProject, onOpenGoal, onAddGoal,
       window.listProjects().catch(() => []),
     ]).then(([gs, ps]) => {
       if (cancelled) return;
-      // Map DB goal row → fixture shape (title/month/glyph/pal).
+      // Map DB goal row → fixture shape. Include defaults for the rich
+      // GoalDetail fields (intention/milestones/projectIds/reflections) so
+      // the detail screen renders gracefully even when the goal hasn't been
+      // fleshed out yet. projectIds is computed from the projects list.
       if (gs.length > 0) {
+        const projectsByGoal = {};
+        for (const p of (ps || [])) {
+          if (!p.goal_id || p.is_admin) continue;
+          (projectsByGoal[p.goal_id] = projectsByGoal[p.goal_id] || []).push(p.id);
+        }
+        const formatCreated = (iso) => {
+          try {
+            const d = new Date(iso);
+            return d.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+          } catch (e) { return ''; }
+        };
         setDbGoals(gs.map((g) => ({
           id: g.id,
           title: g.title,
           month: g.monthly_slice || '',
+          monthNarrative: '',
+          intention: '',
           glyph: g.glyph || 'leaf',
           pal: g.palette || ['#A8C0E0', '#D4C4F0', '#F0E0C0', '#F5E8D0'],
+          created: g.created_at ? formatCreated(g.created_at) : '',
+          milestones: [],
+          projectIds: projectsByGoal[g.id] || [],
+          reflections: [],
+          _position: g.position,
+          _updated_at: g.updated_at || g.created_at || null,
         })));
       }
       if (ps.length > 0) {
-        setDbProjects(ps.filter((p) => !p.is_admin).map((p) => ({
-          id: p.id,
-          title: p.title,
-          status: p.status,
-          // ProjectCard reads p.title; goal_id passed through for navigation
-          goal_id: p.goal_id,
-          todos: Array.isArray(p.todos) ? p.todos : [],
-        })));
+        // Stash the raw DB rows so GoalDetail can resolve projectIds without
+        // an extra fetch when opened. Lives on window because the detail
+        // component renders outside this subtree's state.
+        try { window._dbProjectsRaw = ps; } catch (e) {}
+        // Compute projects-band card facets (count, done, tint, glyph) and
+        // ProjectDetail facets (name, tracker, markdown, blurb) on the fly
+        // from the DB row + JSONB todos so the prototype's render path works
+        // uniformly across Sam-seeded and prototype-fixture data.
+        const TINT_PALETTE = [T.color.TintSage, T.color.TintLilac, T.color.TintButter, T.color.TintPeach, T.color.TintDusk, T.color.TintClay, T.color.TintMint, T.color.TintMoss];
+        const GLYPH_PALETTE = ['rocket', 'leaf', 'pen', 'mountain', 'flag', 'compass', 'spark', 'book'];
+        const richProjects = ps.filter((p) => !p.is_admin).map((p, i) => {
+          const todos = Array.isArray(p.todos) ? p.todos : [];
+          const done = todos.filter((t) => t && t.done).length;
+          return {
+            id: p.id,
+            title: p.title,
+            name: p.title,
+            status: p.status,
+            goal_id: p.goal_id,
+            todos,
+            blurb: p.body_markdown ? String(p.body_markdown).split('\n')[0].slice(0, 140) : '',
+            tint: TINT_PALETTE[i % TINT_PALETTE.length],
+            glyph: GLYPH_PALETTE[i % GLYPH_PALETTE.length],
+            count: todos.length,
+            done,
+            tracker: [],
+            markdown: p.body_markdown ? [{ kind: 'p', text: p.body_markdown }] : [],
+            _updated_at: p.updated_at || p.created_at || null,
+          };
+        });
+        setDbProjects(richProjects);
+        try { window._dbProjects = richProjects; } catch (e) {}
+        // Roll project updated_at up to per-goal max activity timestamp.
+        const activity = {};
+        for (const p of ps) {
+          if (!p.goal_id) continue;
+          const t = new Date(p.updated_at || p.created_at || 0).getTime();
+          if (!activity[p.goal_id] || t > activity[p.goal_id]) activity[p.goal_id] = t;
+        }
+        setGoalActivity(activity);
       }
     });
     return () => { cancelled = true; };
   }, []);
 
-  const goals = dbGoals || window.GOAL_DATA;
+  const allGoals = dbGoals || window.GOAL_DATA;
+  // Sort goals by recent activity desc; fall back to the persisted position order
+  // (and finally goal id) so the order is stable when no projects link a goal.
+  const sortedGoals = React.useMemo(() => {
+    const scored = allGoals.map((g) => ({
+      g,
+      activity: goalActivity[g.id] || (g._updated_at ? new Date(g._updated_at).getTime() : 0),
+      position: typeof g._position === 'number' ? g._position : Number.MAX_SAFE_INTEGER,
+    }));
+    scored.sort((a, b) => (b.activity - a.activity) || (a.position - b.position));
+    return scored.map((s) => s.g);
+  }, [allGoals, goalActivity]);
+  const visibleGoals = showAllGoals ? sortedGoals : sortedGoals.slice(0, 3);
+  const overflowCount = Math.max(0, sortedGoals.length - 3);
+
   const projects = dbProjects || window.PROJECT_DATA;
-  const addedGoals = (adds && adds.goals) || [];
-  const addedProjects = (adds && adds.projects) || [];
+  // useManualAdds hydrates DB goals back into adds.goals — filter to truly
+  // session-pending items (optimistic `g-*` ids) so they don't double-render
+  // the painterly cards above as "Just added" placeholders.
+  const addedGoals = ((adds && adds.goals) || []).filter((g) => typeof g.id === 'string' && g.id.startsWith('g-'));
+  const addedProjects = ((adds && adds.projects) || []).filter((p) => typeof p.id === 'string' && p.id.startsWith('pr-'));
   const admin = (adds && adds.adminReminders) || [];
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
       <ScreenHeader tense="Future" title="What this month is for." caption="Three long-term visions. Each one gets a monthly slice — then the agent cascades it into weekly and daily moves on Present." />
       <div style={{ flex: 1, overflowY: 'auto', padding: '4px 20px 140px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {goals.map((g, i) => (
+        {visibleGoals.map((g, i) => (
           <button key={g.id} onClick={() => onOpenGoal && onOpenGoal(g)} style={{
             textAlign: 'left', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer',
             borderRadius: T.radius.Card, boxShadow: T.shadow.Raised, flexShrink: 0, overflow: 'hidden',
@@ -522,6 +610,21 @@ function FutureScreenProtoTappable({ adds, onOpenProject, onOpenGoal, onAddGoal,
             </PainterlyBlock>
           </button>
         ))}
+
+        {overflowCount > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: -2, marginBottom: 2 }}>
+            <button onClick={() => setShowAllGoals(s => !s)} style={{
+              padding: '7px 14px', background: 'transparent',
+              border: `1px solid ${T.color.EdgeLine}`, borderRadius: 999,
+              fontFamily: T.font.UI, fontSize: 11, fontWeight: 600, letterSpacing: 0.4,
+              color: T.color.SupportingText, cursor: 'pointer',
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+            }}>
+              {showAllGoals ? `Show top 3` : `Show all ${sortedGoals.length} goals (+${overflowCount})`}
+              <Icon.Chev size={11} color={T.color.SupportingText} />
+            </button>
+          </div>
+        )}
 
         {addedGoals.map((g) => (
           <div key={g.id} style={{
@@ -653,8 +756,7 @@ const DAY_STATES = [
   { key: 'closed',        label: 'Closed · reflected' },
 ];
 
-function PrototypePhone({ dayState, setDayState }) {
-  const [idx, setIdx] = React.useState(1);
+function PrototypePhone({ dayState, setDayState, idx, setIdx }) {
   const [heroState, setHeroState] = React.useState('idle');
   const [capturedTranscript, setCapturedTranscript] = React.useState('');
   // Hero state-machine wrapper: extracts a transcript payload from voice→chat
@@ -734,6 +836,7 @@ function PrototypePhone({ dayState, setDayState }) {
           adds={m.state}
           onAddPlan={m.addPlanItem}
           onAddJournal={m.addJournal}
+          onPickEntry={setOpenEntry}
           animate={false}
           onStartReview={() => setDayState('review')}
           plan={livePlan}
@@ -747,6 +850,7 @@ function PrototypePhone({ dayState, setDayState }) {
         adds={m.state}
         onAddPlan={m.addPlanItem}
         onAddJournal={m.addJournal}
+        onPickEntry={setOpenEntry}
         animate={briefJustAccepted}
         plan={livePlan}
       />
@@ -888,6 +992,7 @@ function PrototypePhone({ dayState, setDayState }) {
         <div style={{ position: 'absolute', top: 62, left: 0, right: 0, bottom: 0, zIndex: 40 }}>
           <GoalDetail
             goal={openGoal}
+            dbProjects={typeof window !== 'undefined' ? window._dbProjects : null}
             onBack={() => setOpenGoal(null)}
             onOpenProject={(p) => { setOpenGoal(null); setOpenProject(p); }}
           />
@@ -1119,11 +1224,15 @@ function App() {
     return inferDayState();
   })();
   const [dayState, setDayState] = React.useState(initial);
+  const [idx, setIdx] = React.useState(1);
   const dev = !!window.INTENTLY_DEV;
   return (
     <div className="phone-stage">
       {dev && <DevPanel dayState={dayState} setDayState={setDayState} />}
-      <PrototypePhone dayState={dayState} setDayState={setDayState} />
+      <PrototypePhone dayState={dayState} setDayState={setDayState} idx={idx} setIdx={setIdx} />
+      <div className="tense-nav-outside">
+        <TenseNavArrows index={idx} onIndex={setIdx} />
+      </div>
     </div>
   );
 }
