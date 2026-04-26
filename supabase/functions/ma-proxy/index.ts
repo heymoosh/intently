@@ -33,6 +33,18 @@
 
 // deno-lint-ignore-file no-explicit-any
 
+// Sentry error monitoring — no-op when SENTRY_DSN is unset.
+import * as Sentry from 'https://esm.sh/@sentry/deno@8';
+
+const _sentryDsn = Deno.env.get('SENTRY_DSN');
+if (_sentryDsn) {
+  Sentry.init({
+    dsn: _sentryDsn,
+    // V1: errors only — no performance or replay.
+    tracesSampleRate: 0,
+  });
+}
+
 const ANTHROPIC_API_BASE = 'https://api.anthropic.com';
 const ANTHROPIC_BETA = 'managed-agents-2026-04-01';
 // Paths verified against anthropics/skills/managed-agents-events.md (2026-04-24).
@@ -407,9 +419,18 @@ Deno.serve(async (req: Request) => {
       console.error('[ma-proxy] upstream error', err.status, err.message, err.detail);
       // Passthrough upstream 4xx/5xx; clamp to 5xx if we somehow got a 2xx/3xx.
       const status = err.status >= 400 && err.status < 600 ? err.status : 502;
+      // Report 5xx upstream errors to Sentry (4xx are caller mistakes, not bugs).
+      if (status >= 500 && _sentryDsn) {
+        Sentry.captureException(err);
+        await Sentry.flush(2000);
+      }
       return errResp(status, err.message, err.detail);
     }
     console.error('[ma-proxy] unhandled error', err);
+    if (_sentryDsn) {
+      Sentry.captureException(err);
+      await Sentry.flush(2000);
+    }
     return errResp(500, 'internal error', err instanceof Error ? err.message : String(err));
   }
 });
