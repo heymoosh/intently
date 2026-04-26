@@ -464,6 +464,78 @@ async function archiveUserSignal(id) {
   return data;
 }
 
+// ─── Setup draft (mid-flow persistence) ─────────────────────────────────────
+// Uses the existing life_ops_config.config JSONB column — no new table.
+// `setup_draft` key holds in-progress setup state so users can resume after
+// a hard refresh mid-setup.
+
+async function getSetupDraft() {
+  const config = await getLifeOpsConfig();
+  return (config && config.setup_draft) || null;
+}
+
+async function saveSetupDraftPhase({ phase, data }) {
+  // Merge new phase data into setup_draft, preserving any previously saved phases.
+  const sb = _client();
+  const uid = await _userId();
+
+  // Read current config to get existing setup_draft (if any).
+  const { data: existing, error: readErr } = await sb
+    .from('life_ops_config')
+    .select('config')
+    .eq('user_id', uid)
+    .maybeSingle();
+  if (readErr) _throw('saveSetupDraftPhase (read)', readErr);
+
+  const currentConfig = (existing && existing.config) || {};
+  const currentDraft = (currentConfig && currentConfig.setup_draft) || {};
+
+  // Build merged draft: preserve prior phase data, update the phase marker.
+  const mergedDraft = Object.assign({}, currentDraft, data, {
+    phase,
+    started_at: currentDraft.started_at || new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  });
+
+  const newConfig = Object.assign({}, currentConfig, { setup_draft: mergedDraft });
+
+  const { data: result, error } = await sb
+    .from('life_ops_config')
+    .upsert({ user_id: uid, config: newConfig }, { onConflict: 'user_id' })
+    .select()
+    .single();
+  if (error) _throw('saveSetupDraftPhase (write)', error);
+  return result;
+}
+
+async function clearSetupDraft() {
+  const sb = _client();
+  const uid = await _userId();
+
+  // Read current config so we can remove just the setup_draft key.
+  const { data: existing, error: readErr } = await sb
+    .from('life_ops_config')
+    .select('config')
+    .eq('user_id', uid)
+    .maybeSingle();
+  if (readErr) _throw('clearSetupDraft (read)', readErr);
+
+  if (!existing || !existing.config || !existing.config.setup_draft) {
+    return null; // Nothing to clear.
+  }
+
+  const newConfig = Object.assign({}, existing.config);
+  delete newConfig.setup_draft;
+
+  const { data, error } = await sb
+    .from('life_ops_config')
+    .upsert({ user_id: uid, config: newConfig }, { onConflict: 'user_id' })
+    .select()
+    .single();
+  if (error) _throw('clearSetupDraft (write)', error);
+  return data;
+}
+
 // ─── Life Areas ─────────────────────────────────────────────────────────────
 
 async function insertLifeArea({ name, description, glyph, palette, goal_id, slug } = {}) {
@@ -551,4 +623,8 @@ Object.assign(window, {
   listLifeAreas,
   archiveLifeArea,
   getLifeArea,
+  // setup draft persistence
+  getSetupDraft,
+  saveSetupDraftPhase,
+  clearSetupDraft,
 });
