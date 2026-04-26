@@ -231,7 +231,22 @@ function SettingsSubPage({ title, eyebrow, onBack, children }) {
   );
 }
 
-function StaticRow({ label, value, last }) {
+// StaticRow — non-interactive label + right-aligned value. The value text
+// (e.g. "Change", "Download", "·", or a static address) is **presentational
+// only** until a real destination lands — see interaction-inventory Gap #6.
+// Styling deliberately uses `SupportingText` (muted) and never adds underline
+// / cursor:pointer so the row doesn't read as tappable. If a row needs to
+// become interactive, swap to `<button>`/`<a>` rather than wrapping this.
+function StaticRow({ label, value, last, href }) {
+  // When `href` is provided, render the value as a real link (e.g. mailto:)
+  // so a tap does something. Visual treatment matches the static value to
+  // avoid implying additional affordance.
+  const ValueEl = href ? 'a' : 'span';
+  const valueStyle = {
+    fontFamily: T.font.UI, fontSize: 13, color: T.color.SupportingText, textAlign: 'right',
+    textDecoration: 'none',
+  };
+  const valueProps = href ? { href, style: valueStyle } : { style: valueStyle };
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -241,7 +256,7 @@ function StaticRow({ label, value, last }) {
       gap: 12,
     }}>
       <span style={{ fontFamily: T.font.UI, fontSize: 14, fontWeight: 500, color: T.color.PrimaryText }}>{label}</span>
-      <span style={{ fontFamily: T.font.UI, fontSize: 13, color: T.color.SupportingText, textAlign: 'right' }}>{value}</span>
+      <ValueEl {...valueProps}>{value}</ValueEl>
     </div>
   );
 }
@@ -442,7 +457,7 @@ function HelpPage({ onBack }) {
         border: `1px solid ${T.color.EdgeLine}`,
         borderRadius: 14, overflow: 'hidden', marginBottom: 18,
       }}>
-        <StaticRow label="Contact support" value="hi@intently.app" />
+        <StaticRow label="Contact support" value="hi@intently.app" href="mailto:hi@intently.app" />
         <StaticRow label="What's new" value="Apr 2026" last />
       </div>
 

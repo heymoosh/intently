@@ -35,18 +35,12 @@ const DOW_FULL    = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 function sameDay(a, b) { return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); }
 const TODAY = new Date(2026, 3, 23);
 
-// ─── top chrome: search + zoom segmented ────────────────────────
+// ─── top chrome: zoom segmented ─────────────────────────────────
+// (Search bar removed in wiring-audit Gap #8 — was a `<span>` masquerading
+// as an `<input>`. Restore as a real `<input>` once search is implemented.)
 function JournalHeader({ zoom, onZoom, title, subtitle }) {
   return (
     <div style={{ padding: '18px 20px 10px', background: T.color.PrimarySurface }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
-        background: T.color.SecondarySurface, border: `1px solid ${T.color.EdgeLine}`,
-        borderRadius: 999, marginBottom: 10,
-      }}>
-        <Icon.Search size={14} color={T.color.SupportingText} />
-        <span style={{ flex: 1, fontFamily: T.font.Reading, fontSize: 14, color: T.color.SubtleText, fontStyle: 'italic' }}>Search entries…</span>
-      </div>
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 8 }}>
         <div>
           <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', color: T.color.SupportingText }}>{subtitle}</div>
@@ -274,10 +268,15 @@ function WeekView({ onPickDay, onStartWeeklyReview }) {
   );
 }
 
-// ─── DAY view ─── today's entries chronologically + archive ─────
-function DayView({ onBack, onPickEntry }) {
+// ─── DAY view ─── one day's entries chronologically + archive ─────
+// `date` (Date | undefined) — the day to render. Defaults to "now" so the
+// existing "open Day directly" path keeps working. MonthView/WeekView pass
+// the picked day through so DayView shows that day, not always-today
+// (wiring-audit Gap #9).
+function DayView({ onBack, onPickEntry, date }) {
+  const dayDate = date || new Date();
   // Fallback used while DB load is pending OR when the user has no entries
-  // for today — keeps the screen looking real instead of empty.
+  // for the picked day — keeps the screen looking real instead of empty.
   const FALLBACK_ENTRIES = [
     { id: 'brief-7-14', time: '7:14', kind: 'brief', title: 'Daily brief', body: 'A quieter one than yesterday. Morning for deep work.' },
     { id: 'journal-10-32', time: '10:32', kind: 'journal', title: 'On the data slide', body: 'Rewrote the opening — it was too defensive. The new frame is: here is what we learned; here is what it implies; here is what we are doing about it. Three beats. Anya will push back on beat two.' },
@@ -287,8 +286,8 @@ function DayView({ onBack, onPickEntry }) {
 
   const [entries, setEntries] = React.useState(FALLBACK_ENTRIES);
   const [archive, setArchive] = React.useState([
-    { date: 'Mar 2', t: "Named the thing about the ops hire.", glyph: 'footprints' },
-    { date: 'Feb 14', t: 'First pitch rewrite — still too defensive.', glyph: 'pen' },
+    { id: 'archive-mar-2', date: 'Mar 2', t: "Named the thing about the ops hire.", glyph: 'footprints' },
+    { id: 'archive-feb-14', date: 'Feb 14', t: 'First pitch rewrite — still too defensive.', glyph: 'pen' },
   ]);
 
   // Hydrate today's entries from Supabase. Falls back to FALLBACK_ENTRIES if
@@ -300,10 +299,10 @@ function DayView({ onBack, onPickEntry }) {
       try {
         const sb = window.getSupabaseClient();
         const userId = await window.getCurrentUserId();
-        const today = new Date();
-        const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
-        const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1).toISOString();
-        const sevenDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        const day = dayDate;
+        const startOfDay = new Date(day.getFullYear(), day.getMonth(), day.getDate()).toISOString();
+        const endOfDay = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1).toISOString();
+        const sevenDaysAgo = new Date(day.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
         const [todayEntries, olderEntries] = await Promise.all([
           sb.from('entries').select('*')
             .eq('user_id', userId)
@@ -347,7 +346,7 @@ function DayView({ onBack, onPickEntry }) {
             const date = at.toLocaleString('en-US', { month: 'short', day: 'numeric' });
             const body = e.body_markdown || '';
             const t = body.split('\n')[0].slice(0, 80);
-            return { date, t, glyph: e.glyph || 'pen' };
+            return { id: e.id, date, t, glyph: e.glyph || 'pen' };
           }));
         }
       } catch (err) {
@@ -355,7 +354,9 @@ function DayView({ onBack, onPickEntry }) {
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+    // Re-hydrate when the picked day changes (Gap #9). Compare by Y/M/D so
+    // identical-day Date instances don't re-fire.
+  }, [dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate()]);
   const kindMeta = {
     brief:   { tint: T.color.TintSage,   label: 'Brief',   glyph: 'sunrise' },
     journal: { tint: T.color.TintLilac,  label: 'Journal', glyph: 'pen' },
@@ -477,10 +478,14 @@ function DayView({ onBack, onPickEntry }) {
         <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: T.color.SupportingText, marginBottom: 10 }}>From your archive</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {archive.map((a, i) => (
-            <button key={i} style={{
-              display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px',
-              background: 'transparent', border: 'none', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
-            }}>
+            <button
+              key={a.id || i}
+              onClick={() => onPickEntry && onPickEntry(a.id)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px',
+                background: 'transparent', border: 'none', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+              }}
+            >
               <span style={{ width: 32, height: 32, borderRadius: 10, background: T.color.PrimarySurface, border: `1px solid ${T.color.EdgeLine}`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <Glyph name={a.glyph} size={16} color={T.color.PrimaryText} stroke={1.75} />
               </span>
@@ -499,15 +504,23 @@ function DayView({ onBack, onPickEntry }) {
 // ─── PAST SHELL — zoomable journal ──────────────────────────────
 function PastJournal({ initialZoom = 'Week', onStartWeeklyReview }) {
   const [zoom, setZoom] = React.useState(initialZoom);
-  const subtitle = { Year: '2026', Month: 'April 2026', Week: 'Week 17 · Apr 20–26', Day: 'Thursday · Apr 23' }[zoom];
+  // Picked day from Year/Month/Week views — DayView reads this so day-cell
+  // taps actually navigate to that day, not always-today (Gap #9).
+  const [pickedDate, setPickedDate] = React.useState(null);
+  const pickDay = (d) => { if (d) setPickedDate(d); setZoom('Day'); };
+  const dayForSubtitle = pickedDate || new Date();
+  const daySubtitle = dayForSubtitle.toLocaleDateString('en-US', {
+    weekday: 'long', month: 'short', day: 'numeric',
+  });
+  const subtitle = { Year: '2026', Month: 'April 2026', Week: 'Week 17 · Apr 20–26', Day: daySubtitle }[zoom];
   const title = { Year: 'The year, at a glance.', Month: 'This month.', Week: 'What this week is for.', Day: 'Today, in your words.' }[zoom];
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: T.color.PrimarySurface }}>
       <JournalHeader zoom={zoom} onZoom={setZoom} title={title} subtitle={subtitle} />
-      {zoom === 'Year'  && <YearView  onPickMonth={() => setZoom('Month')} onPickDay={() => setZoom('Day')} />}
-      {zoom === 'Month' && <MonthView onPickDay={() => setZoom('Day')} />}
-      {zoom === 'Week'  && <WeekView  onPickDay={() => setZoom('Day')} onStartWeeklyReview={onStartWeeklyReview} />}
-      {zoom === 'Day'   && <DayView   onBack={() => setZoom('Week')} />}
+      {zoom === 'Year'  && <YearView  onPickMonth={() => setZoom('Month')} onPickDay={pickDay} />}
+      {zoom === 'Month' && <MonthView onPickDay={pickDay} />}
+      {zoom === 'Week'  && <WeekView  onPickDay={pickDay} onStartWeeklyReview={onStartWeeklyReview} />}
+      {zoom === 'Day'   && <DayView   onBack={() => setZoom('Week')} date={pickedDate} />}
     </div>
   );
 }

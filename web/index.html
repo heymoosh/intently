@@ -194,19 +194,27 @@ function Phone({ children }) {
 // Past → Day with a manual-add trailing row.
 function PastJournalProto({ adds, onAddJournal, onPickEntry, onStartWeeklyReview }) {
   const [zoom, setZoom] = React.useState('Day');
-  const subtitle = { Year: '2026', Month: 'April 2026', Week: 'Week 17 · Apr 20–26', Day: 'Thursday · Apr 23' }[zoom];
+  // Picked day from Year/Month/Week views — DayView reads this so day-cell
+  // taps actually navigate to that day, not always-today (wiring-audit Gap #9).
+  const [pickedDate, setPickedDate] = React.useState(null);
+  const pickDay = (d) => { if (d) setPickedDate(d); setZoom('Day'); };
+  const dayForSubtitle = pickedDate || new Date();
+  const daySubtitle = dayForSubtitle.toLocaleDateString('en-US', {
+    weekday: 'long', month: 'short', day: 'numeric',
+  });
+  const subtitle = { Year: '2026', Month: 'April 2026', Week: 'Week 17 · Apr 20–26', Day: daySubtitle }[zoom];
   const title = { Year: 'The year, at a glance.', Month: 'This month.', Week: 'What this week is for.', Day: 'Today, in your words.' }[zoom];
   const addedJournal = (adds && adds.journal && adds.journal.today) || [];
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: T.color.PrimarySurface }}>
       <JournalHeader zoom={zoom} onZoom={setZoom} title={title} subtitle={subtitle} />
-      {zoom === 'Year'  && <YearView  onPickMonth={() => setZoom('Month')} onPickDay={() => setZoom('Day')} />}
-      {zoom === 'Month' && <MonthView onPickDay={() => setZoom('Day')} />}
-      {zoom === 'Week'  && <WeekView  onPickDay={() => setZoom('Day')} onStartWeeklyReview={onStartWeeklyReview} />}
+      {zoom === 'Year'  && <YearView  onPickMonth={() => setZoom('Month')} onPickDay={pickDay} />}
+      {zoom === 'Month' && <MonthView onPickDay={pickDay} />}
+      {zoom === 'Week'  && <WeekView  onPickDay={pickDay} onStartWeeklyReview={onStartWeeklyReview} />}
       {zoom === 'Day'   && (
         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
           <div style={{ flex: '0 0 auto' }}>
-            <DayView onBack={() => setZoom('Week')} onPickEntry={onPickEntry} />
+            <DayView onBack={() => setZoom('Week')} onPickEntry={onPickEntry} date={pickedDate} />
           </div>
           <div style={{ padding: '0 20px 140px', marginTop: -120 }}>
             {addedJournal.slice().reverse().map((j) => (
@@ -1084,7 +1092,15 @@ function PrototypePhone({ dayState, setDayState, idx, setIdx }) {
           onOpenAccount={() => setProfileView('account')}
           onOpenPreferences={() => setProfileView('preferences')}
           onOpenHelp={() => setProfileView('help')}
-          onSignOut={() => setProfileView(null)}
+          onSignOut={async () => {
+            try {
+              if (window.signOutAndReset) await window.signOutAndReset();
+            } catch (err) {
+              // Don't block sheet close on sign-out failure — log and move on.
+              console.warn('[signOut] failed:', err && err.message);
+            }
+            setProfileView(null);
+          }}
           onStartSetup={() => { setProfileView(null); setShowSetup(true); }}
         />
       )}

@@ -13,7 +13,7 @@
 function JournalComposer({ onClose, onSave }) {
   const [text, setText] = React.useState('');
   const taRef = React.useRef(null);
-  const [now] = React.useState(() => new Date(2026, 3, 23, 14, 32));
+  const [now] = React.useState(() => new Date());
 
   React.useEffect(() => {
     if (taRef.current) taRef.current.focus();
