@@ -457,6 +457,10 @@ function FutureScreenProtoTappable({ adds, onOpenProject, onOpenGoal, onAddGoal,
   // fixtures when the user has no DB rows (so the demo is never empty).
   const [dbGoals, setDbGoals] = React.useState(null);
   const [dbProjects, setDbProjects] = React.useState(null);
+  // Track per-goal "most recent activity" — max(updated_at) across that goal's
+  // projects. Drives the "top 3 by recent activity" cap on the goals band.
+  const [goalActivity, setGoalActivity] = React.useState({});
+  const [showAllGoals, setShowAllGoals] = React.useState(false);
   React.useEffect(() => {
     if (!window.listGoals || !window.listProjects) return;
     let cancelled = false;
@@ -473,6 +477,8 @@ function FutureScreenProtoTappable({ adds, onOpenProject, onOpenGoal, onAddGoal,
           month: g.monthly_slice || '',
           glyph: g.glyph || 'leaf',
           pal: g.palette || ['#A8C0E0', '#D4C4F0', '#F0E0C0', '#F5E8D0'],
+          _position: g.position,
+          _updated_at: g.updated_at || g.created_at || null,
         })));
       }
       if (ps.length > 0) {
@@ -483,23 +489,49 @@ function FutureScreenProtoTappable({ adds, onOpenProject, onOpenGoal, onAddGoal,
           // ProjectCard reads p.title; goal_id passed through for navigation
           goal_id: p.goal_id,
           todos: Array.isArray(p.todos) ? p.todos : [],
+          _updated_at: p.updated_at || p.created_at || null,
         })));
+        // Roll project updated_at up to per-goal max activity timestamp.
+        const activity = {};
+        for (const p of ps) {
+          if (!p.goal_id) continue;
+          const t = new Date(p.updated_at || p.created_at || 0).getTime();
+          if (!activity[p.goal_id] || t > activity[p.goal_id]) activity[p.goal_id] = t;
+        }
+        setGoalActivity(activity);
       }
     });
     return () => { cancelled = true; };
   }, []);
 
-  const goals = dbGoals || window.GOAL_DATA;
+  const allGoals = dbGoals || window.GOAL_DATA;
+  // Sort goals by recent activity desc; fall back to the persisted position order
+  // (and finally goal id) so the order is stable when no projects link a goal.
+  const sortedGoals = React.useMemo(() => {
+    const scored = allGoals.map((g) => ({
+      g,
+      activity: goalActivity[g.id] || (g._updated_at ? new Date(g._updated_at).getTime() : 0),
+      position: typeof g._position === 'number' ? g._position : Number.MAX_SAFE_INTEGER,
+    }));
+    scored.sort((a, b) => (b.activity - a.activity) || (a.position - b.position));
+    return scored.map((s) => s.g);
+  }, [allGoals, goalActivity]);
+  const visibleGoals = showAllGoals ? sortedGoals : sortedGoals.slice(0, 3);
+  const overflowCount = Math.max(0, sortedGoals.length - 3);
+
   const projects = dbProjects || window.PROJECT_DATA;
-  const addedGoals = (adds && adds.goals) || [];
-  const addedProjects = (adds && adds.projects) || [];
+  // useManualAdds hydrates DB goals back into adds.goals — filter to truly
+  // session-pending items (optimistic `g-*` ids) so they don't double-render
+  // the painterly cards above as "Just added" placeholders.
+  const addedGoals = ((adds && adds.goals) || []).filter((g) => typeof g.id === 'string' && g.id.startsWith('g-'));
+  const addedProjects = ((adds && adds.projects) || []).filter((p) => typeof p.id === 'string' && p.id.startsWith('pr-'));
   const admin = (adds && adds.adminReminders) || [];
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
       <ScreenHeader tense="Future" title="What this month is for." caption="Three long-term visions. Each one gets a monthly slice — then the agent cascades it into weekly and daily moves on Present." />
       <div style={{ flex: 1, overflowY: 'auto', padding: '4px 20px 140px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {goals.map((g, i) => (
+        {visibleGoals.map((g, i) => (
           <button key={g.id} onClick={() => onOpenGoal && onOpenGoal(g)} style={{
             textAlign: 'left', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer',
             borderRadius: T.radius.Card, boxShadow: T.shadow.Raised, flexShrink: 0, overflow: 'hidden',
@@ -522,6 +554,21 @@ function FutureScreenProtoTappable({ adds, onOpenProject, onOpenGoal, onAddGoal,
             </PainterlyBlock>
           </button>
         ))}
+
+        {overflowCount > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: -2, marginBottom: 2 }}>
+            <button onClick={() => setShowAllGoals(s => !s)} style={{
+              padding: '7px 14px', background: 'transparent',
+              border: `1px solid ${T.color.EdgeLine}`, borderRadius: 999,
+              fontFamily: T.font.UI, fontSize: 11, fontWeight: 600, letterSpacing: 0.4,
+              color: T.color.SupportingText, cursor: 'pointer',
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+            }}>
+              {showAllGoals ? `Show top 3` : `Show all ${sortedGoals.length} goals (+${overflowCount})`}
+              <Icon.Chev size={11} color={T.color.SupportingText} />
+            </button>
+          </div>
+        )}
 
         {addedGoals.map((g) => (
           <div key={g.id} style={{
