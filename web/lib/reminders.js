@@ -95,4 +95,32 @@ async function classifyTranscript(transcript) {
   }
 }
 
-Object.assign(window, { fetchDueReminders, formatRemindersForInput, classifyTranscript });
+// Send a transcript to the chained classify-and-tag Edge Function.
+// Chain: reminder check first → if not reminder, signal classification.
+// Returns:
+//   { is_reminder: true, reminder: {...} }
+//   { is_reminder: false, signal_tag: 'ant'|null, signal_confidence: float, signal_framework_hint: string|null }
+//   null on transport / auth failure.
+async function classifyAndTag(transcript) {
+  const supabaseUrl = window.INTENTLY_CONFIG && window.INTENTLY_CONFIG.supabaseUrl;
+  if (!supabaseUrl || !transcript || !transcript.trim()) return null;
+  const token = await getSessionAccessToken();
+  if (!token) return null;
+  const endpoint = `${supabaseUrl.replace(/\/+$/, '')}/functions/v1/reminders/classify-and-tag`;
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ transcript, today: localTodayIso() }),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+Object.assign(window, { fetchDueReminders, formatRemindersForInput, classifyTranscript, classifyAndTag });

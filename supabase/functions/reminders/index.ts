@@ -23,6 +23,10 @@
 // Endpoints:
 //   POST /functions/v1/reminders/classify-and-store
 //        body: { transcript: string, today?: "YYYY-MM-DD" }
+//   POST /functions/v1/reminders/classify-and-tag
+//        body: { transcript: string, today?: "YYYY-MM-DD" }
+//        Chained classifier: reminder check first, then signal-type detection.
+//        Returns { is_reminder, reminder?, signal_tag?, signal_confidence?, signal_framework_hint? }
 //   GET  /functions/v1/reminders/due?date=YYYY-MM-DD
 //
 // CORS: mirrors ma-proxy (Access-Control-Allow-Origin: *). Lock down
@@ -78,6 +82,78 @@ function extractBearerToken(req: Request): string | null {
   const token = match[1].trim();
   return token.length > 0 ? token : null;
 }
+
+// ---------- V1 canonical signal taxonomy ----------
+// Single source of truth for signal types consumed by the classifier prompt.
+// Derived from docs/product/signals.md. When signals.md adds a new type,
+// add the corresponding entry here and update the framework_hints map.
+// DO NOT hardcode the tag list in any other file — import CANONICAL_SIGNALS.
+
+interface SignalDef {
+  tag: string;
+  description: string;
+  what_to_listen_for: string;
+  framework_hint: string; // Short explanation for the inline confirmation card
+}
+
+const CANONICAL_SIGNALS: SignalDef[] = [
+  {
+    tag: 'brag',
+    description: 'Wins and accomplishments worth remembering',
+    what_to_listen_for:
+      'User describes something going well, a problem solved, positive reaction received, or outcome they are proud of — especially when they understate or minimize it.',
+    framework_hint:
+      'Career coaches recommend keeping a "brag document" — a log of wins to draw on during performance reviews and when imposter syndrome hits.',
+  },
+  {
+    tag: 'ant',
+    description: 'Automatic negative thoughts — limiting beliefs worth noticing and challenging',
+    what_to_listen_for:
+      'Self-critical or limiting statements ("I\'m not good at X", "I always do Y wrong"), catastrophizing, filtering ("it went well but..."), should statements, fortune-telling. Reflexive self-undermining the user didn\'t pause on.',
+    framework_hint:
+      'Automatic Negative Thoughts (ANTs) come from CBT: these are cognitive distortions that fire reflexively and shape behavior without examination. Once named, they can be challenged.',
+  },
+  {
+    tag: 'grow',
+    description: 'Lessons from advice received from others worth acting on',
+    what_to_listen_for:
+      'Moments where the user received feedback, was told something useful, read something that reframed how they operate, or had a realization prompted by another person\'s input. "My manager said…", "they pointed out…", "after that conversation I realized…"',
+    framework_hint:
+      'Career coaching practice: deliberately capturing advice from others is how you build on external perspective rather than losing it.',
+  },
+  {
+    tag: 'self',
+    description: 'Personal insights from your own reflection — knowing yourself better',
+    what_to_listen_for:
+      'Internally generated statements about the user\'s nature: "I realized I work better when…", "I don\'t do well in environments like…", "I need…". Energy or drain observations that came from within.',
+    framework_hint:
+      'Designing Your Life (Burnett & Evans): knowing what conditions produce your best work is a prerequisite to well-designed work.',
+  },
+  {
+    tag: 'ideas',
+    description: 'Ideas worth developing — candidates not yet commitments',
+    what_to_listen_for:
+      '"What if…", "I\'ve been thinking about…", "I had an idea for…". Speculative or generative observations the user mentions and moves past. Distinct from tasks (executional) and projects (committed work).',
+    framework_hint:
+      'Ideas need a designated container to survive — capturing them explicitly and reviewing them periodically allows for compounding.',
+  },
+  {
+    tag: 'gtj',
+    description: 'Energy pattern observations — what energized or drained you',
+    what_to_listen_for:
+      'Language about engagement, energy, flow, or drain. "That meeting felt like a waste" → draining. "I couldn\'t stop working on it" → high engagement / possible flow.',
+    framework_hint:
+      'Good Time Journal (Designing Your Life): tracking engagement and energy over time reveals what genuinely energizes you vs. what drains you.',
+  },
+  {
+    tag: 'bet',
+    description: 'Bets and decisions — commitments made under uncertainty',
+    what_to_listen_for:
+      'Explicit commitment ("I\'ve decided to…", "I\'m going to…"), commitments with reasoning ("because…", "the main reason is…"), forward-looking predictions, acknowledgment of uncertainty. Distinct from tasks and ideas.',
+    framework_hint:
+      'Thinking in Bets (Annie Duke): recording decisions as bets — with reasoning at the time — lets you reflect on the quality of your thinking, not just outcomes.',
+  },
+];
 
 // ---------- classification ----------
 
@@ -158,6 +234,129 @@ async function classifyTranscript(
     classified: false,
     reason: typeof parsed?.reason === 'string' ? parsed.reason : 'not a reminder',
   };
+}
+
+// ---------- signal classifier ----------
+
+// Builds the signal detection prompt. Includes the canonical taxonomy
+// from CANONICAL_SIGNALS plus any per-user custom signals.
+// V1: picks the single strongest signal per utterance.
+function buildSignalPrompt(transcript: string, customSignals: SignalDef[]): string {
+  const allSignals = [...CANONICAL_SIGNALS, ...customSignals];
+
+  const signalLines = allSignals.map((s) =>
+    `- tag: "${s.tag}" | ${s.description} | Listen for: ${s.what_to_listen_for}`
+  ).join('\n');
+
+  return [
+    `The user said: "${transcript}"`,
+    '',
+    'You are a signal classifier for a life-ops journaling app. Detect if this utterance contains a signal of one of these types:',
+    '',
+    signalLines,
+    '',
+    'Pick the SINGLE strongest signal match. If no signal matches, return tag: null.',
+    '',
+    'Respond with JSON only:',
+    '{"tag": "<tag name or null>", "confidence": <0.0-1.0 float>}',
+    '',
+    'Rules:',
+    '- confidence should reflect how certain you are this is the stated signal type.',
+    '- Return the tag string without the # prefix.',
+    '- If multiple signals could apply, pick the one with highest confidence.',
+    '- Output ONLY the JSON object, no prose, no code fences.',
+  ].join('\n');
+}
+
+interface SignalResult {
+  tag: string | null;
+  confidence: number;
+  framework_hint?: string;
+}
+
+async function classifySignal(
+  apiKey: string,
+  transcript: string,
+  customSignals: SignalDef[],
+): Promise<SignalResult> {
+  const res = await fetch(`${ANTHROPIC_API_BASE}/v1/messages`, {
+    method: 'POST',
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: ANTHROPIC_MODEL,
+      max_tokens: 128,
+      messages: [{ role: 'user', content: buildSignalPrompt(transcript, customSignals) }],
+    }),
+  });
+
+  if (!res.ok) {
+    const detail = await safeReadBody(res);
+    throw new Error(`anthropic signal ${res.status}: ${JSON.stringify(detail)}`);
+  }
+
+  const data = (await res.json()) as any;
+  const textBlock = Array.isArray(data?.content)
+    ? data.content.find((b: any) => b?.type === 'text')
+    : null;
+  const raw = textBlock?.text ?? '';
+
+  let parsed: any;
+  try {
+    const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '');
+    parsed = JSON.parse(cleaned);
+  } catch {
+    return { tag: null, confidence: 0 };
+  }
+
+  const tag = typeof parsed?.tag === 'string' && parsed.tag !== 'null' ? parsed.tag : null;
+  const confidence = typeof parsed?.confidence === 'number'
+    ? Math.max(0, Math.min(1, parsed.confidence))
+    : 0;
+
+  if (!tag) return { tag: null, confidence: 0 };
+
+  // Look up the framework hint from canonical or custom signals.
+  const def = [...CANONICAL_SIGNALS, ...customSignals].find((s) => s.tag === tag);
+  return {
+    tag,
+    confidence,
+    framework_hint: def?.framework_hint,
+  };
+}
+
+// Fetch user_signals rows from Supabase for the current user (JWT-scoped).
+// Returns an array of SignalDef objects for the signal classifier prompt.
+// Returns [] gracefully on any error (classifier falls back to canonical only).
+async function fetchUserSignals(
+  supabaseUrl: string,
+  anonKey: string,
+  userJwt: string,
+): Promise<SignalDef[]> {
+  try {
+    const url = new URL(`${supabaseUrl}/rest/v1/user_signals`);
+    url.searchParams.set('enabled', 'eq.true');
+    url.searchParams.set('select', 'tag,description,framework');
+
+    const res = await fetch(url.toString(), {
+      method: 'GET',
+      headers: userScopedHeaders(anonKey, userJwt),
+    });
+    if (!res.ok) return [];
+
+    const rows = (await res.json()) as any[];
+    return rows.map((r) => ({
+      tag: r.tag,
+      description: r.description || '',
+      what_to_listen_for: r.description || '',
+      framework_hint: r.framework || '',
+    }));
+  } catch {
+    return [];
+  }
 }
 
 // ---------- PostgREST (JWT-passthrough; RLS evaluates auth.uid()) ----------
@@ -377,8 +576,76 @@ Deno.serve(async (req: Request) => {
     }
   }
 
+  // POST /reminders/classify-and-tag ------------------------------------------
+  // Chained classifier:
+  //   1. Haiku reminder check — is this a reminder? If yes, stop and return is_reminder: true.
+  //   2. If not a reminder, run signal classifier — which V1 canonical (or user-custom) signal
+  //      type best fits this utterance?
+  // Response:
+  //   { is_reminder: true, reminder: {...} }
+  //   { is_reminder: false, signal_tag: 'ant', signal_confidence: 0.92, signal_framework_hint: '...' }
+  //   { is_reminder: false, signal_tag: null, signal_confidence: 0 }
+  if (req.method === 'POST' && pathname.endsWith('/classify-and-tag')) {
+    if (!anthropicKey) {
+      console.error('[reminders] ANTHROPIC_API_KEY not set — run `supabase secrets set`');
+      return errResp(500, 'server misconfigured: missing ANTHROPIC_API_KEY');
+    }
+
+    let raw: any;
+    try {
+      raw = await req.json();
+    } catch {
+      return errResp(400, 'invalid JSON body');
+    }
+    const transcript = raw?.transcript;
+    if (typeof transcript !== 'string' || transcript.trim().length === 0) {
+      return errResp(400, 'body must include non-empty { transcript: string }');
+    }
+
+    let today: string;
+    if (typeof raw?.today === 'string' && raw.today.length > 0) {
+      if (!isValidIsoDate(raw.today)) {
+        return errResp(400, 'today must be YYYY-MM-DD');
+      }
+      today = raw.today;
+    } else {
+      today = todayIsoDate();
+    }
+
+    try {
+      // Step 1: Reminder check (fast, cheap — same Haiku call as classify-and-store)
+      const reminderResult = await classifyTranscript(anthropicKey, transcript, today);
+      if (reminderResult.classified) {
+        // It's a reminder — persist and return early; no signal tagging needed.
+        const reminder = await insertReminder(
+          supabaseUrl,
+          anonKey,
+          userJwt,
+          reminderResult.text,
+          reminderResult.remind_on,
+        );
+        return json({ is_reminder: true, reminder });
+      }
+
+      // Step 2: Signal classification — load user customs, then run signal classifier.
+      const userCustomSignals = await fetchUserSignals(supabaseUrl, anonKey, userJwt);
+      const signalResult = await classifySignal(anthropicKey, transcript, userCustomSignals);
+
+      return json({
+        is_reminder: false,
+        signal_tag: signalResult.tag,
+        signal_confidence: signalResult.confidence,
+        signal_framework_hint: signalResult.framework_hint ?? null,
+      });
+    } catch (err) {
+      console.error('[reminders] classify-and-tag error', err);
+      if (_sentryDsn) { Sentry.captureException(err); await Sentry.flush(2000); }
+      return errResp(502, 'classify-and-tag failed', err instanceof Error ? err.message : String(err));
+    }
+  }
+
   return errResp(
     404,
-    'not found — try POST /reminders/classify-and-store or GET /reminders/due?date=YYYY-MM-DD',
+    'not found — try POST /reminders/classify-and-store, POST /reminders/classify-and-tag, or GET /reminders/due?date=YYYY-MM-DD',
   );
 });

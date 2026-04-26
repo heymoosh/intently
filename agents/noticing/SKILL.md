@@ -126,6 +126,21 @@ metadata            jsonb not null default '{}'
 
 ---
 
+## Workstream 4 — capture-time signal tagging (V1.1, shipped)
+
+The classifier (chained, Haiku) tags entries at write time using `docs/product/signals.md` as the canonical taxonomy plus the user's custom signals from the `user_signals` table. Confidence-split UX: ≥0.8 confidence = silent auto-tag; <0.8 = inline confirmation card in the chat thread.
+
+**Implementation:**
+- Edge Function: `supabase/functions/reminders/index.ts` route `POST /classify-and-tag`
+- Chained: Haiku reminder check → if not reminder, Haiku signal classifier using CANONICAL_SIGNALS constant (derived from `docs/product/signals.md`)
+- Schema: `entries.tags text[]` + `entries.tag_confidence jsonb` (migration `0011_entry_tags.sql`)
+- User customs: `user_signals` table scaffold (V1.1 read interface; V1.2 for full management UX)
+- Frontend: `web/intently-hero.jsx` `HeroChat.sendUtterance` — routes through `classifyAndTag()` in `web/lib/reminders.js`; renders `SignalConfirmCard` for lower-confidence tags
+
+**V1 picks the single strongest tag per utterance.**
+
+---
+
 ## V2 TODOs
 
 - Scheduled invocation: pg_cron fires noticing agent on each `tick_skills` cycle.
