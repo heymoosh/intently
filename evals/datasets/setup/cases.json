@@ -1,0 +1,173 @@
+{
+  "skill": "setup",
+  "cases": [
+    {
+      "id": "happy-path-all-4-phases",
+      "notes": "User goes through all 4 phases providing rich input. Exercises goal enrichment, project FK linkage, week outcome write, and preferences merge. Agent call is Phase 1 only; Phases 2–4 are form writes. Expected: all 4 entity tables populated, first_run_complete=true.",
+      "input": {
+        "goal_titles": [
+          "Ship a product people rely on",
+          "Build a consistent health routine",
+          "Spend real time with family"
+        ],
+        "projects": [
+          { "title": "Intently launch", "goal_index": 0 },
+          { "title": "Strength training program", "goal_index": 1 }
+        ],
+        "week_outcome": "Have the onboarding flow working end-to-end and demoed",
+        "prefs": {
+          "focus_area": "Product work",
+          "work_start": "09:00",
+          "work_end": "18:00",
+          "energy_pattern": "morning_peak",
+          "daily_brief_time": "07:00",
+          "weekly_review_day": "Sunday"
+        },
+        "journal_text": "Starting Intently because I keep losing track of what actually matters week to week."
+      },
+      "expected": {
+        "must_surface": [
+          "Agent returns slices array with exactly 3 items indexed 0, 1, 2.",
+          "Each slice has a non-empty monthly_slice (under 40 words) grounded in the user's goal title language.",
+          "Each slice has a glyph from the canonical set (leaf, star, flame, bolt, heart, shield, anchor, compass, mountain, sun).",
+          "goals table receives 3 rows with title, monthly_slice, glyph, palette, position.",
+          "projects table receives 2 rows with goal_id FK matching the inserted goal IDs, plus the hardcoded Admin project.",
+          "life_ops_config.config contains this_week_outcome matching the input string.",
+          "life_ops_config.config contains work_hours.start='09:00', work_hours.end='18:00', energy_pattern='morning_peak', daily_brief_time='07:00', weekly_review_day='Sunday'.",
+          "life_ops_config.config.first_run_complete=true.",
+          "entries table receives 1 row with kind='journal' and body_markdown matching the journal_text."
+        ],
+        "anti_patterns": [
+          "Agent invents goals the user did not provide.",
+          "monthly_slice paraphrases or reframes the goal into different language (e.g. 'Establish a sustainable product culture').",
+          "glyph outside the canonical set.",
+          "projects written without goal_id when a goal_index was provided.",
+          "first_run_complete left false or absent after final persist.",
+          "Journal entry written even when journal_text is blank."
+        ]
+      }
+    },
+    {
+      "id": "skip-phase-2-no-projects",
+      "notes": "User skips Phase 2 entirely (no projects entered). Only the hardcoded Admin project should be written. Goals, outcome, and prefs still written.",
+      "input": {
+        "goal_titles": [
+          "Write and publish regularly",
+          "Pay off the mortgage early"
+        ],
+        "projects": [],
+        "week_outcome": "Draft three essay outlines",
+        "prefs": {
+          "focus_area": "Writing",
+          "work_start": "08:00",
+          "work_end": "17:00",
+          "energy_pattern": "morning_peak",
+          "daily_brief_time": "06:30",
+          "weekly_review_day": "Saturday"
+        },
+        "journal_text": ""
+      },
+      "expected": {
+        "must_surface": [
+          "Agent returns 2 slices indexed 0 and 1.",
+          "goals table receives 2 rows.",
+          "projects table receives only the Admin row (is_admin=true) — no user projects.",
+          "life_ops_config.config.this_week_outcome = 'Draft three essay outlines'.",
+          "life_ops_config.config.first_run_complete = true.",
+          "No entries row written (journal_text was blank)."
+        ],
+        "anti_patterns": [
+          "Any non-Admin project row inserted when the user provided no projects.",
+          "Error thrown because projects array is empty.",
+          "journal entry inserted when journal_text is empty string."
+        ]
+      }
+    },
+    {
+      "id": "minimal-phase-4-prefs",
+      "notes": "User accepts all Phase 4 defaults without changing anything. Tests that defaults are persisted correctly even when the user doesn't modify the form.",
+      "input": {
+        "goal_titles": [
+          "Grow the agency"
+        ],
+        "projects": [
+          { "title": "Client proposal pipeline", "goal_index": 0 }
+        ],
+        "week_outcome": "",
+        "prefs": {
+          "focus_area": "Grow the agency",
+          "work_start": "09:00",
+          "work_end": "18:00",
+          "energy_pattern": "unset",
+          "daily_brief_time": "07:00",
+          "weekly_review_day": "Sunday"
+        },
+        "journal_text": ""
+      },
+      "expected": {
+        "must_surface": [
+          "Agent returns 1 slice for the single goal.",
+          "goals table receives 1 row.",
+          "projects table receives the user project + Admin.",
+          "life_ops_config.config.work_hours = { start: '09:00', end: '18:00' }.",
+          "life_ops_config.config.energy_pattern = 'unset'.",
+          "life_ops_config.config.daily_brief_time = '07:00'.",
+          "life_ops_config.config.weekly_review_day = 'Sunday'.",
+          "life_ops_config.config does NOT contain this_week_outcome key (or it is absent/null) because week_outcome was blank.",
+          "first_run_complete = true."
+        ],
+        "anti_patterns": [
+          "this_week_outcome written as empty string rather than omitted.",
+          "Defaults overwritten with null/undefined values.",
+          "Error on single-goal input."
+        ]
+      }
+    },
+    {
+      "id": "extensive-phase-4-prefs",
+      "notes": "User provides fully non-default preferences: early brief time, non-Sunday review day, explicit energy pattern, and narrow work hours.",
+      "input": {
+        "goal_titles": [
+          "Become a senior engineer",
+          "Run a half-marathon"
+        ],
+        "projects": [
+          { "title": "Systems design study", "goal_index": 0 },
+          { "title": "Half-marathon training plan", "goal_index": 1 },
+          { "title": "Side project — CLI tool", "goal_index": null }
+        ],
+        "week_outcome": "Complete the first two chapters of the systems design book",
+        "prefs": {
+          "focus_area": "Engineering growth",
+          "work_start": "07:30",
+          "work_end": "16:30",
+          "energy_pattern": "morning_peak",
+          "daily_brief_time": "06:00",
+          "weekly_review_day": "Friday"
+        },
+        "journal_text": "I've tried tracking systems before and they all fall apart. Hoping this one actually sticks because it's agent-powered."
+      },
+      "expected": {
+        "must_surface": [
+          "Agent returns 2 slices indexed 0 and 1.",
+          "goals table receives 2 rows.",
+          "projects table receives 3 user projects + Admin. The third project (goal_index=null) is inserted with null goal_id.",
+          "life_ops_config.config.focus_area = 'Engineering growth'.",
+          "life_ops_config.config.work_hours = { start: '07:30', end: '16:30' }.",
+          "life_ops_config.config.daily_brief_time = '06:00'.",
+          "life_ops_config.config.energy_pattern = 'morning_peak'.",
+          "life_ops_config.config.weekly_review_day = 'Friday'.",
+          "life_ops_config.config.this_week_outcome = 'Complete the first two chapters of the systems design book'.",
+          "entries row inserted with kind='journal' matching the journal_text.",
+          "first_run_complete = true."
+        ],
+        "anti_patterns": [
+          "Non-default prefs silently reverted to defaults.",
+          "Third project errors out because goal_index is null — it should insert with null goal_id.",
+          "monthly_slice for 'Run a half-marathon' reframed into general wellness language rather than running-specific.",
+          "Journal entry not written despite non-empty journal_text."
+        ]
+      }
+    }
+  ]
+}
