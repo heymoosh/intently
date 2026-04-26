@@ -243,12 +243,41 @@ function _formatEmails(emails) {
   return `## Email flags\n${lines.join('\n')}\n`;
 }
 
+// Build the "what did the assembler actually consult" list — used by the
+// confirm cards' InputTrace UI to surface ethical-AI explain-before-you-act.
+function _buildConsulted(state, opts = {}) {
+  const consulted = [];
+  if (state.goals && state.goals.length > 0) consulted.push('goals');
+  if (state.projects && state.projects.filter((p) => !p.is_admin).length > 0) consulted.push('projects');
+  if (opts.hasYesterdayReview) consulted.push('yesterday-review');
+  if (opts.hasRecentJournal) consulted.push('journal');
+  if (state.todayPlan && state.todayPlan.length > 0) consulted.push('plan');
+  if (state.dueReminders && state.dueReminders.length > 0) consulted.push('reminders');
+  if (state.todayCal && state.todayCal.length > 0) consulted.push('calendar');
+  if (state.urgentEmails && state.urgentEmails.length > 0) consulted.push('email');
+  return consulted;
+}
+
+// Detect: is there a yesterday-or-recent review entry? (Used both for trace
+// + for the review-as-summary compression branch in the journal section.)
+function _hasYesterdayReviewEntry(entries) {
+  return entries.some((e) => e.kind === 'review');
+}
+
+function _hasJournalEntry(entries) {
+  return entries.some((e) => e.kind === 'journal');
+}
+
 // Public: assemble the markdown context for a daily brief. The brief flow's
 // per-turn user input (the "what's alive?" / "what to park?" answers) gets
 // appended below this; the agent sees user state THEN today's conversation.
+//
+// Returns { input: string, consulted: string[] } so the calling UI can render
+// an InputTrace ("consulted: goals, journal, calendar, email…") on the confirm
+// card per ethical-AI design principle "explain before you act."
 async function assembleBriefContext(userAnswers = []) {
   const state = await _gatherUserState();
-  if (!state) return userAnswers.join('\n\n');
+  if (!state) return { input: userAnswers.join('\n\n'), consulted: [] };
 
   const hasReview = _hasRecentReview(state.recentEntries);
   const sections = [
@@ -276,13 +305,18 @@ async function assembleBriefContext(userAnswers = []) {
     'Then append the structured JSON tail per your output contract (pacing / flags / bands / parked / today_one_line / carrying_into_tomorrow).',
   );
 
-  return sections.join('\n');
+  const consulted = _buildConsulted(state, {
+    hasYesterdayReview: _hasYesterdayReviewEntry(state.recentEntries),
+    hasRecentJournal: !hasReview && _hasJournalEntry(state.recentEntries),
+  });
+
+  return { input: sections.join('\n'), consulted };
 }
 
 // Public: assemble the markdown context for an evening review.
 async function assembleReviewContext(userAnswers = [], autoCheckedItems = []) {
   const state = await _gatherUserState();
-  if (!state) return userAnswers.join('\n\n');
+  if (!state) return { input: userAnswers.join('\n\n'), consulted: [] };
 
   const hasReview = _hasRecentReview(state.recentEntries);
   const sections = [
@@ -314,7 +348,146 @@ async function assembleReviewContext(userAnswers = [], autoCheckedItems = []) {
     'Then append the structured JSON tail per your output contract (journal_text / friction / tomorrow / calendar).',
   );
 
-  return sections.join('\n');
+  const consulted = _buildConsulted(state, {
+    hasYesterdayReview: false, // review flow doesn't lean on yesterday's review
+    hasRecentJournal: !hasReview && _hasJournalEntry(state.recentEntries),
+  });
+
+  return { input: sections.join('\n'), consulted };
 }
 
-Object.assign(window, { assembleBriefContext, assembleReviewContext });
+// ─── Weekly review context ─────────────────────────────────────────────────
+
+// ISO week id like "2026-W17". Used as a link id on weekly review entries
+// so the assembler can detect "this week's WeeklyReview exists" vs not.
+function _isoWeekId(d = new Date()) {
+  const target = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNum = (target.getUTCDay() + 6) % 7; // mon=0
+  target.setUTCDate(target.getUTCDate() - dayNum + 3); // shift to Thursday
+  const firstThursday = new Date(Date.UTC(target.getUTCFullYear(), 0, 4));
+  const week = 1 + Math.round(((target - firstThursday) / 86400000 - 3 + ((firstThursday.getUTCDay() + 6) % 7)) / 7);
+  return `${target.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
+}
+
+// Read the week-scoped state the weekly-review agent needs.
+async function _gatherWeekState() {
+  const sb = window.getSupabaseClient ? window.getSupabaseClient() : null;
+  if (!sb) return null;
+  const userId = await window.getCurrentUserId();
+  const today = new Date();
+  // Start of week = Monday 00:00 (matches ISO week)
+  const dow = (today.getDay() + 6) % 7; // mon=0
+  const weekStart = new Date(today.getFullYear(), today.getMonth(), today.getDate() - dow);
+  const weekStartIso = weekStart.toISOString();
+
+  const [goals, projects, weekEntries, weekPlanItems] = await Promise.all([
+    sb.from('goals').select('*').eq('user_id', userId).is('archived_at', null)
+      .order('position', { ascending: true, nullsFirst: false }).limit(3)
+      .then((r) => r.data || []),
+    sb.from('projects').select('*').eq('user_id', userId).eq('status', 'active')
+      .order('updated_at', { ascending: false }).then((r) => r.data || []),
+    sb.from('entries').select('*').eq('user_id', userId).gte('at', weekStartIso)
+      .order('at', { ascending: true }).then((r) => r.data || []),
+    sb.from('plan_items').select('*').eq('user_id', userId)
+      .gte('date', weekStart.toISOString().slice(0, 10))
+      .order('date', { ascending: true }).then((r) => r.data || []),
+  ]);
+
+  return { today, weekStart, goals, projects, weekEntries, weekPlanItems };
+}
+
+// Format the week's outcomes from plan_items + reviews + journals — what the
+// agent should treat as "this week's done". Mirrors the daily auto-check
+// pattern but week-scoped.
+function _formatWeekOutcomes(weekEntries, weekPlanItems) {
+  const lines = [];
+  if (weekPlanItems.length > 0) {
+    lines.push('### Plan items this week');
+    weekPlanItems.forEach((p) => lines.push(`- ${p.date}: ${p.text}${p.tier ? ` (${p.tier})` : ''}`));
+    lines.push('');
+  }
+  const reviews = weekEntries.filter((e) => e.kind === 'review');
+  if (reviews.length > 0) {
+    lines.push('### Daily reviews this week');
+    reviews.forEach((r) => {
+      const at = new Date(r.at);
+      const day = at.toLocaleString('en-US', { weekday: 'short' });
+      const prose = (r.body_markdown || '').replace(/```json[\s\S]*$/, '').trim();
+      lines.push(`- **${day}**: ${prose}`);
+    });
+    lines.push('');
+  }
+  const journals = weekEntries.filter((e) => e.kind === 'journal').slice(0, 6);
+  if (journals.length > 0) {
+    lines.push('### Journal entries this week');
+    journals.forEach((j) => {
+      const at = new Date(j.at);
+      const day = at.toLocaleString('en-US', { weekday: 'short' });
+      lines.push(`- **${day}**: ${j.body_markdown}`);
+    });
+    lines.push('');
+  }
+  return lines.length > 0 ? lines.join('\n') : '';
+}
+
+// Public: assemble context for a weekly review.
+async function assembleWeeklyReviewContext(userAnswers = []) {
+  const state = await _gatherWeekState();
+  if (!state) return { input: userAnswers.join('\n\n'), consulted: [] };
+
+  const sections = [
+    `# Weekly review context for ${_isoWeekId(state.today)} (week of ${state.weekStart.toLocaleString('en-US', { month: 'short', day: 'numeric' })})`,
+    '',
+    _formatGoals(state.goals),
+    _formatProjects(state.projects),
+    _formatWeekOutcomes(state.weekEntries, state.weekPlanItems),
+  ].filter(Boolean);
+
+  if (userAnswers.length > 0) {
+    sections.push("## What the user just told you in this weekly review");
+    userAnswers.forEach((a, i) => sections.push(`${i + 1}. ${a}`));
+    sections.push('');
+  }
+
+  sections.push(
+    '## Your task',
+    'Generate a weekly review in plain prose (≤4 short paragraphs). Open by naming what actually landed this week (cite specific plan items / reviews / journal moments — show you remember). Reflect on the through-line: was the week serving the active monthly priorities, or drifting? Name one pattern worth carrying forward, one worth dropping. End with 2–4 outcome-directions for next week, each connected to an active goal/monthly slice. Speak directly to them ("you"). Tone: warm, end-of-week, perspective-taking.',
+    '',
+    'Then append a structured JSON tail per the weekly-review output contract:',
+    '```json',
+    '{',
+    '  "summary": "one-line week summary",',
+    '  "outcomes": [{"text": "...", "status": "done|doing|todo"}],',
+    '  "key_moments": [{"glyph": "rocket|leaf|moon|...", "text": "..."}],',
+    '  "next_week_directions": [{"text": "...", "serves_goal_index": 0}]',
+    '}',
+    '```',
+  );
+
+  const consulted = [];
+  if (state.goals.length) consulted.push('goals');
+  if (state.projects.filter(p => !p.is_admin).length) consulted.push('projects');
+  if (state.weekPlanItems.length) consulted.push('plan');
+  if (state.weekEntries.some(e => e.kind === 'review')) consulted.push('yesterday-review');
+  if (state.weekEntries.some(e => e.kind === 'journal')) consulted.push('journal');
+
+  return { input: sections.join('\n'), consulted, weekId: _isoWeekId(state.today) };
+}
+
+// Map a consulted-key to a chip-label (mirrors labelForInputTrace from
+// agent-output.js but covers the keys our assembler emits).
+function labelForConsulted(key) {
+  const map = {
+    goals: 'Goals',
+    projects: 'Projects',
+    'yesterday-review': "Yesterday's review",
+    journal: 'Journal',
+    plan: "Today's plan",
+    reminders: 'Reminders',
+    calendar: 'Calendar',
+    email: 'Email',
+  };
+  return map[key] || key;
+}
+
+Object.assign(window, { assembleBriefContext, assembleReviewContext, assembleWeeklyReviewContext, labelForConsulted });

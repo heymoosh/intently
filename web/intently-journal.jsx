@@ -155,7 +155,7 @@ function MonthView({ monthIdx = 3, onPickWeek, onPickDay }) {
 }
 
 // ─── WEEK view ─── weekly review surface ───────────────────────
-function WeekView({ onPickDay }) {
+function WeekView({ onPickDay, onStartWeeklyReview }) {
   // Fake "this week" — Mon Apr 20 → Sun Apr 26
   const weekStart = new Date(2026, 3, 20);
   const weekDays = Array.from({ length: 7 }, (_, i) => {
@@ -243,6 +243,24 @@ function WeekView({ onPickDay }) {
           ))}
         </ul>
       </div>
+
+      {/* Weekly-review CTA — opens WeeklyReviewFlow overlay. Naturally surfaces
+          on Sundays in production; here it's available any day for testing. */}
+      {onStartWeeklyReview && (
+        <div style={{ marginTop: 8, marginBottom: 8, display: 'flex', justifyContent: 'center' }}>
+          <button onClick={onStartWeeklyReview} style={{
+            padding: '12px 22px',
+            background: 'linear-gradient(135deg, #2A2348 0%, #3D3565 55%, #5A4E7E 100%)',
+            color: '#FBF6EA', border: 'none', borderRadius: 999, cursor: 'pointer',
+            fontFamily: T.font.UI, fontSize: 13, fontWeight: 600, letterSpacing: 0.4,
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            boxShadow: '0 4px 16px rgba(42,35,72,0.30)',
+          }}>
+            <Icon.Moon size={14} color="#FBF6EA" />
+            Start weekly review
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -470,7 +488,7 @@ function DayView({ onBack, onPickEntry }) {
 }
 
 // ─── PAST SHELL — zoomable journal ──────────────────────────────
-function PastJournal({ initialZoom = 'Week' }) {
+function PastJournal({ initialZoom = 'Week', onStartWeeklyReview }) {
   const [zoom, setZoom] = React.useState(initialZoom);
   const subtitle = { Year: '2026', Month: 'April 2026', Week: 'Week 17 · Apr 20–26', Day: 'Thursday · Apr 23' }[zoom];
   const title = { Year: 'The year, at a glance.', Month: 'This month.', Week: 'What this week is for.', Day: 'Today, in your words.' }[zoom];
@@ -479,7 +497,7 @@ function PastJournal({ initialZoom = 'Week' }) {
       <JournalHeader zoom={zoom} onZoom={setZoom} title={title} subtitle={subtitle} />
       {zoom === 'Year'  && <YearView  onPickMonth={() => setZoom('Month')} onPickDay={() => setZoom('Day')} />}
       {zoom === 'Month' && <MonthView onPickDay={() => setZoom('Day')} />}
-      {zoom === 'Week'  && <WeekView  onPickDay={() => setZoom('Day')} />}
+      {zoom === 'Week'  && <WeekView  onPickDay={() => setZoom('Day')} onStartWeeklyReview={onStartWeeklyReview} />}
       {zoom === 'Day'   && <DayView   onBack={() => setZoom('Week')} />}
     </div>
   );
