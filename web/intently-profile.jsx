@@ -291,76 +291,6 @@ Object.assign(window, { getPref, setPref, getAllPrefs });
 
 const _DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-// SelectRow — tap to cycle through options. For the small option sets here
-// (week-day pickers) cycling is faster than opening a sheet/select.
-function SelectRow({ label, sub, prefKey, options, defaultValue, last }) {
-  const [value, setValue] = React.useState(() => getPref(prefKey, defaultValue));
-  const cycle = () => {
-    const i = options.indexOf(value);
-    const next = options[(i + 1) % options.length];
-    setValue(next);
-    setPref(prefKey, next);
-  };
-  return (
-    <button onClick={cycle} style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      width: '100%', padding: '14px 16px',
-      borderBottom: last ? 'none' : `1px solid ${T.color.EdgeLine}`,
-      minHeight: 52, gap: 12,
-      background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left',
-    }}>
-      <span style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ display: 'block', fontFamily: T.font.UI, fontSize: 14, fontWeight: 500, color: T.color.PrimaryText }}>{label}</span>
-        {sub && <span style={{ display: 'block', marginTop: 2, fontFamily: T.font.Reading, fontSize: 12, color: T.color.SupportingText }}>{sub}</span>}
-      </span>
-      <span style={{ fontFamily: T.font.UI, fontSize: 13, color: T.color.SupportingText, textAlign: 'right' }}>{value}</span>
-    </button>
-  );
-}
-
-// ToggleRow — same persistence pattern as SelectRow (getPref/setPref against
-// localStorage `intently:prefs`). Each instance MUST pass a stable `prefKey`
-// string (declared at call sites, not derived from labels) so that copy edits
-// to `label` don't orphan saved values. See Pref keys block above PreferencesPage.
-function ToggleRow({ label, sub, prefKey, defaultOn = false, last }) {
-  const [on, setOn] = React.useState(() => getPref(prefKey, defaultOn));
-  const toggle = () => {
-    setOn(prev => {
-      const next = !prev;
-      setPref(prefKey, next);
-      return next;
-    });
-  };
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 12,
-      padding: '14px 16px',
-      borderBottom: last ? 'none' : `1px solid ${T.color.EdgeLine}`,
-      minHeight: 52,
-    }}>
-      <span style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ display: 'block', fontFamily: T.font.UI, fontSize: 14, fontWeight: 500, color: T.color.PrimaryText }}>{label}</span>
-        {sub && <span style={{ display: 'block', marginTop: 2, fontFamily: T.font.Reading, fontSize: 12, color: T.color.SupportingText }}>{sub}</span>}
-      </span>
-      <button onClick={toggle} aria-pressed={on} style={{
-        width: 44, height: 26, borderRadius: 999,
-        background: on ? T.color.PrimaryText : T.color.Stone300,
-        border: 'none', cursor: 'pointer', flexShrink: 0,
-        position: 'relative', padding: 0,
-        transition: 'background 180ms ease',
-      }}>
-        <span style={{
-          position: 'absolute', top: 3, left: on ? 21 : 3,
-          width: 20, height: 20, borderRadius: 999,
-          background: '#FBF6EA',
-          boxShadow: '0 2px 4px rgba(31,27,21,0.2)',
-          transition: 'left 180ms ease',
-        }} />
-      </button>
-    </div>
-  );
-}
-
 // ─── SAVE ACCOUNT CTA + MODAL ────────────────────────────────────────
 function SaveAccountCta({ onClick }) {
   return (
@@ -520,24 +450,85 @@ function AccountPage({ onBack }) {
   );
 }
 
+// TimeRow — label + <input type="time"> that persists to life_ops_config.config.
+// Overlays an invisible time input over a formatted display value so the native
+// picker appears on click without exposing an ugly input chrome.
+function TimeRow({ label, sub, configKey, defaultValue, last, rhythmConfig, setRhythmConfig }) {
+  const fromDB = rhythmConfig && rhythmConfig[configKey];
+  const [val, setVal] = React.useState(fromDB || defaultValue);
+  React.useEffect(() => { if (fromDB) setVal(fromDB); }, [fromDB]);
+  const save = async (v) => {
+    setRhythmConfig(prev => Object.assign({}, prev, { [configKey]: v }));
+    try { await window.updateLifeOpsConfig({ [configKey]: v }); } catch (e) { /* silent */ }
+  };
+  const display = (() => {
+    if (!val) return '—';
+    const [h, m] = val.split(':').map(Number);
+    const ampm = h < 12 ? 'AM' : 'PM';
+    const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+    return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
+  })();
+  return (
+    <label style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '14px 16px', minHeight: 52, gap: 12, cursor: 'pointer',
+      borderBottom: last ? 'none' : `1px solid ${T.color.EdgeLine}`,
+    }}>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: 'block', fontFamily: T.font.UI, fontSize: 14, fontWeight: 500, color: T.color.PrimaryText }}>{label}</span>
+        {sub && <span style={{ display: 'block', marginTop: 2, fontFamily: T.font.Reading, fontSize: 12, color: T.color.SupportingText }}>{sub}</span>}
+      </span>
+      <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+        <span style={{ fontFamily: T.font.UI, fontSize: 13, color: T.color.SupportingText }}>{display}</span>
+        <input type="time" value={val} onChange={e => setVal(e.target.value)}
+          onBlur={e => save(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
+          style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%' }} />
+      </span>
+    </label>
+  );
+}
+
+// DaySelectRow — cycles through _DAYS and persists to both localStorage and
+// life_ops_config.config so agent scheduling reads the canonical value.
+function DaySelectRow({ label, sub, configKey, prefKey, defaultValue, last, rhythmConfig, setRhythmConfig }) {
+  const fromDB = rhythmConfig && rhythmConfig[configKey];
+  const [value, setValue] = React.useState(() => fromDB || getPref(prefKey, defaultValue));
+  React.useEffect(() => { if (fromDB) setValue(fromDB); }, [fromDB]);
+  const cycle = async () => {
+    const i = _DAYS.indexOf(value);
+    const next = _DAYS[(i + 1) % _DAYS.length];
+    setValue(next);
+    setPref(prefKey, next);
+    setRhythmConfig(prev => Object.assign({}, prev, { [configKey]: next }));
+    try { await window.updateLifeOpsConfig({ [configKey]: next }); } catch (e) { /* silent */ }
+  };
+  return (
+    <button onClick={cycle} style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      width: '100%', padding: '14px 16px',
+      borderBottom: last ? 'none' : `1px solid ${T.color.EdgeLine}`,
+      minHeight: 52, gap: 12,
+      background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left',
+    }}>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: 'block', fontFamily: T.font.UI, fontSize: 14, fontWeight: 500, color: T.color.PrimaryText }}>{label}</span>
+        {sub && <span style={{ display: 'block', marginTop: 2, fontFamily: T.font.Reading, fontSize: 12, color: T.color.SupportingText }}>{sub}</span>}
+      </span>
+      <span style={{ fontFamily: T.font.UI, fontSize: 13, color: T.color.SupportingText, textAlign: 'right' }}>{value}</span>
+    </button>
+  );
+}
+
 function PreferencesPage({ onBack }) {
+  const [rhythmConfig, setRhythmConfig] = React.useState({});
+  React.useEffect(() => {
+    if (window.getLifeOpsConfig) {
+      window.getLifeOpsConfig().then(cfg => setRhythmConfig(cfg || {})).catch(_e => setRhythmConfig({}));
+    }
+  }, []);
   return (
     <SettingsSubPage title="Preferences." eyebrow="Profile · Preferences" onBack={onBack}>
-      <div style={{
-        fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2,
-        textTransform: 'uppercase', color: T.color.SupportingText,
-        padding: '0 4px 8px',
-      }}>Voice & chat</div>
-      <div style={{
-        background: T.color.SecondarySurface,
-        border: `1px solid ${T.color.EdgeLine}`,
-        borderRadius: 14, overflow: 'hidden', marginBottom: 22,
-      }}>
-        <ToggleRow prefKey="alwaysConfirm" label="Always confirm before saving" sub="Show the confirmation card after every voice utterance" defaultOn />
-        <ToggleRow prefKey="holdToTalk" label="Hold to talk" sub="Press and hold the mic instead of tap-to-toggle" />
-        <ToggleRow prefKey="readAloud" label="Read replies aloud" sub="Agent speaks its responses back to you" last />
-      </div>
-
       <div style={{
         fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2,
         textTransform: 'uppercase', color: T.color.SupportingText,
@@ -548,24 +539,14 @@ function PreferencesPage({ onBack }) {
         border: `1px solid ${T.color.EdgeLine}`,
         borderRadius: 14, overflow: 'hidden', marginBottom: 22,
       }}>
-        <StaticRow label="Brief time" value="7:00 AM" />
-        <StaticRow label="Review window" value="After 8:00 PM" />
-        <SelectRow label="Week start" prefKey="weekStart" defaultValue="Monday" options={_DAYS} />
-        <SelectRow label="Weekly review day" sub="When the weekly review CTA appears" prefKey="weeklyReviewDay" defaultValue="Sunday" options={_DAYS} last />
-      </div>
-
-      <div style={{
-        fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2,
-        textTransform: 'uppercase', color: T.color.SupportingText,
-        padding: '0 4px 8px',
-      }}>Notifications</div>
-      <div style={{
-        background: T.color.SecondarySurface,
-        border: `1px solid ${T.color.EdgeLine}`,
-        borderRadius: 14, overflow: 'hidden',
-      }}>
-        <ToggleRow prefKey="briefReminder" label="Brief reminder" defaultOn />
-        <ToggleRow prefKey="reviewNudge" label="Review nudge" sub="If you haven't logged a review by 10pm" defaultOn last />
+        <TimeRow label="Brief time" configKey="daily_brief_time" defaultValue="07:00"
+          rhythmConfig={rhythmConfig} setRhythmConfig={setRhythmConfig} />
+        <TimeRow label="Review window" sub="Evening review opens after this time" configKey="daily_review_time" defaultValue="20:00"
+          rhythmConfig={rhythmConfig} setRhythmConfig={setRhythmConfig} />
+        <DaySelectRow label="Week start" configKey="week_start_day" prefKey="weekStart" defaultValue="Monday"
+          rhythmConfig={rhythmConfig} setRhythmConfig={setRhythmConfig} />
+        <DaySelectRow label="Weekly review day" sub="When the weekly review CTA appears" configKey="weekly_review_day" prefKey="weeklyReviewDay" defaultValue="Sunday"
+          rhythmConfig={rhythmConfig} setRhythmConfig={setRhythmConfig} last />
       </div>
     </SettingsSubPage>
   );
