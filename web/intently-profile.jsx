@@ -572,8 +572,38 @@ function AgentActivityPage({ onBack }) {
     );
   };
 
+  // Repeated-failure surface (AC: "Repeated failures (e.g., 3 in a row) surface
+  // in a 'system status' entry visible in Profile."). Computed inline from
+  // the rows already loaded — if the 3 most-recent fires all failed, banner.
+  const recentFailureStreak = (() => {
+    if (!rows || rows.length < 3) return 0;
+    let n = 0;
+    for (const r of rows) {
+      const phase = (r.metadata && r.metadata.phase) || (r.dispatched ? 'completed' : 'queued');
+      if (phase === 'failed' || phase === 'http_error') n += 1;
+      else break;
+    }
+    return n;
+  })();
+
   return (
     <SettingsSubPage title="Agent activity." eyebrow="Profile · Agent activity" onBack={onBack}>
+      {recentFailureStreak >= 3 && (
+        <div style={{
+          background: '#F2D7CB',
+          border: '1px solid #DDB29C',
+          color: '#A8421C',
+          padding: '12px 14px',
+          borderRadius: 12,
+          marginBottom: 14,
+          fontFamily: T.font.UI, fontSize: 13, lineHeight: '18px',
+        }}>
+          <div style={{ fontWeight: 700, marginBottom: 2 }}>System status — agent has failed {recentFailureStreak} times in a row.</div>
+          <div style={{ fontWeight: 400 }}>
+            Scheduled fires aren't landing. Check Connections (if you've set up calendars/email) and your day-rhythm times in Preferences. Tap a row below to see the error.
+          </div>
+        </div>
+      )}
       {rows === null && (
         <div style={{ padding: '20px 16px', fontFamily: T.font.UI, fontSize: 13, color: T.color.SupportingText }}>
           Loading…
