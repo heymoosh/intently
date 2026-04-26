@@ -29,13 +29,13 @@ export const MVP_SKILLS = [
 export type MvpSkill = (typeof MVP_SKILLS)[number];
 
 // Skills that receive MA memory stores. Subset of MVP_SKILLS.
-// monthly-review is excluded (cadence doesn't justify memory state yet).
 // reminders-classifier is excluded (stateless classification, no benefit).
 export const MEMORY_SKILLS: readonly string[] = [
   'chat',
   'daily-brief',
   'daily-review',
   'weekly-review',
+  'monthly-review',
   'setup',
   'update-tracker',
   'noticing',
@@ -241,6 +241,8 @@ export function memoryStoreDescription(skill: string): string {
     setup: 'Partial onboarding state so a user who walks away mid-setup can resume.',
     'update-tracker':
       'Projects the user has mentioned multiple times — signals for noticing-layer promotion.',
+    'monthly-review':
+      "What was discussed in last month's review — themes, follow-ups, and patterns to watch.",
     noticing:
       'Working tier of pattern observations — soft accumulator before promoting to public.observations table per architecture audit Correction 2.',
   };
