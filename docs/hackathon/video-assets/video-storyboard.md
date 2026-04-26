@@ -58,40 +58,41 @@ Person reappears small, looking up at the question mark. Expression: thoughtful,
 *Lottie: character looking up, contemplative*
 
 **Scene 10 — Intently arrives**
-App icon slides in from the side and stops next to the person. Both looking at the question mark together. A pause — like the app is saying: I can help with that.
+App icon slides in from the side and stops next to the person. A pause — like the app is saying: I can help with that.
 *VO: "That's why Intently exists."*
 *Remotion: app icon sliding in, stopping beside character*
 
 ---
 
-### ACT 2 — THE SOLUTION
+### ACT 2 — FOUNDER + APP DEMO (real footage)
 
-**Scene 11 — Zoom into the app**
-Camera pushes into the app icon → dissolves into the actual interface. Morning brief is already there.
-*VO: "Every morning your brief is already there —"*
-*Remotion: zoom/transition into screen recording*
+**Scene 11 — Founder on camera**
+[Real footage] Camera zooms into the app icon → dissolves into a direct-to-camera shot of Muxin. He introduces himself and tells his story — the full founder riff (see Demo Script.md § Founder Cameo — Raw Riff). Approx. 45–60 seconds.
+*VO: Founder cameo script*
+*Production: direct-to-camera recording*
 
-**Scene 12 — Using the app**
-Person holds the phone, reading the brief, smiling slightly. Not amazed — just relieved.
-*VO: "what you're working toward, what needs your attention today. Before the noise starts."*
-*Screen recording: daily brief UI*
+**Scene 12 — App demo: morning brief**
+[Real screen recording] The actual app, live. Shows the morning brief UI — daily priorities, what's in focus today.
+*VO: (founder riff continues or light VO overlay)*
+*Production: screen recording of intently-eta.vercel.app — daily brief flow*
 
-**Scene 13 — Evening review**
-Person at end of day. Review is on screen. They look at it, nod.
-*VO: "Every evening, a review captures what actually happened."*
-*Screen recording: daily review UI*
+**Scene 13 — App demo: voice capture + daily review**
+[Real screen recording] Voice capture in action — adding something to the system. Cuts to the daily review UI at end of day.
+*VO: (founder riff continues or light VO overlay)*
+*Production: screen recording — voice capture + daily review flows*
 
-**Scene 14 — Journal / pattern surfacing**
-Notebook-style visual — a single scene. Words forming. A pattern note appearing in the margin: "you've been skipping rest — 3 weeks running."
-*VO: "The journal goes deeper — your patterns, your blind spots, things you'd never catch from inside a single day."*
-*Remotion: notebook aesthetic, handwriting-style text animation*
+**Scene 14 — App demo: weekly / pattern view**
+[Real screen recording] Weekly review or pattern surfacing — showing that the system synthesizes over time, not just day-by-day.
+*VO: (founder riff closing beat)*
+*Production: screen recording — weekly review or journal/patterns flow*
 
 ---
 
 ### ACT 3 — THE OUTCOME
 
-**Scene 15 — Bright path**
-Pull back from the phone. Person is standing on a path — but now it's bright, clear, going straight ahead. The world is starting to change around them — a few hints of color and nature coming in at the edges.
+**Scene 15 — Zoom back out to 2D**
+[Transition] Real footage dissolves back into the illustrated world. Pull back — person is standing on a path that's now bright, clear, going straight ahead. The 2D animated character resumes.
+*Remotion: transition from screen recording back to illustrated world* The world is starting to change around them — a few hints of color and nature coming in at the edges.
 *VO: "Your days feed your weeks."*
 *Remotion: path animation, color bleeding in from edges*
 

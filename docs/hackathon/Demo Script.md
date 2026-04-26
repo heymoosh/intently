@@ -19,6 +19,46 @@ And we do try to manage with the tools we've got today — but they're scattered
 
 That's why Intently exists.
 
+---
+
+## Founder Cameo
+
+> **[Zoom in on app → video of Muxin opens]**
+
+I'm a product manager by trade. For several years I was managing dozens of cross-functional teams at a large regulated enterprise — an entire portfolio of energy products and digital products. No two launches were the same. Every team had different policies, different processes, different systems. I had to be the glue person coordinating all of it.
+
+By the way — I have ADHD, and I'm not naturally organized. All I had were Microsoft Office Suites and standard productivity tools. But over several years of just figuring stuff out, I created my own system for staying on top of things — and somehow earned a reputation for being one of the most organized people any team had ever worked with. Which is genuinely funny, because I literally cannot trust my own memory to remember details if I don't write it down and build a system for follow-ups.
+
+When LLMs came out I suddenly saw this potential — the kind of system I'd always dreamed of. Something that self-organizes and doesn't require me to spend all my time and energy keeping track of and maintaining it. I found out I wasn't the only one who felt this way. Other people with ADHD. Household managers. The glue person in every social circle. There's always somebody keeping it all together — and it's incredibly mentally taxing.
+
+I built Intently for the busy parents and professionals who just want something that works out of the box and doesn't require their effort to maintain. It's the kind of tool I wish I'd had all these years.
+
+---
+
+The problem with all the apps and tools we have today is that you end up spending more time maintaining them than actually getting things done. They're built in isolation. They don't talk to each other. There's no systemic view of your whole life — your goals, your commitments, what you're actually trying to do. In the SaaS era, without AI, every app is just a silo. They capture stuff. They don't carry it.
+
+> **[Transition to app screen recordings]**
+
+---
+
+## Technical VO
+
+*(over Remotion animation, after app demo)*
+
+Under the hood, Intently runs six agents on a schedule — a daily brief every morning, a daily review every evening, weekly and monthly reviews that look across time. They all read from and write to the same place.
+
+But the real story isn't the schedule. It's what they're listening for.
+
+Most productivity tools try to capture everything. Intently is built around a different bet: that only certain signals actually matter for living well. Your energy patterns — what drains you versus what lights you up. The automatic negative thoughts you have about yourself. Your wins, the moments worth remembering. The decisions and bets you're making. These are things career coaches and behavioral designers have known for years are worth tracking. Most of us don't, because nobody told us to.
+
+Intently knows to look for them. That's the job of Opus 4.7 — not just to summarize your day, but to recognize when one of those moments shows up, extract it, and keep it in the record.
+
+*[data complexity visual — signals accumulating over time: energy, automatic negative thoughts, brags, decisions]*
+
+A week in, it's starting to notice. A month in, it can see patterns you'd never catch from inside a single day. That's what turns a journal entry into an insight.
+
+---
+
 Every morning your brief is already there — what you're working toward, what needs your attention today. Before the noise starts.
 
 Every evening, a review captures what actually happened. The journal goes deeper — your patterns, your blind spots, things you'd never catch from inside a single day.
@@ -95,3 +135,37 @@ Ideas surfaced during strategy session reviewing Mike Brown's demo. Not yet wove
 - Opus orchestrator / dynamic subagents
 - Multi-destination hero button routing
 - Topic clustering / auto-project creation
+
+---
+
+## Session Notes — 2026-04-26 (technical VO + script structure)
+
+### Frame shift on the technical section
+The original tech beat described the architecture without answering why it matters to the user. The real argument: the apps you have today wait for you, work in isolation, and capture without carrying. Intently's architecture answers that — it runs on a schedule whether you open it or not, and it's watching for specific things.
+
+### The two-part Opus argument (these are one story, not two)
+Initially had two disconnected angles — "structured attention" vs "data complexity." They're actually the same argument: Opus needs to hold a large and growing body of context (data volume) AND apply judgment about which signals within that context are worth surfacing (structured attention). Neither alone is the real story. Together they are.
+
+### The signal taxonomy — the biggest insight from this session
+The unlock isn't that the AI knows a lot about you. It's that Intently encodes which signals actually matter for living well — energy patterns, automatic negative thoughts, brags/wins, decisions and bets. This comes from real frameworks: Designing Your Life (Good Time Journal), career coaching practices, behavioral design. Most people don't track these things not because they don't care, but because nobody told them they should. Intently knows to look for them.
+
+### Script structure locked (from founder cameo onward)
+1. Founder cameo — Muxin on camera, personal story
+2. Apps bridge — SaaS-era isolation problem
+3. App demo VO — functional register over screen recordings: brief, voice capture, review, weekly synthesis
+4. Technical VO — Remotion animation: six agents on schedule, signal taxonomy, data complexity visual, Opus judgment
+5. Act 3 VO — emotional close (original, untouched)
+6. Tagline
+
+### Drafts not yet written to doc (ready to apply)
+- **App demo VO:** "Every morning, your brief is already there — what you're focused on today, what's coming, what matters most right now. When something comes up mid-day — a win, a thought, a decision — you just say it. Voice capture. It goes straight in. Every evening, a review. What actually happened. How your energy went. The moments worth noting. And week by week, the agents synthesize across all of it — not just what you did, but what it means."
+- **Revised technical VO:** Full draft in chat from 2026-04-26 session. Closing line under consideration: *"You've been living those days from the inside. Intently's been watching across them."* — not yet signed off.
+
+### Timing gut check (all sections)
+- Act 1 VO: ~30 sec
+- Founder cameo: ~45 sec
+- Apps bridge: ~10 sec
+- App demo VO: ~20 sec
+- Technical VO: ~30 sec
+- Act 3 VO + tagline: ~25 sec
+- Total: ~2:40 — leaves ~20 sec for transitions
