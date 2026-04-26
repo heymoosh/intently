@@ -14,10 +14,12 @@
 //     and lets dispatch-skill change without touching the browser flow.
 //
 // Auth model:
-//   • Postgres tick_skills sends Authorization: Bearer <SERVICE_ROLE_KEY>
-//     (configured via `ALTER DATABASE ... SET app.settings.dispatch_skill_auth`).
-//   • This function verifies the header against SUPABASE_SERVICE_ROLE_KEY
-//     (Deno env, autoloaded by Supabase Functions). No user JWT involved.
+//   • Postgres tick_skills sends Authorization: Bearer <service_role JWT>
+//     (stored in vault as `dispatch_skill_auth`, read via app.settings).
+//   • This function decodes the JWT payload and checks role === 'service_role'.
+//     Signature validation is handled by the gateway (verify_jwt: true in
+//     config.toml). This avoids brittle strict-equality against the env-injected
+//     SUPABASE_SERVICE_ROLE_KEY which can differ under Supabase key migration.
 //   • DB writes use a service-role Supabase client — RLS-bypass is OK because
 //     every write is scoped to the user_id from the verified payload.
 //
@@ -438,16 +440,40 @@ Deno.serve(async (req: Request) => {
     return errResp(405, 'method not allowed; use POST');
   }
 
-  // Auth: service-role token shared via app.settings.dispatch_skill_auth.
+  // Auth: verify the bearer token is a service_role JWT for this project.
+  // `verify_jwt: true` in supabase/config.toml gates signature validation at the
+  // Supabase function gateway — by the time we get here, the JWT is signed by
+  // the project's secret. We decode the payload to check it's a service_role
+  // token (not anon, not user). This avoids strict-equality against
+  // SUPABASE_SERVICE_ROLE_KEY which can fail under key rotation / new-API-key migration.
+  const authHeader = req.headers.get('Authorization') || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
+  if (!token) {
+    return errResp(401, 'missing Authorization header');
+  }
+  let claims: { role?: string; ref?: string; exp?: number };
+  try {
+    // JWT format: header.payload.signature — we only need the payload (middle part)
+    const payloadB64 = token.split('.')[1];
+    if (!payloadB64) throw new Error('malformed JWT');
+    // base64url → base64 → decode
+    const padded = payloadB64.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(payloadB64.length / 4) * 4, '=');
+    const jsonStr = atob(padded);
+    claims = JSON.parse(jsonStr);
+  } catch (_e) {
+    return errResp(401, 'unauthorized — invalid JWT format');
+  }
+  if (claims.role !== 'service_role') {
+    return errResp(401, `unauthorized — token role is "${claims.role}", expected service_role`);
+  }
+  // Optional sanity: expired check (gateway should already enforce, but cheap defense-in-depth)
+  if (claims.exp && claims.exp * 1000 < Date.now()) {
+    return errResp(401, 'unauthorized — token expired');
+  }
+  // We still need the service-role key for the Supabase client — read from env (must exist for DB writes)
   const expectedAuth = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   if (!expectedAuth) {
-    console.error('[dispatch-skill] SUPABASE_SERVICE_ROLE_KEY not in env');
     return errResp(500, 'server misconfigured: missing SUPABASE_SERVICE_ROLE_KEY');
-  }
-  const authHeader = req.headers.get('Authorization') || '';
-  const provided = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
-  if (provided !== expectedAuth) {
-    return errResp(401, 'unauthorized — bad service role token');
   }
 
   let raw: unknown;
