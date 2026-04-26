@@ -577,7 +577,32 @@ function BriefFlow({ onClose, onComplete }) {
           {showBriefThinking && <AgentTyping />}
           {liveBrief && <ChatBubble role="agent" text={liveBrief} />}
           {briefError && <ChatBubble role="agent" text="(I couldn't reach the brief generator just now — here's your day shape anyway.)" />}
-          {showConfirm && <BriefConfirmCard plan={parseAgentPlan(liveBrief, MOCK_PLAN)} consulted={consulted} onAccept={() => onComplete && onComplete(parseAgentPlan(liveBrief, MOCK_PLAN))} />}
+          {showConfirm && <BriefConfirmCard plan={parseAgentPlan(liveBrief, MOCK_PLAN)} consulted={consulted} onAccept={async () => {
+            // Persist the brief response as entries.kind='brief' + fire undo toast.
+            let insertedId = null;
+            if (liveBrief && window.getSupabaseClient && window.getCurrentUserId) {
+              try {
+                const sb = window.getSupabaseClient();
+                const userId = await window.getCurrentUserId();
+                const { data } = await sb.from('entries').insert([{
+                  user_id: userId, kind: 'brief', body_markdown: liveBrief,
+                  source: 'agent', mood: 'morning',
+                }]).select().single();
+                if (data) insertedId = data.id;
+              } catch (e) { console.warn('[brief] persist failed:', e && e.message); }
+            }
+            if (insertedId && window.showUndoToast) {
+              window.showUndoToast({
+                message: "Saved today's brief",
+                onUndo: async () => {
+                  const sb = window.getSupabaseClient();
+                  const userId = await window.getCurrentUserId();
+                  await sb.from('entries').delete().eq('id', insertedId).eq('user_id', userId);
+                },
+              });
+            }
+            onComplete && onComplete(parseAgentPlan(liveBrief, MOCK_PLAN));
+          }} />}
         </div>
       </div>
 
@@ -1063,7 +1088,32 @@ function ReviewFlow({ onClose, onComplete }) {
           {reviewError && <ChatBubbleDark role="agent" text="(I couldn't reach the review generator just now — saving what you said anyway.)" />}
           {showConfirm && (() => {
             const parsed = liveReview ? (window.parseAgentReview && window.parseAgentReview(liveReview)) : null;
-            return <ReviewConfirmCard parsed={parsed} consulted={reviewConsulted} onAccept={() => onComplete && onComplete(parsed)} />;
+            return <ReviewConfirmCard parsed={parsed} consulted={reviewConsulted} onAccept={async () => {
+              // Persist the review response as entries.kind='review' (daily-scoped — no links.scope).
+              let insertedId = null;
+              if (liveReview && window.getSupabaseClient && window.getCurrentUserId) {
+                try {
+                  const sb = window.getSupabaseClient();
+                  const userId = await window.getCurrentUserId();
+                  const { data } = await sb.from('entries').insert([{
+                    user_id: userId, kind: 'review', body_markdown: liveReview,
+                    source: 'agent', mood: 'night',
+                  }]).select().single();
+                  if (data) insertedId = data.id;
+                } catch (e) { console.warn('[review] persist failed:', e && e.message); }
+              }
+              if (insertedId && window.showUndoToast) {
+                window.showUndoToast({
+                  message: "Saved today's review",
+                  onUndo: async () => {
+                    const sb = window.getSupabaseClient();
+                    const userId = await window.getCurrentUserId();
+                    await sb.from('entries').delete().eq('id', insertedId).eq('user_id', userId);
+                  },
+                });
+              }
+              onComplete && onComplete(parsed);
+            }} />;
           })()}
         </div>
       </div>
@@ -1551,26 +1601,40 @@ function WeeklyReviewFlow({ onClose, onComplete }) {
 
   // Persist weekly review entry on accept. Insert into `entries` with
   // kind='review', source='agent', links={scope:'week', week_id}. The brief
-  // assembler will pick it up as the week's compression summary.
+  // assembler will pick it up as the week's compression summary. Fires an
+  // Undo toast that deletes the entry by id if the user clicks within 6s.
   const persistAndComplete = async () => {
     const parsed = liveReview && window.parseAgentWeeklyReview
       ? window.parseAgentWeeklyReview(liveReview)
       : null;
+    let insertedId = null;
     try {
       if (window.getSupabaseClient && window.getCurrentUserId && weekId) {
         const sb = window.getSupabaseClient();
         const userId = await window.getCurrentUserId();
-        await sb.from('entries').insert([{
+        const { data, error } = await sb.from('entries').insert([{
           user_id: userId,
           kind: 'review',
           body_markdown: liveReview || '',
           source: 'agent',
           mood: 'dusk',
           links: { scope: 'week', week_id: weekId },
-        }]);
+        }]).select().single();
+        if (!error && data) insertedId = data.id;
       }
     } catch (e) {
       console.warn('[weekly-review] persist failed:', e && e.message);
+    }
+
+    if (insertedId && window.showUndoToast) {
+      window.showUndoToast({
+        message: `Saved this week's review (${weekId})`,
+        onUndo: async () => {
+          const sb = window.getSupabaseClient();
+          const userId = await window.getCurrentUserId();
+          await sb.from('entries').delete().eq('id', insertedId).eq('user_id', userId);
+        },
+      });
     }
     if (onComplete) onComplete(parsed);
   };
@@ -1695,10 +1759,292 @@ function WeeklyReviewConfirmCard({ parsed, consulted = [], weekId, onAccept }) {
   );
 }
 
+// ─── MONTHLY GOAL SLICE REFRESH FLOW ───────────────────────────────────
+// On month boundary (or on-demand from Future tab), the agent reads active
+// goals + this month's reviews/journals and drafts a fresh monthly_slice per
+// goal. User reviews, edits inline, accepts. Persists each accepted slice via
+// UPDATE on the goals table.
+
+function MonthlyRefreshFlow({ onClose, onComplete }) {
+  const [phase, setPhase] = React.useState('loading'); // loading | drafted | error
+  const [drafts, setDrafts] = React.useState([]);
+  const [nextMonthName, setNextMonthName] = React.useState('');
+  const [errorMsg, setErrorMsg] = React.useState('');
+  const [consulted, setConsulted] = React.useState([]);
+  const [saving, setSaving] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!window.assembleMonthlyRefreshContext || !window.callMaProxy) {
+      setPhase('error'); setErrorMsg('Cognition layer not loaded.'); return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const ctx = await window.assembleMonthlyRefreshContext();
+        if (cancelled) return;
+        setNextMonthName(ctx.nextMonthName || '');
+        setConsulted(ctx.consulted || []);
+        if (!ctx.goals || ctx.goals.length === 0) {
+          setPhase('error'); setErrorMsg('No active goals to refresh — add goals on the Future tab first.');
+          return;
+        }
+        const r = await window.callMaProxy({ skill: 'monthly-review', input: ctx.input });
+        if (cancelled) return;
+        const text = (r && r.finalText) || '';
+        const parsed = window.parseMonthlyRefreshResponse(text);
+        if (!parsed) {
+          setPhase('error');
+          setErrorMsg("Couldn't parse the agent's response. Try again, or refresh manually on the Future tab.");
+          return;
+        }
+        const newDrafts = (ctx.goals || []).map((g, i) => {
+          const match = (parsed.slices || []).find((s) => s.goal_index === i) || (parsed.slices || [])[i];
+          return {
+            goal_id: g.id,
+            goal_title: g.title,
+            current: g.monthly_slice || '',
+            proposed: (match && match.monthly_slice) || g.monthly_slice || '',
+            accepted: true,
+          };
+        });
+        setDrafts(newDrafts);
+        setPhase('drafted');
+      } catch (e) {
+        if (cancelled) return;
+        setPhase('error');
+        setErrorMsg((e && e.message) || 'monthly-review call failed');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const updateProposed = (i, v) => setDrafts((d) => d.map((draft, j) => j === i ? { ...draft, proposed: v } : draft));
+  const toggleAccepted = (i) => setDrafts((d) => d.map((draft, j) => j === i ? { ...draft, accepted: !draft.accepted } : draft));
+
+  const acceptAll = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const sb = window.getSupabaseClient();
+      const userId = await window.getCurrentUserId();
+      const toUpdate = drafts.filter((d) => d.accepted && d.proposed && d.proposed !== d.current);
+      // Snapshot prior values for Undo
+      const priors = toUpdate.map((d) => ({ goal_id: d.goal_id, prior: d.current }));
+      for (const d of toUpdate) {
+        await sb.from('goals').update({ monthly_slice: d.proposed }).eq('id', d.goal_id).eq('user_id', userId);
+      }
+      if (toUpdate.length > 0 && window.showUndoToast) {
+        window.showUndoToast({
+          message: `Updated ${toUpdate.length} monthly slice${toUpdate.length === 1 ? '' : 's'}`,
+          onUndo: async () => {
+            const sb2 = window.getSupabaseClient();
+            const uid = await window.getCurrentUserId();
+            for (const p of priors) {
+              await sb2.from('goals').update({ monthly_slice: p.prior }).eq('id', p.goal_id).eq('user_id', uid);
+            }
+          },
+        });
+      }
+      if (onComplete) onComplete({ updated: toUpdate.length });
+    } catch (e) {
+      console.warn('[monthly-refresh] persist failed:', e && e.message);
+      if (onComplete) onComplete({ updated: 0, error: e && e.message });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{
+      position: 'absolute', inset: 0, zIndex: 60,
+      background: `linear-gradient(180deg, ${T.color.PrimarySurface} 0%, #F5EBD6 100%)`,
+      display: 'flex', flexDirection: 'column',
+    }}>
+      <div style={{ flexShrink: 0, padding: '14px 18px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          <Icon.Sun size={14} color={T.color.FocusObject} />
+          <span style={{ fontFamily: T.font.UI, fontSize: 11, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', color: T.color.FocusObject }}>
+            {nextMonthName ? `Refresh for ${nextMonthName}` : 'Monthly slice refresh'}
+          </span>
+        </div>
+        <button onClick={onClose} aria-label="Close" style={{
+          width: 32, height: 32, borderRadius: 999, background: 'rgba(31,27,21,0.06)',
+          border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Icon.X size={16} color={T.color.PrimaryText} />
+        </button>
+      </div>
+
+      <div style={{ flex: 1, overflowY: 'auto', padding: '8px 20px 24px' }}>
+        {phase === 'loading' && (
+          <div style={{ padding: '40px 8px', textAlign: 'center' }}>
+            <AgentTyping />
+            <div style={{ marginTop: 14, fontFamily: T.font.UI, fontSize: 12, color: T.color.SupportingText, fontStyle: 'italic' }}>
+              Drafting fresh monthly slices…
+            </div>
+          </div>
+        )}
+
+        {phase === 'error' && (
+          <div style={{
+            padding: '16px 18px', background: T.color.SecondarySurface, border: `1px solid ${T.color.EdgeLine}`,
+            borderRadius: 14, fontFamily: T.font.Reading, fontSize: 14, color: T.color.PrimaryText,
+          }}>{errorMsg}</div>
+        )}
+
+        {phase === 'drafted' && (
+          <>
+            <div style={{ marginBottom: 14, fontFamily: T.font.Reading, fontSize: 14, lineHeight: '20px', color: T.color.SupportingText, fontStyle: 'italic' }}>
+              Edit any of these before accepting. Unchecked slices stay as-is.
+            </div>
+            {drafts.map((d, i) => {
+              const changed = d.proposed && d.proposed !== d.current;
+              return (
+                <div key={d.goal_id || i} style={{
+                  padding: '14px 16px', marginBottom: 12,
+                  background: T.color.ConfirmationCardSurface,
+                  border: `1px solid ${changed ? T.color.FocusObject + '88' : T.color.EdgeLine}`,
+                  borderRadius: 14, boxShadow: '0 4px 14px rgba(31,27,21,0.05)',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
+                    <button onClick={() => toggleAccepted(i)} aria-label="Toggle accepted" style={{
+                      width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+                      background: d.accepted ? T.color.PrimaryText : 'transparent',
+                      border: `1.5px solid ${d.accepted ? T.color.PrimaryText : T.color.SubtleText}`,
+                      cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      {d.accepted && <Icon.Check size={14} color="#FBF6EA" stroke={2.6} />}
+                    </button>
+                    <div style={{ flex: 1, fontFamily: T.font.Display, fontSize: 16, lineHeight: '21px', fontStyle: 'italic', fontWeight: 500, color: T.color.PrimaryText, letterSpacing: -0.2 }}>{d.goal_title}</div>
+                  </div>
+                  <div style={{ marginBottom: 6, fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: T.color.SubtleText }}>
+                    {nextMonthName} slice
+                  </div>
+                  <textarea
+                    value={d.proposed}
+                    onChange={(e) => updateProposed(i, e.target.value)}
+                    rows={3}
+                    style={{
+                      width: '100%', resize: 'vertical', minHeight: 60,
+                      padding: '10px 12px', border: `1px solid ${T.color.EdgeLine}`,
+                      borderRadius: 10, background: 'rgba(255,255,255,0.6)',
+                      fontFamily: T.font.Reading, fontSize: 14, lineHeight: '20px', color: T.color.PrimaryText,
+                      outline: 'none', boxSizing: 'border-box',
+                    }}
+                  />
+                  {d.current && (
+                    <div style={{ marginTop: 8, fontFamily: T.font.UI, fontSize: 11, color: T.color.SubtleText, fontStyle: 'italic' }}>
+                      Current: {d.current}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            <ConsultedChips items={consulted} />
+            <button onClick={acceptAll} disabled={saving} style={{
+              marginTop: 16, width: '100%', padding: '12px 18px',
+              background: T.color.PrimaryText, color: '#FBF6EA',
+              border: 'none', borderRadius: 999, cursor: saving ? 'wait' : 'pointer',
+              fontFamily: T.font.UI, fontSize: 14, fontWeight: 600, letterSpacing: 0.2,
+              opacity: saving ? 0.6 : 1,
+            }}>
+              {saving ? 'Saving…' : `Accept ${drafts.filter(d => d.accepted && d.proposed !== d.current).length} updates`}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── UNDO TOAST ──────────────────────────────────────────────────────────
+// Per app-experience.md: every automated action gets a highly visible Undo
+// inline with the announcement. We surface it as a global toast at the bottom
+// of the phone frame, auto-dismissing after 6 seconds. Flows call:
+//   window.showUndoToast({ message: "Saved this week's review", onUndo: async () => {...} })
+// PrototypePhone mounts <UndoToast /> which subscribes to that emitter.
+
+const _undoListeners = new Set();
+function showUndoToast(opts) {
+  _undoListeners.forEach((fn) => { try { fn(opts); } catch {} });
+}
+function _onUndoToast(fn) {
+  _undoListeners.add(fn);
+  return () => _undoListeners.delete(fn);
+}
+
+function UndoToast() {
+  const [toast, setToast] = React.useState(null); // {message, onUndo, expiresAt}
+  const [busy, setBusy] = React.useState(false);
+
+  React.useEffect(() => {
+    const off = _onUndoToast((opts) => {
+      const ms = (opts && opts.durationMs) || 6000;
+      setToast({
+        message: (opts && opts.message) || 'Saved',
+        onUndo: opts && opts.onUndo,
+        expiresAt: Date.now() + ms,
+      });
+      setBusy(false);
+    });
+    return off;
+  }, []);
+
+  React.useEffect(() => {
+    if (!toast || busy) return;
+    const remaining = toast.expiresAt - Date.now();
+    if (remaining <= 0) { setToast(null); return; }
+    const t = setTimeout(() => setToast(null), remaining);
+    return () => clearTimeout(t);
+  }, [toast, busy]);
+
+  if (!toast) return null;
+
+  const handleUndo = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      if (toast.onUndo) await toast.onUndo();
+      setToast({ ...toast, message: 'Undone.', onUndo: null, expiresAt: Date.now() + 1500 });
+    } catch (e) {
+      console.warn('[undo-toast] undo failed:', e && e.message);
+      setToast({ ...toast, message: "Couldn't undo — see console.", onUndo: null, expiresAt: Date.now() + 2500 });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div style={{
+      position: 'absolute', bottom: 96, left: '50%', transform: 'translateX(-50%)',
+      zIndex: 80, maxWidth: 320,
+      background: 'rgba(43,33,24,0.94)', color: '#FBF6EA',
+      borderRadius: 999, padding: '10px 6px 10px 18px',
+      display: 'inline-flex', alignItems: 'center', gap: 8,
+      boxShadow: '0 8px 22px rgba(31,27,21,0.30)',
+      backdropFilter: 'blur(10px)',
+      animation: 'intentlyRise 220ms ease',
+    }}>
+      <span style={{
+        fontFamily: T.font.UI, fontSize: 13, fontWeight: 500, letterSpacing: 0.1,
+      }}>{toast.message}</span>
+      {toast.onUndo && (
+        <button onClick={handleUndo} disabled={busy} style={{
+          marginLeft: 4, padding: '6px 14px', borderRadius: 999,
+          background: '#F5EBCF', color: '#2B2118', border: 'none',
+          fontFamily: T.font.UI, fontSize: 12, fontWeight: 700, letterSpacing: 0.4,
+          cursor: busy ? 'wait' : 'pointer',
+        }}>{busy ? '…' : 'Undo'}</button>
+      )}
+    </div>
+  );
+}
+
 Object.assign(window, {
   GOAL_DATA, PROJECT_EXTRAS,
   GoalDetail, ProjectDetailV2,
-  BriefFlow, ReviewFlow, WeeklyReviewFlow,
-  PresentEmpty, PresentClosed,
+  BriefFlow, ReviewFlow, WeeklyReviewFlow, MonthlyRefreshFlow,
+  PresentEmpty, PresentClosed, UndoToast,
   usePopulate, MOCK_PLAN,
+  showUndoToast,
 });
