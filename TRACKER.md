@@ -103,6 +103,11 @@ End-to-end Playwright smoke against `intently-eta.vercel.app/?dev=1`. ma-proxy f
 
 ## Follow-ups (pending manual or flight-test)
 
+- Add row to TRACKER § Active handoffs (or in the per-row format used by existing entries): ([PR #149](https://github.com/heymoosh/intently/pull/149))
+- Phase 2 implementation: `/groom`, `/work-next`, session-precheck integration, drift-check extension — all queued in `.claude/inbox/` for first grooming session ([PR #149](https://github.com/heymoosh/intently/pull/149))
+- TRACKER doc-hierarchy row referencing `.claude/inbox/` between TRACKER and handoffs ([PR #149](https://github.com/heymoosh/intently/pull/149))
+- CLAUDE.md one-line pointer to the workflow handoff (within 100-line cap) ([PR #149](https://github.com/heymoosh/intently/pull/149))
+- ADR documenting the file-isolation decision (`.claude/inbox/` per-item files vs TRACKER § Inbox section) so future sessions don't re-litigate ([PR #149](https://github.com/heymoosh/intently/pull/149))
 - **(Optional)** Re-provision the live weekly-review agent so its system prompt includes the new Output contract section: `cd app && bws run -- npx tsx ../scripts/provision-ma-agents.ts --skill weekly-review --update-existing`. Verified live the agent emits the right structured tail WITHOUT this — because the assembler inlines the contract in its task instructions. The re-provision just makes it durable across off-assembler calls. ([PR #148](https://github.com/heymoosh/intently/pull/148))
 - **Re-run `supabase db push`** from the primary checkout. The earlier db push apparently didn't pick up `0006_calendar_email.sql` — `calendar_events` + `email_flags` tables still 404 on prod (verified live). Once applied, refresh the app and the backfill seeder fires automatically; brief input then includes calendar + email context. ([PR #147](https://github.com/heymoosh/intently/pull/147))
 - **#24 Anthropic prompt caching in ma-proxy** — deferred from this batch. Requires an Edge Function deploy (`supabase functions deploy ma-proxy`) which is user-only. Will land in its own PR. ([PR #147](https://github.com/heymoosh/intently/pull/147))
