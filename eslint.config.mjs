@@ -79,6 +79,7 @@ const PROTOTYPE_GLOBALS = {
   JournalComposer: 'readonly', ConnectionsPage: 'readonly', OAuthFlow: 'readonly',
   ProfileButton: 'readonly', OnboardingConnectCard: 'readonly',
   INTEGRATIONS: 'readonly', useConnections: 'readonly',
+  formatLastSync: 'readonly',
   // intently-profile.jsx
   ProfileSheet: 'readonly', AccountPage: 'readonly', PreferencesPage: 'readonly',
   HelpPage: 'readonly',

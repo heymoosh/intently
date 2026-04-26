@@ -156,6 +156,48 @@
     // satisfies the owner-only RLS policies.
     supabasePublishableKey: 'sb_publishable_uvMby6govO8qKuxYVRXb7A_nBZvMzII', // gitleaks:allow — publishable key is RLS-gated, public-by-design per Supabase docs
   };
+
+  // OAuth callback handling. Two paths land here:
+  //   1. Popup path: the popup redirected back to our origin. We postMessage
+  //      to window.opener (the parent OAuthFlow promise resolves) and don't
+  //      bother stripping the query — the popup will be closed momentarily.
+  //   2. Top-level-redirect path (popup blocked): we are the parent. Strip
+  //      the query params (so a refresh doesn't re-trigger) and dispatch
+  //      `intently:oauth-connected` so useConnections re-fetches.
+  (function handleOauthReturn() {
+    try {
+      var params = new URLSearchParams(window.location.search);
+      var connected = params.get('connected');
+      var oauthError = params.get('oauth_error');
+      if (!connected && !oauthError) return;
+
+      // Path 1: popup — opener exists and isn't us.
+      if (window.opener && window.opener !== window && !window.opener.closed) {
+        try {
+          window.opener.postMessage({
+            type: 'intently:oauth-callback',
+            provider: connected || null,
+            error: oauthError || null,
+          }, window.location.origin);
+        } catch (e) { /* ignore */ }
+        // Don't replaceState — the parent will close the popup once it gets
+        // the message. If the parent never closes it, the user can; either
+        // way no app state to preserve here.
+        return;
+      }
+
+      // Path 2: top-level redirect.
+      params.delete('connected');
+      params.delete('oauth_error');
+      var clean = window.location.pathname + (params.toString() ? '?' + params.toString() : '') + window.location.hash;
+      window.history.replaceState({}, document.title, clean);
+      setTimeout(function () {
+        window.dispatchEvent(new CustomEvent('intently:oauth-connected', {
+          detail: { provider: connected, error: oauthError },
+        }));
+      }, 200);
+    } catch (e) { /* ignore */ }
+  })();
 </script>
 
 <!-- Live wiring ported from app/lib/. Loads after React/ReactDOM (voice.js
