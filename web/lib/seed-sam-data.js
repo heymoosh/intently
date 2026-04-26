@@ -94,6 +94,12 @@ const SAM_PROJECTS = [
 // `days_ago` is relative to "today" at seed time (Thursday, hackathon day 4).
 const SAM_JOURNAL = [
   {
+    days_ago: 0,
+    body_markdown: 'Demo day. The app is live and I\'m about to record the walkthrough. Weird feeling — equal parts nervous and ready. Whatever happens, the thing exists now. That counts.',
+    glyph: 'rocket',
+    mood: 'morning',
+  },
+  {
     days_ago: 1,
     body_markdown: 'Day 3 of the hackathon. Tired in a way that feels productive, if that makes sense — like the tiredness is evidence something real is happening. Merged /next-tracks today. The project is starting to feel like a coherent thing, not just a pile of files and ideas. Still a lot to do before Friday. Trying not to look at the full list at once.',
     glyph: 'pen',
