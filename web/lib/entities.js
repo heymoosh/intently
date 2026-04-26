@@ -34,9 +34,24 @@ function _throw(label, error) {
   throw e;
 }
 
+// ─── Demo-mode guard ────────────────────────────────────────────────────────
+// When window.INTENTLY_DEMO is true, all reads return SAM_* fixtures and all
+// writes are no-ops that return a fake-but-valid response. Nothing touches
+// Supabase in demo mode — no new auth session, no DB rows.
+
+function _isDemo() {
+  return !!window.INTENTLY_DEMO;
+}
+
+// Fake-id generator for no-op writes so callers that read back .id don't crash.
+function _fakeId() {
+  return 'demo-' + Math.random().toString(36).slice(2, 10);
+}
+
 // ─── Goals ──────────────────────────────────────────────────────────────────
 
 async function insertGoal(title) {
+  if (_isDemo()) return { id: _fakeId(), title, user_id: 'demo' };
   const { data, error } = await _client()
     .from('goals')
     .insert({ user_id: (await _userId()), title })
@@ -47,6 +62,18 @@ async function insertGoal(title) {
 }
 
 async function listGoals() {
+  if (_isDemo()) {
+    return (window.SAM_GOALS || []).map((g, i) => ({
+      id: 'demo-goal-' + i,
+      user_id: 'demo',
+      title: g.title,
+      monthly_slice: g.monthly_slice || null,
+      glyph: g.glyph || null,
+      palette: g.palette || null,
+      position: g.position != null ? g.position : i,
+      archived_at: null,
+    }));
+  }
   const { data, error } = await _client()
     .from('goals')
     .select('*')
@@ -60,6 +87,7 @@ async function listGoals() {
 // ─── Projects ───────────────────────────────────────────────────────────────
 
 async function insertProject(title, goalId) {
+  if (_isDemo()) return { id: _fakeId(), title, goal_id: goalId || null, user_id: 'demo', status: 'active', todos: [] };
   const row = { user_id: (await _userId()), title };
   if (goalId !== undefined && goalId !== null) row.goal_id = goalId;
   const { data, error } = await _client()
@@ -72,6 +100,23 @@ async function insertProject(title, goalId) {
 }
 
 async function listProjects() {
+  if (_isDemo()) {
+    return (window.SAM_PROJECTS || []).map((p, i) => ({
+      id: 'demo-proj-' + i,
+      user_id: 'demo',
+      title: p.title,
+      goal_id: p.goal_index != null ? 'demo-goal-' + p.goal_index : null,
+      body_markdown: p.body_markdown || '',
+      todos: (p.todos || []).map((t, ti) => ({
+        id: 'demo-todo-' + i + '-' + ti,
+        text: t.text,
+        done: !!t.done,
+      })),
+      status: p.status || 'active',
+      is_admin: !!p.is_admin,
+      updated_at: new Date().toISOString(),
+    }));
+  }
   const { data, error } = await _client()
     .from('projects')
     .select('*')
@@ -83,6 +128,7 @@ async function listProjects() {
 }
 
 async function addProjectTodo(projectId, text) {
+  if (_isDemo()) return { id: projectId, todos: [{ id: _fakeId(), text, done: false }] };
   // Read-modify-write the JSONB column. Single-user V1 so the read/write race
   // is fine; multi-writer would need a server-side append (RPC or trigger).
   const sb = _client();
@@ -110,6 +156,7 @@ async function addProjectTodo(projectId, text) {
 }
 
 async function toggleProjectTodo(projectId, todoId) {
+  if (_isDemo()) return { id: projectId };
   const sb = _client();
   const { data: row, error: readErr } = await sb
     .from('projects')
@@ -137,6 +184,7 @@ async function toggleProjectTodo(projectId, todoId) {
 // ─── Plan items ─────────────────────────────────────────────────────────────
 
 async function insertPlanItem(date, band, text, tier, durationMin) {
+  if (_isDemo()) return { id: _fakeId(), date, band, text, tier: tier || null, duration_min: durationMin || null, user_id: 'demo' };
   const row = { user_id: (await _userId()), date, band, text };
   if (tier !== undefined && tier !== null) row.tier = tier;
   if (durationMin !== undefined && durationMin !== null) row.duration_min = durationMin;
@@ -151,6 +199,17 @@ async function insertPlanItem(date, band, text, tier, durationMin) {
 }
 
 async function listPlanItems(date) {
+  if (_isDemo()) {
+    return (window.SAM_TODAY_PLAN || []).map((p, i) => ({
+      id: 'demo-plan-' + i,
+      user_id: 'demo',
+      date,
+      band: p.band,
+      text: p.text,
+      tier: p.tier || null,
+      position: i,
+    }));
+  }
   const { data, error } = await _client()
     .from('plan_items')
     .select('*')
@@ -164,6 +223,7 @@ async function listPlanItems(date) {
 // ─── Journal entries (kind='journal' on the entries table) ─────────────────
 
 async function insertJournalEntry(text, date) {
+  if (_isDemo()) return { id: _fakeId(), kind: 'journal', body_markdown: text, at: date || new Date().toISOString(), user_id: 'demo' };
   // Omit `at` when not provided so the column default (now()) fires. Passing
   // null would override the default with null and violate not-null.
   const row = {
@@ -186,6 +246,26 @@ async function insertJournalEntry(text, date) {
 }
 
 async function listJournalEntries(opts) {
+  if (_isDemo()) {
+    const today = new Date();
+    const entries = (window.SAM_JOURNAL || []).map((j, i) => {
+      const at = new Date(today);
+      at.setDate(at.getDate() - (j.days_ago || 0));
+      return {
+        id: 'demo-journal-' + i,
+        user_id: 'demo',
+        kind: 'journal',
+        body_markdown: j.body_markdown,
+        glyph: j.glyph || null,
+        mood: j.mood || null,
+        at: at.toISOString(),
+        source: 'text',
+      };
+    });
+    // Already newest-first (days_ago ascending order in SAM_JOURNAL).
+    const limit = opts && typeof opts.limit === 'number' ? opts.limit : null;
+    return limit ? entries.slice(0, limit) : entries;
+  }
   const limit = opts && typeof opts.limit === 'number' ? opts.limit : null;
   let q = _client()
     .from('entries')
@@ -200,6 +280,7 @@ async function listJournalEntries(opts) {
 }
 
 async function updateJournalEntry(id, text) {
+  if (_isDemo()) return { id, body_markdown: text, user_id: 'demo' };
   const { data, error } = await _client()
     .from('entries')
     .update({ body_markdown: text })
@@ -214,6 +295,7 @@ async function updateJournalEntry(id, text) {
 // ─── Life ops config ─────────────────────────────────────────────────────────
 
 async function updateLifeOpsConfig(patch) {
+  if (_isDemo()) return { config: patch, user_id: 'demo' };
   // Upsert a row for this user, merging `patch` into the existing JSONB config.
   // Supabase does not natively deep-merge JSONB on upsert, so we read-merge-write.
   // Single-user V1: read/write race is acceptable.
@@ -240,6 +322,7 @@ async function updateLifeOpsConfig(patch) {
 }
 
 async function getLifeOpsConfig() {
+  if (_isDemo()) return {};
   const { data, error } = await _client()
     .from('life_ops_config')
     .select('config')
@@ -252,6 +335,7 @@ async function getLifeOpsConfig() {
 // ─── Admin reminders (uses the existing public.reminders table) ─────────────
 
 async function insertAdminReminder(text, remindOn) {
+  if (_isDemo()) return { id: _fakeId(), text, remind_on: remindOn || new Date().toISOString().slice(0, 10), status: 'pending', user_id: 'demo' };
   // remind_on is NOT NULL on the table. Default to today (YYYY-MM-DD) when
   // the caller doesn't provide a date — admin items captured ad-hoc surface
   // immediately rather than disappearing into the future.
@@ -271,6 +355,20 @@ async function insertAdminReminder(text, remindOn) {
 }
 
 async function listAdminReminders() {
+  if (_isDemo()) {
+    const today = new Date();
+    return (window.SAM_REMINDERS || []).map((r, i) => {
+      const due = new Date(today);
+      due.setDate(due.getDate() + (r.remind_in_days || 0));
+      return {
+        id: 'demo-rem-' + i,
+        user_id: 'demo',
+        text: r.text,
+        remind_on: due.toISOString().slice(0, 10),
+        status: 'pending',
+      };
+    });
+  }
   const { data, error } = await _client()
     .from('reminders')
     .select('*')
@@ -282,6 +380,7 @@ async function listAdminReminders() {
 }
 
 async function markAdminReminderDone(id) {
+  if (_isDemo()) return { id, status: 'done', user_id: 'demo' };
   const { data, error } = await _client()
     .from('reminders')
     .update({ status: 'done' })
@@ -298,6 +397,7 @@ async function markAdminReminderDone(id) {
 // Called by the noticing MA agent when a pattern crosses the 3/48h threshold.
 
 async function insertObservation({ patternText, subjectKind, subjectId, timesObserved, metadata }) {
+  if (_isDemo()) return { id: _fakeId(), pattern_text: patternText, user_id: 'demo' };
   const uid = await _userId();
   const row = {
     user_id: uid,
@@ -317,6 +417,7 @@ async function insertObservation({ patternText, subjectKind, subjectId, timesObs
 }
 
 async function incrementObservation(observationId) {
+  if (_isDemo()) return { id: observationId, times_observed: 1, user_id: 'demo' };
   // Increments times_observed by 1 and stamps last_observed_at = now().
   // Uses a Postgres RPC call-style update via raw SQL through supabase-js
   // (no RPC function needed — supabase-js can run the arithmetic on the column).
@@ -343,6 +444,7 @@ async function incrementObservation(observationId) {
 }
 
 async function listRecentObservations({ sinceHours } = {}) {
+  if (_isDemo()) return [];
   // Returns unpromoted observations for the current user within the look-back
   // window (default: 48 hours). Ordered newest-first.
   const hours = sinceHours != null ? sinceHours : 48;
@@ -368,6 +470,7 @@ async function listRecentObservations({ sinceHours } = {}) {
 // tag_confidence: object — { ant: 0.92, ... } per-tag confidence scores
 
 async function insertEntryWithTags({ kind, body_markdown, tags, tag_confidence, source, at } = {}) {
+  if (_isDemo()) return { id: _fakeId(), kind: kind || 'journal', body_markdown, tags: tags || [], user_id: 'demo' };
   const uid = await _userId();
   const normalizedTags = Array.isArray(tags) ? tags : [];
   const normalizedConf = tag_confidence && typeof tag_confidence === 'object' ? tag_confidence : {};
@@ -405,6 +508,7 @@ async function insertEntryWithTags({ kind, body_markdown, tags, tag_confidence, 
 // Uses the structured tags column: WHERE 'brag' = ANY(tags)
 // Optional `since` is an ISO timestamp to bound the lookback window.
 async function listEntriesByTag(tag, since) {
+  if (_isDemo()) return [];
   let q = _client()
     .from('entries')
     .select('*')
@@ -424,6 +528,7 @@ async function listEntriesByTag(tag, since) {
 // TODO(V1.2): build signal management UX surface
 
 async function listUserSignals() {
+  if (_isDemo()) return [];
   const { data, error } = await _client()
     .from('user_signals')
     .select('*')
@@ -436,6 +541,7 @@ async function listUserSignals() {
 
 // V1.1 scaffold — for admin/power-user use; full UX in V1.2
 async function insertUserSignal({ tag, description, framework } = {}) {
+  if (_isDemo()) return { id: _fakeId(), tag, user_id: 'demo' };
   const { data, error } = await _client()
     .from('user_signals')
     .insert({
@@ -453,6 +559,7 @@ async function insertUserSignal({ tag, description, framework } = {}) {
 
 // V1.1 scaffold — soft-delete by setting enabled=false
 async function archiveUserSignal(id) {
+  if (_isDemo()) return { id, enabled: false, user_id: 'demo' };
   const { data, error } = await _client()
     .from('user_signals')
     .update({ enabled: false })
@@ -475,6 +582,7 @@ async function getSetupDraft() {
 }
 
 async function saveSetupDraftPhase({ phase, data }) {
+  if (_isDemo()) return { config: { setup_draft: { phase } }, user_id: 'demo' };
   // Merge new phase data into setup_draft, preserving any previously saved phases.
   const sb = _client();
   const uid = await _userId();
@@ -509,6 +617,7 @@ async function saveSetupDraftPhase({ phase, data }) {
 }
 
 async function clearSetupDraft() {
+  if (_isDemo()) return null;
   const sb = _client();
   const uid = await _userId();
 
@@ -539,6 +648,7 @@ async function clearSetupDraft() {
 // ─── Life Areas ─────────────────────────────────────────────────────────────
 
 async function insertLifeArea({ name, description, glyph, palette, goal_id, slug } = {}) {
+  if (_isDemo()) return { id: _fakeId(), name, user_id: 'demo' };
   const row = { user_id: (await _userId()), name };
   if (description != null) row.description = description;
   if (glyph != null) row.glyph = glyph;
@@ -555,6 +665,17 @@ async function insertLifeArea({ name, description, glyph, palette, goal_id, slug
 }
 
 async function listLifeAreas({ archived = false } = {}) {
+  if (_isDemo()) {
+    return (window.SAM_LIFE_AREAS || []).map((a, i) => ({
+      id: 'demo-area-' + i,
+      user_id: 'demo',
+      name: a.name,
+      glyph: a.glyph || null,
+      description: a.description || null,
+      position: a.position != null ? a.position : i + 1,
+      archived_at: null,
+    }));
+  }
   let q = _client()
     .from('life_areas')
     .select('*')
@@ -569,6 +690,7 @@ async function listLifeAreas({ archived = false } = {}) {
 }
 
 async function archiveLifeArea(id) {
+  if (_isDemo()) return { id, archived_at: new Date().toISOString(), user_id: 'demo' };
   const { data, error } = await _client()
     .from('life_areas')
     .update({ archived_at: new Date().toISOString() })
@@ -581,6 +703,17 @@ async function archiveLifeArea(id) {
 }
 
 async function getLifeArea(id) {
+  if (_isDemo()) {
+    return (window.SAM_LIFE_AREAS || []).map((a, i) => ({
+      id: 'demo-area-' + i,
+      user_id: 'demo',
+      name: a.name,
+      glyph: a.glyph || null,
+      description: a.description || null,
+      position: a.position != null ? a.position : i + 1,
+      archived_at: null,
+    })).find((a) => a.id === id) || null;
+  }
   const { data, error } = await _client()
     .from('life_areas')
     .select('*')
