@@ -314,6 +314,17 @@ function useManualAdds() {
           console.warn('[seed-sam] calendar/email backfill failed:', e && e.message ? e.message : e);
         }
       }
+      // Independent gate for life_areas — covers users seeded before PR #195.
+      if (seedAllowed && window.seedSamLifeAreasIfEmpty) {
+        try {
+          const result = await window.seedSamLifeAreasIfEmpty();
+          if (result && !result.skipped && result.inserted && result.inserted.life_areas) {
+            console.log('[seed-sam] backfilled life_areas:', result.inserted);
+          }
+        } catch (e) {
+          console.warn('[seed-sam] life_areas backfill failed:', e && e.message ? e.message : e);
+        }
+      }
 
       const today = _today();
       const [goals, projects, journalEntries, planItems, reminders] = await Promise.all([

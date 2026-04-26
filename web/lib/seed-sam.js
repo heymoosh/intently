@@ -241,6 +241,20 @@ async function seedSamIfEmpty() {
     summary.inserted.email_flags = emailRows.length;
   }
 
+  // 9. Life areas — persistent ongoing topics (health, relationships, etc.).
+  if (window.SAM_LIFE_AREAS && window.SAM_LIFE_AREAS.length > 0) {
+    const areaRows = window.SAM_LIFE_AREAS.map((a) => ({
+      user_id: userId,
+      name: a.name,
+      glyph: a.glyph || null,
+      description: a.description || null,
+      position: a.position != null ? a.position : null,
+    }));
+    const { error: areasErr } = await sb.from('life_areas').insert(areaRows);
+    if (areasErr) console.warn('[seed-sam] life_areas skipped:', areasErr.message);
+    else summary.inserted.life_areas = areaRows.length;
+  }
+
   return summary;
 }
 
@@ -303,6 +317,43 @@ async function seedSamCalendarEmailIfEmpty() {
   return summary;
 }
 
+// Independent gate for life_areas. Runs even when the goals seed has already
+// happened — covers users seeded before PR #195 shipped the life_areas table.
+// Idempotent: only seeds if the user has zero life_area rows.
+async function seedSamLifeAreasIfEmpty() {
+  if (!window.getSupabaseClient || !window.getCurrentUserId) {
+    return { skipped: true, reason: 'libs not loaded' };
+  }
+  if (!window.SAM_LIFE_AREAS || !window.SAM_LIFE_AREAS.length) {
+    return { skipped: true, reason: 'sam-seed-data not loaded' };
+  }
+  const sb = window.getSupabaseClient();
+  const userId = await window.getCurrentUserId();
+
+  const { data: existing, error: checkErr } = await sb
+    .from('life_areas').select('id').eq('user_id', userId).limit(1);
+  if (checkErr) {
+    return { skipped: true, reason: `life_areas table missing: ${checkErr.message}` };
+  }
+  if (existing && existing.length > 0) {
+    return { skipped: true, reason: 'user already has life areas' };
+  }
+
+  const areaRows = window.SAM_LIFE_AREAS.map((a) => ({
+    user_id: userId,
+    name: a.name,
+    glyph: a.glyph || null,
+    description: a.description || null,
+    position: a.position != null ? a.position : null,
+  }));
+  const { error } = await sb.from('life_areas').insert(areaRows);
+  if (error) {
+    console.warn('[seed-sam] life_areas backfill failed:', error.message);
+    return { skipped: true, reason: error.message };
+  }
+  return { inserted: { life_areas: areaRows.length } };
+}
+
 // Wipe all of the current user's seeded data — used when re-seeding cleanly
 // or resetting demo state. Only deletes the current user's rows (RLS enforces).
 async function clearAllUserData() {
@@ -317,6 +368,8 @@ async function clearAllUserData() {
   await sb.from('email_flags').delete().neq('id', '00000000-0000-0000-0000-000000000000').then(() => {}, () => {});
   await sb.from('projects').delete().neq('id', '00000000-0000-0000-0000-000000000000');
   await sb.from('goals').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  // life_areas may not exist if 0011 not applied.
+  await sb.from('life_areas').delete().neq('id', '00000000-0000-0000-0000-000000000000').then(() => {}, () => {});
 }
 
-Object.assign(window, { seedSamIfEmpty, seedSamCalendarEmailIfEmpty, clearAllUserData });
+Object.assign(window, { seedSamIfEmpty, seedSamCalendarEmailIfEmpty, seedSamLifeAreasIfEmpty, clearAllUserData });
