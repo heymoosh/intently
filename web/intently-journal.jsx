@@ -249,16 +249,86 @@ function WeekView({ onPickDay }) {
 
 // ─── DAY view ─── today's entries chronologically + archive ─────
 function DayView({ onBack, onPickEntry }) {
-  const entries = [
+  // Fallback used while DB load is pending OR when the user has no entries
+  // for today — keeps the screen looking real instead of empty.
+  const FALLBACK_ENTRIES = [
     { id: 'brief-7-14', time: '7:14', kind: 'brief', title: 'Daily brief', body: 'A quieter one than yesterday. Morning for deep work.' },
     { id: 'journal-10-32', time: '10:32', kind: 'journal', title: 'On the data slide', body: 'Rewrote the opening — it was too defensive. The new frame is: here is what we learned; here is what it implies; here is what we are doing about it. Three beats. Anya will push back on beat two.' },
     { id: 'chat-14-50', time: '14:50', kind: 'chat', title: 'Chat — walk timing', body: 'Moved walk to after dinner per your note.' },
     { id: 'review-21-06', time: '21:06', kind: 'review', title: 'End-of-day review', body: 'Shipped the slide. Declined Raj. Walked. Good day.' },
   ];
-  const archive = [
+
+  const [entries, setEntries] = React.useState(FALLBACK_ENTRIES);
+  const [archive, setArchive] = React.useState([
     { date: 'Mar 2', t: "Named the thing about the ops hire.", glyph: 'footprints' },
     { date: 'Feb 14', t: 'First pitch rewrite — still too defensive.', glyph: 'pen' },
-  ];
+  ]);
+
+  // Hydrate today's entries from Supabase. Falls back to FALLBACK_ENTRIES if
+  // the user has no entries today, so the demo never looks empty.
+  React.useEffect(() => {
+    if (!window.getSupabaseClient || !window.getCurrentUserId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const sb = window.getSupabaseClient();
+        const userId = await window.getCurrentUserId();
+        const today = new Date();
+        const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
+        const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1).toISOString();
+        const sevenDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        const [todayEntries, olderEntries] = await Promise.all([
+          sb.from('entries').select('*')
+            .eq('user_id', userId)
+            .gte('at', startOfDay).lt('at', endOfDay)
+            .order('at', { ascending: true })
+            .then((r) => r.data || []),
+          sb.from('entries').select('*')
+            .eq('user_id', userId)
+            .lt('at', startOfDay).gte('at', sevenDaysAgo)
+            .eq('kind', 'journal')
+            .order('at', { ascending: false })
+            .limit(2)
+            .then((r) => r.data || []),
+        ]);
+        if (cancelled) return;
+
+        if (todayEntries.length > 0) {
+          setEntries(todayEntries.map((e) => {
+            const at = new Date(e.at);
+            const hh = at.getHours();
+            const mm = at.getMinutes();
+            const time = `${hh}:${String(mm).padStart(2, '0')}`;
+            // Title: first sentence or first 60 chars of body.
+            const body = e.body_markdown || '';
+            const sentenceMatch = body.match(/^[^.!?]+[.!?]/);
+            const title = (sentenceMatch ? sentenceMatch[0] : body).trim().slice(0, 80);
+            const kindTitle = { brief: 'Daily brief', review: 'End-of-day review', chat: 'Chat', journal: title }[e.kind] || title;
+            return {
+              id: e.id,
+              time,
+              kind: e.kind,
+              title: kindTitle,
+              body: body.replace(/```json[\s\S]*$/, '').trim() || '—',
+            };
+          }));
+        }
+
+        if (olderEntries.length > 0) {
+          setArchive(olderEntries.map((e) => {
+            const at = new Date(e.at);
+            const date = at.toLocaleString('en-US', { month: 'short', day: 'numeric' });
+            const body = e.body_markdown || '';
+            const t = body.split('\n')[0].slice(0, 80);
+            return { date, t, glyph: e.glyph || 'pen' };
+          }));
+        }
+      } catch (err) {
+        console.warn('[DayView] hydrate failed:', err && err.message);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
   const kindMeta = {
     brief:   { tint: T.color.TintSage,   label: 'Brief',   glyph: 'sunrise' },
     journal: { tint: T.color.TintLilac,  label: 'Journal', glyph: 'pen' },

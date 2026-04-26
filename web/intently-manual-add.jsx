@@ -294,6 +294,18 @@ function useManualAdds() {
           console.warn('[seed-sam] failed:', e && e.message ? e.message : e);
         }
       }
+      // Independent gate for calendar/email — covers the case where 0006 was
+      // applied AFTER the user was first seeded (calendar/email 404'd then).
+      if (window.seedSamCalendarEmailIfEmpty) {
+        try {
+          const result = await window.seedSamCalendarEmailIfEmpty();
+          if (result && !result.skipped && Object.keys(result.inserted).length > 0) {
+            console.log('[seed-sam] backfilled calendar/email:', result.inserted);
+          }
+        } catch (e) {
+          console.warn('[seed-sam] calendar/email backfill failed:', e && e.message ? e.message : e);
+        }
+      }
 
       const today = _today();
       const [goals, projects, journalEntries, planItems, reminders] = await Promise.all([

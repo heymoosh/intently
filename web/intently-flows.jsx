@@ -842,13 +842,40 @@ const REVIEW_SCRIPT = [
   },
 ];
 
-// Items the agent infers done from today's log + journal + manual checks.
-const AUTO_CHECK_ITEMS = [
+// Fallback items used only when the user has zero today-plan / today-journal
+// in the DB. Once the cognition layer hydrates, this is replaced by inferred
+// items per inferAutoCheckItems() below.
+const AUTO_CHECK_FALLBACK = [
   'Hackathon build — light touch. One trial run for the demo.',
-  '11:00 AM CST — AMA with Thariq (Anthropic). Show up. Ask one question.',
-  '2:00 PM CST — WIP AI Weekly demo. Walk in present.',
+  'Show up to your AMA / drop-in. Ask one question.',
   'Movement — light, not a workout.',
 ];
+
+// Read today's plan_items + today's journal entries from the DB; combine them
+// into "what I saw you do" auto-check items. Plan items represent intent;
+// journal entries are concrete signals. The agent's actual review prose then
+// confirms or corrects.
+async function inferAutoCheckItems() {
+  if (!window.listPlanItems || !window.listJournalEntries) return AUTO_CHECK_FALLBACK;
+  const today = new Date().toISOString().slice(0, 10);
+  try {
+    const [planItems, journalEntries] = await Promise.all([
+      window.listPlanItems(today).catch(() => []),
+      window.listJournalEntries({ limit: 10 }).catch(() => []),
+    ]);
+    const todayJournal = journalEntries.filter((e) => {
+      try { return new Date(e.at).toISOString().slice(0, 10) === today; }
+      catch { return false; }
+    });
+    const items = [
+      ...planItems.map((p) => p.text),
+      ...todayJournal.map((e) => `Captured: "${(e.body_markdown || '').slice(0, 80)}${e.body_markdown && e.body_markdown.length > 80 ? '…' : ''}"`),
+    ];
+    return items.length > 0 ? items.slice(0, 6) : AUTO_CHECK_FALLBACK;
+  } catch {
+    return AUTO_CHECK_FALLBACK;
+  }
+}
 
 function ReviewFlow({ onClose, onComplete }) {
   const [step, setStep] = React.useState(0);
@@ -856,10 +883,20 @@ function ReviewFlow({ onClose, onComplete }) {
   const [agentTyping, setAgentTyping] = React.useState(true);
   const [draft, setDraft] = React.useState('');
   const [checkedIndex, setCheckedIndex] = React.useState(-1); // how many auto-check items have been "checked"
+  const [autoCheckItems, setAutoCheckItems] = React.useState(AUTO_CHECK_FALLBACK);
   const [liveReview, setLiveReview] = React.useState(null);   // live ma-proxy daily-review response
   const [reviewError, setReviewError] = React.useState(null); // set if the live call fails (demo still proceeds)
   const [reviewLoading, setReviewLoading] = React.useState(false);
   const scrollRef = React.useRef(null);
+
+  // Hydrate auto-check items from today's plan + journal on mount.
+  React.useEffect(() => {
+    let cancelled = false;
+    inferAutoCheckItems().then((items) => {
+      if (!cancelled) setAutoCheckItems(items);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   React.useEffect(() => {
     const s = REVIEW_SCRIPT[step];
@@ -869,7 +906,7 @@ function ReviewFlow({ onClose, onComplete }) {
       setMessages(m => [...m, { role: 'agent', text: s.agent, sub: s.agentSub }]);
       setAgentTyping(false);
       if (s.autoCheck) {
-        setMessages(m => [...m, { role: 'checklist', items: AUTO_CHECK_ITEMS }]);
+        setMessages(m => [...m, { role: 'checklist', items: autoCheckItems }]);
       }
     }, s.typing);
     return () => clearTimeout(t);
@@ -878,7 +915,7 @@ function ReviewFlow({ onClose, onComplete }) {
   // Drive the checklist animation after it appears — stagger check-ins
   React.useEffect(() => {
     const hasChecklist = messages.some(m => m.role === 'checklist');
-    if (!hasChecklist || checkedIndex >= AUTO_CHECK_ITEMS.length - 1) return;
+    if (!hasChecklist || checkedIndex >= autoCheckItems.length - 1) return;
     const t = setTimeout(() => setCheckedIndex(i => i + 1), checkedIndex < 0 ? 500 : 420);
     return () => clearTimeout(t);
   }, [messages, checkedIndex]);
@@ -890,7 +927,7 @@ function ReviewFlow({ onClose, onComplete }) {
   const s = REVIEW_SCRIPT[step];
   // For step 0 (autoCheck), auto-advance after the checklist animates in fully
   React.useEffect(() => {
-    if (s && s.autoCheck && checkedIndex === AUTO_CHECK_ITEMS.length - 1) {
+    if (s && s.autoCheck && checkedIndex === autoCheckItems.length - 1) {
       const t = setTimeout(() => setStep(step + 1), 900);
       return () => clearTimeout(t);
     }
@@ -913,7 +950,7 @@ function ReviewFlow({ onClose, onComplete }) {
     // reminders from Supabase. Auto-checked items still come from the JSX
     // (Task #14 will replace them with inferred-from-real-entries).
     const inputPromise = window.assembleReviewContext
-      ? window.assembleReviewContext(userAnswers, AUTO_CHECK_ITEMS)
+      ? window.assembleReviewContext(userAnswers, autoCheckItems)
       : Promise.resolve([
           "It's evening. The user just had this end-of-day reflection:",
           ...userAnswers.map((a, i) => `Answer ${i + 1}: ${a}`),
