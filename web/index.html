@@ -188,7 +188,7 @@ function Phone({ children }) {
 }
 
 // Past → Day with a manual-add trailing row.
-function PastJournalProto({ adds, onAddJournal, onPickEntry }) {
+function PastJournalProto({ adds, onAddJournal, onPickEntry, onStartWeeklyReview }) {
   const [zoom, setZoom] = React.useState('Day');
   const subtitle = { Year: '2026', Month: 'April 2026', Week: 'Week 17 · Apr 20–26', Day: 'Thursday · Apr 23' }[zoom];
   const title = { Year: 'The year, at a glance.', Month: 'This month.', Week: 'What this week is for.', Day: 'Today, in your words.' }[zoom];
@@ -198,7 +198,7 @@ function PastJournalProto({ adds, onAddJournal, onPickEntry }) {
       <JournalHeader zoom={zoom} onZoom={setZoom} title={title} subtitle={subtitle} />
       {zoom === 'Year'  && <YearView  onPickMonth={() => setZoom('Month')} onPickDay={() => setZoom('Day')} />}
       {zoom === 'Month' && <MonthView onPickDay={() => setZoom('Day')} />}
-      {zoom === 'Week'  && <WeekView  onPickDay={() => setZoom('Day')} />}
+      {zoom === 'Week'  && <WeekView  onPickDay={() => setZoom('Day')} onStartWeeklyReview={onStartWeeklyReview} />}
       {zoom === 'Day'   && (
         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
           <div style={{ flex: '0 0 auto' }}>
@@ -655,6 +655,7 @@ function PrototypePhone({ dayState, setDayState }) {
   const [briefJustAccepted, setBriefJustAccepted] = React.useState(false);
   const [livePlan, setLivePlan] = React.useState(null);   // agent-driven plan from latest BriefFlow accept
   const [liveReview, setLiveReview] = React.useState(null); // agent-driven review summary from latest ReviewFlow accept
+  const [showWeeklyReview, setShowWeeklyReview] = React.useState(false);
   const [showJournal, setShowJournal] = React.useState(false);
   const [showConnections, setShowConnections] = React.useState(false);
   const [profileView, setProfileView] = React.useState(null); // null | 'sheet' | 'account' | 'preferences' | 'help'
@@ -848,7 +849,7 @@ function PrototypePhone({ dayState, setDayState }) {
       <div style={{ position: 'absolute', top: 62, left: 0, right: 0, bottom: 0 }}>
         <SwipeShell index={idx} onIndex={setIdx}>
           {[
-            <PastJournalProto key="p" adds={m.state} onAddJournal={m.addJournal} onPickEntry={setOpenEntry} />,
+            <PastJournalProto key="p" adds={m.state} onAddJournal={m.addJournal} onPickEntry={setOpenEntry} onStartWeeklyReview={() => setShowWeeklyReview(true)} />,
             <div key="c" style={{ height: '100%' }}>{presentView}</div>,
             <FutureScreenProtoTappable
               key="f"
@@ -905,8 +906,17 @@ function PrototypePhone({ dayState, setDayState }) {
         />
       )}
 
+      {/* Weekly review flow overlay — opens from Past → Week → "Start weekly
+          review" CTA. Persists to entries.kind='review' with links.scope='week'. */}
+      {showWeeklyReview && (
+        <WeeklyReviewFlow
+          onClose={() => setShowWeeklyReview(false)}
+          onComplete={() => setShowWeeklyReview(false)}
+        />
+      )}
+
       {/* Profile button — bottom-left, persistent across all tenses */}
-      {dayState !== 'brief' && dayState !== 'review' && !openGoal && !openProject && !showJournal && !showConnections && !profileView && !openEntry && (
+      {dayState !== 'brief' && dayState !== 'review' && !showWeeklyReview && !openGoal && !openProject && !showJournal && !showConnections && !profileView && !openEntry && (
         <ProfileButton onClick={() => setProfileView('sheet')} dim={micDim} />
       )}
 
@@ -968,7 +978,7 @@ function PrototypePhone({ dayState, setDayState }) {
       )}
 
       {/* Chrome: tense nav + hero — hidden during brief/review chat / overlays */}
-      {dayState !== 'brief' && dayState !== 'review' && !openGoal && !openProject && !showJournal && !showConnections && !profileView && !openEntry && (
+      {dayState !== 'brief' && dayState !== 'review' && !showWeeklyReview && !openGoal && !openProject && !showJournal && !showConnections && !profileView && !openEntry && (
         <>
           <TenseNav index={idx} onIndex={setIdx} dim={micDim} />
           <HeroAffordance
@@ -987,7 +997,7 @@ function PrototypePhone({ dayState, setDayState }) {
           />
         </>
       )}
-      {(openGoal || openProject) && dayState !== 'brief' && dayState !== 'review' && !showJournal && !showConnections && !profileView && (
+      {(openGoal || openProject) && dayState !== 'brief' && dayState !== 'review' && !showWeeklyReview && !showJournal && !showConnections && !profileView && (
         <HeroAffordance
           state={heroState}
           onChange={onHeroChange}

@@ -128,3 +128,29 @@ If `first_run_complete: false`: this is the first weekly-review.
 - At step 9, AFTER everything else completes successfully, flip `first_run_complete: true` in config.
 
 From the second weekly-review onward, all steps run normally.
+
+## Output contract (V1 demo)
+
+The web app's prototype consumes weekly-review responses by parsing prose first
+and an optional structured JSON tail second. After your prose review (≤4 short
+paragraphs per the steps above), append a fenced JSON block of this exact shape:
+
+```json
+{
+  "summary": "one-line week summary in the user's voice",
+  "outcomes": [
+    {"text": "outcome direction text", "status": "done|doing|todo"}
+  ],
+  "key_moments": [
+    {"glyph": "rocket|leaf|moon|pen|footprints|message|mountain|handshake|sparkles", "text": "one-line moment description"}
+  ],
+  "next_week_directions": [
+    {"text": "direction for next week", "serves_goal_index": 0}
+  ]
+}
+```
+
+- 2–6 outcomes, 2–4 key moments, 2–4 next_week_directions. Status reflects where the outcome ended the week.
+- key_moments.glyph picks from the user's existing daily-mark glyph set (above list is canonical for V1).
+- next_week_directions.serves_goal_index references the active goals' position (0/1/2). Set to null if the direction stands alone.
+- Output ONLY the prose followed by the JSON block. No prose AFTER the JSON.

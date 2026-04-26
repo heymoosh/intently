@@ -459,6 +459,7 @@ function BriefFlow({ onClose, onComplete }) {
   const [liveBrief, setLiveBrief] = React.useState(null);   // live ma-proxy daily-brief response
   const [briefError, setBriefError] = React.useState(null); // set if the live call fails (demo still proceeds)
   const [briefLoading, setBriefLoading] = React.useState(false);
+  const [consulted, setConsulted] = React.useState([]);     // input traces — what the assembler injected
   const scrollRef = React.useRef(null);
 
   // Drive the script — when step changes, post agent turn, reveal input/confirm.
@@ -503,19 +504,22 @@ function BriefFlow({ onClose, onComplete }) {
 
     setBriefLoading(true);
     // Context assembler reads goals/projects/yesterday's review/recent journals/
-    // today's plan/calendar/emails/due reminders from Supabase and formats them
-    // as the agent's input. Falls back to user-answers-only if assembler missing.
-    const inputPromise = window.assembleBriefContext
+    // today's plan/calendar/emails/due reminders from Supabase. Returns
+    // {input, consulted} — the consulted list drives the InputTrace UI.
+    const ctxPromise = window.assembleBriefContext
       ? window.assembleBriefContext(userAnswers)
-      : Promise.resolve([
+      : Promise.resolve({ input: [
           "It's morning. The user just had this conversation:",
           ...userAnswers.map((a, i) => `Answer ${i + 1}: ${a}`),
           '',
           'Generate a personal daily brief in plain prose. Speak directly to them ("you").',
-        ].join('\n'));
+        ].join('\n'), consulted: [] });
 
-    inputPromise
-      .then((input) => window.callMaProxy({ skill: 'daily-brief', input }))
+    ctxPromise
+      .then(({ input, consulted: c }) => {
+        setConsulted(c || []);
+        return window.callMaProxy({ skill: 'daily-brief', input });
+      })
       .then(r => {
         setLiveBrief((r && r.finalText) || '');
         setBriefLoading(false);
@@ -573,7 +577,7 @@ function BriefFlow({ onClose, onComplete }) {
           {showBriefThinking && <AgentTyping />}
           {liveBrief && <ChatBubble role="agent" text={liveBrief} />}
           {briefError && <ChatBubble role="agent" text="(I couldn't reach the brief generator just now — here's your day shape anyway.)" />}
-          {showConfirm && <BriefConfirmCard plan={parseAgentPlan(liveBrief, MOCK_PLAN)} onAccept={() => onComplete && onComplete(parseAgentPlan(liveBrief, MOCK_PLAN))} />}
+          {showConfirm && <BriefConfirmCard plan={parseAgentPlan(liveBrief, MOCK_PLAN)} consulted={consulted} onAccept={() => onComplete && onComplete(parseAgentPlan(liveBrief, MOCK_PLAN))} />}
         </div>
       </div>
 
@@ -770,7 +774,42 @@ function flagKindFor(kind) {
 
 Object.assign(window, { parseAgentPlan });
 
-function BriefConfirmCard({ onAccept, plan = MOCK_PLAN }) {
+// Renders the "Consulted: …" chip strip on a confirm card. Mirrors the
+// InputTrace pattern from intently-cards.jsx but tuned for our consulted
+// keys (goals / projects / yesterday-review / journal / plan / reminders /
+// calendar / email). Pass onDark=true for dark surfaces (review flow).
+function ConsultedChips({ items, onDark = false }) {
+  if (!items || items.length === 0) return null;
+  const labelFn = window.labelForConsulted || ((k) => k);
+  const textCol = onDark ? 'rgba(251,246,234,0.78)' : T.color.SupportingText;
+  const edgeCol = onDark ? 'rgba(251,246,234,0.28)' : T.color.EdgeLine;
+  const dotCol = onDark ? 'rgba(245,235,207,0.72)' : T.color.FocusObject;
+  return (
+    <div style={{
+      display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center',
+      marginTop: 12, paddingTop: 10, borderTop: `1px dashed ${edgeCol}`,
+    }}>
+      <span style={{
+        fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.0,
+        textTransform: 'uppercase', color: textCol, opacity: 0.85, marginRight: 4,
+      }}>Consulted</span>
+      {items.map((key) => (
+        <span key={key} style={{
+          display: 'inline-flex', alignItems: 'center', gap: 5,
+          background: onDark ? 'rgba(251,246,234,0.10)' : 'rgba(31,27,21,0.04)',
+          border: `1px solid ${edgeCol}`,
+          borderRadius: 999, padding: '3px 9px',
+          fontFamily: T.font.UI, fontSize: 11, fontWeight: 500, color: textCol,
+        }}>
+          <span style={{ width: 6, height: 6, borderRadius: 999, background: dotCol }} />
+          {labelFn(key)}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function BriefConfirmCard({ onAccept, plan = MOCK_PLAN, consulted = [] }) {
   return (
     <div style={{ marginTop: 4 }}>
       <div style={{
@@ -789,7 +828,9 @@ function BriefConfirmCard({ onAccept, plan = MOCK_PLAN }) {
             </div>
           ))}
         </div>
+        <ConsultedChips items={consulted} />
         <button onClick={onAccept} style={{
+          marginTop: consulted && consulted.length > 0 ? 14 : 0,
           width: '100%', padding: '12px 18px',
           background: T.color.PrimaryText, color: '#FBF6EA',
           border: 'none', borderRadius: 999, cursor: 'pointer',
@@ -887,6 +928,7 @@ function ReviewFlow({ onClose, onComplete }) {
   const [liveReview, setLiveReview] = React.useState(null);   // live ma-proxy daily-review response
   const [reviewError, setReviewError] = React.useState(null); // set if the live call fails (demo still proceeds)
   const [reviewLoading, setReviewLoading] = React.useState(false);
+  const [reviewConsulted, setReviewConsulted] = React.useState([]); // input traces
   const scrollRef = React.useRef(null);
 
   // Hydrate auto-check items from today's plan + journal on mount.
@@ -946,20 +988,20 @@ function ReviewFlow({ onClose, onComplete }) {
       .map(m => m.text);
 
     setReviewLoading(true);
-    // Context assembler reads goals/projects/today's plan/recent journal/due
-    // reminders from Supabase. Auto-checked items still come from the JSX
-    // (Task #14 will replace them with inferred-from-real-entries).
-    const inputPromise = window.assembleReviewContext
+    const ctxPromise = window.assembleReviewContext
       ? window.assembleReviewContext(userAnswers, autoCheckItems)
-      : Promise.resolve([
+      : Promise.resolve({ input: [
           "It's evening. The user just had this end-of-day reflection:",
           ...userAnswers.map((a, i) => `Answer ${i + 1}: ${a}`),
           '',
           'Generate a short evening review in plain prose. Speak directly to them ("you"). Tone: warm, plainspoken, end-of-day.',
-        ].join('\n'));
+        ].join('\n'), consulted: [] });
 
-    inputPromise
-      .then((input) => window.callMaProxy({ skill: 'daily-review', input }))
+    ctxPromise
+      .then(({ input, consulted: c }) => {
+        setReviewConsulted(c || []);
+        return window.callMaProxy({ skill: 'daily-review', input });
+      })
       .then(r => {
         setLiveReview((r && r.finalText) || '');
         setReviewLoading(false);
@@ -1021,7 +1063,7 @@ function ReviewFlow({ onClose, onComplete }) {
           {reviewError && <ChatBubbleDark role="agent" text="(I couldn't reach the review generator just now — saving what you said anyway.)" />}
           {showConfirm && (() => {
             const parsed = liveReview ? (window.parseAgentReview && window.parseAgentReview(liveReview)) : null;
-            return <ReviewConfirmCard parsed={parsed} onAccept={() => onComplete && onComplete(parsed)} />;
+            return <ReviewConfirmCard parsed={parsed} consulted={reviewConsulted} onAccept={() => onComplete && onComplete(parsed)} />;
           })()}
         </div>
       </div>
@@ -1161,7 +1203,7 @@ function AutoCheckList({ items, checkedIndex }) {
   );
 }
 
-function ReviewConfirmCard({ parsed, onAccept }) {
+function ReviewConfirmCard({ parsed, onAccept, consulted = [] }) {
   const journal  = (parsed && parsed.journal)  || 'The dry run actually went well. I walked in present.';
   const friction = (parsed && parsed.friction) || 'Over-polishing the data slide — twice this week.';
   const tomorrow = (parsed && parsed.tomorrow) || 'Write the job pitch before opening Slack.';
@@ -1237,7 +1279,9 @@ function ReviewConfirmCard({ parsed, onAccept }) {
             ))}
           </div>
         </div>
+        <ConsultedChips items={consulted} onDark />
         <button onClick={onAccept} style={{
+          marginTop: consulted && consulted.length > 0 ? 14 : 0,
           width: '100%', padding: '12px 18px',
           background: '#E6DFF5', color: '#2A2348',
           border: 'none', borderRadius: 999, cursor: 'pointer',
@@ -1397,10 +1441,264 @@ function PresentClosed({ onReopenReview, review }) {
   );
 }
 
+// ─── WEEKLY REVIEW FLOW ──────────────────────────────────────────────
+// End-of-week reflection. Three steps: highlight → friction → next week's
+// directions. Calls weekly-review MA agent with this week's full context
+// (week's entries + plan_items + active goals/projects/monthly slice).
+// On accept, persists as entries.kind='review' with links={scope:'week',
+// week_id:'YYYY-WNN'} so the daily-brief assembler can use it as the week's
+// compression summary going forward.
+
+const WEEKLY_REVIEW_SCRIPT = [
+  {
+    agent: "Let's close out the week.",
+    agentSub: "I'll pull what landed; you tell me what mattered.",
+    typing: 1300,
+  },
+  {
+    agent: "What's the one thing from this week you want to carry forward?",
+    input: { placeholder: 'Say the thing.' },
+    userDefault: 'Single-focus AM blocks worked. Mixing spec and code did not.',
+    typing: 1400,
+  },
+  {
+    agent: "And what didn't land — what's the pattern you noticed?",
+    input: { placeholder: 'Be specific if you can.' },
+    userDefault: 'Energy dropped mid-afternoon every day. The day shape isn\'t the problem; sleep debt is.',
+    typing: 1300,
+  },
+  {
+    agent: "Looking at next week — what are 2 or 3 outcomes you're aiming for?",
+    input: { placeholder: 'Outcome-directions, not to-dos.' },
+    userDefault: 'Demo recorded and submitted. First three real users in the loop. Sleep back to baseline.',
+    typing: 1300,
+  },
+  {
+    agent: "Good week. Here's what I'll save.",
+    typing: 1500,
+    confirm: true,
+  },
+];
+
+function WeeklyReviewFlow({ onClose, onComplete }) {
+  const [step, setStep] = React.useState(0);
+  const [messages, setMessages] = React.useState([]);
+  const [agentTyping, setAgentTyping] = React.useState(true);
+  const [draft, setDraft] = React.useState('');
+  const [liveReview, setLiveReview] = React.useState(null);
+  const [reviewError, setReviewError] = React.useState(null);
+  const [reviewLoading, setReviewLoading] = React.useState(false);
+  const [consulted, setConsulted] = React.useState([]);
+  const [weekId, setWeekId] = React.useState(null);
+  const scrollRef = React.useRef(null);
+
+  React.useEffect(() => {
+    const s = WEEKLY_REVIEW_SCRIPT[step];
+    if (!s) return;
+    setAgentTyping(true);
+    const t = setTimeout(() => {
+      setMessages(m => [...m, { role: 'agent', text: s.agent, sub: s.agentSub }]);
+      setAgentTyping(false);
+    }, s.typing);
+    return () => clearTimeout(t);
+  }, [step]);
+
+  React.useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [messages, agentTyping, liveReview, reviewError, reviewLoading]);
+
+  const s = WEEKLY_REVIEW_SCRIPT[step];
+
+  React.useEffect(() => {
+    if (!s || !s.confirm) return;
+    if (!window.callMaProxy) return;
+    if (liveReview || reviewError || reviewLoading) return;
+
+    const userAnswers = messages.filter(m => m.role === 'user').map(m => m.text);
+    setReviewLoading(true);
+    const ctxPromise = window.assembleWeeklyReviewContext
+      ? window.assembleWeeklyReviewContext(userAnswers)
+      : Promise.resolve({ input: userAnswers.join('\n\n'), consulted: [] });
+
+    ctxPromise
+      .then(({ input, consulted: c, weekId: w }) => {
+        setConsulted(c || []);
+        if (w) setWeekId(w);
+        return window.callMaProxy({ skill: 'weekly-review', input });
+      })
+      .then(r => {
+        setLiveReview((r && r.finalText) || '');
+        setReviewLoading(false);
+      })
+      .catch(e => {
+        setReviewError((e && e.message) || 'weekly review call failed');
+        setReviewLoading(false);
+      });
+  }, [s, messages, liveReview, reviewError, reviewLoading]);
+
+  const showInput = s && s.input && !agentTyping;
+  const liveReviewReady = liveReview !== null || reviewError !== null;
+  const showConfirm = s && s.confirm && !agentTyping && liveReviewReady;
+  const showThinking = s && s.confirm && !agentTyping && reviewLoading;
+
+  const submit = (text) => {
+    const t = (text && text.trim()) || (s.userDefault || '');
+    if (!t) return;
+    setMessages(m => [...m, { role: 'user', text: t }]);
+    setDraft('');
+    setTimeout(() => setStep(step + 1), 260);
+  };
+
+  // Persist weekly review entry on accept. Insert into `entries` with
+  // kind='review', source='agent', links={scope:'week', week_id}. The brief
+  // assembler will pick it up as the week's compression summary.
+  const persistAndComplete = async () => {
+    const parsed = liveReview && window.parseAgentWeeklyReview
+      ? window.parseAgentWeeklyReview(liveReview)
+      : null;
+    try {
+      if (window.getSupabaseClient && window.getCurrentUserId && weekId) {
+        const sb = window.getSupabaseClient();
+        const userId = await window.getCurrentUserId();
+        await sb.from('entries').insert([{
+          user_id: userId,
+          kind: 'review',
+          body_markdown: liveReview || '',
+          source: 'agent',
+          mood: 'dusk',
+          links: { scope: 'week', week_id: weekId },
+        }]);
+      }
+    } catch (e) {
+      console.warn('[weekly-review] persist failed:', e && e.message);
+    }
+    if (onComplete) onComplete(parsed);
+  };
+
+  return (
+    <div style={{
+      position: 'absolute', inset: 0, zIndex: 60,
+      background: `linear-gradient(180deg, #1F1B35 0%, #2E274A 50%, #46386A 100%)`,
+      display: 'flex', flexDirection: 'column', color: '#FBF6EA',
+    }}>
+      <div style={{ flexShrink: 0, padding: '14px 18px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          <Icon.Moon size={14} color="#E6DFF5" />
+          <span style={{ fontFamily: T.font.UI, fontSize: 11, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', color: '#E6DFF5' }}>Weekly review · {weekId || 'this week'}</span>
+        </div>
+        <button onClick={onClose} aria-label="Close" style={{
+          width: 32, height: 32, borderRadius: 999, background: 'rgba(251,246,234,0.1)',
+          border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Icon.X size={16} color="#FBF6EA" />
+        </button>
+      </div>
+
+      <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '8px 20px 20px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {messages.map((m, i) => <ChatBubbleDark key={i} role={m.role} text={m.text} sub={m.sub} />)}
+          {agentTyping && <AgentTypingDark />}
+          {showThinking && <AgentTypingDark />}
+          {liveReview && <ChatBubbleDark role="agent" text={liveReview} />}
+          {reviewError && <ChatBubbleDark role="agent" text="(I couldn't reach the weekly-review generator just now — saving what you said anyway.)" />}
+          {showConfirm && (() => {
+            const parsed = liveReview && window.parseAgentWeeklyReview
+              ? window.parseAgentWeeklyReview(liveReview)
+              : null;
+            return <WeeklyReviewConfirmCard parsed={parsed} consulted={consulted} weekId={weekId} onAccept={persistAndComplete} />;
+          })()}
+        </div>
+      </div>
+
+      {showInput && (
+        <div style={{ flexShrink: 0, padding: '10px 16px 20px', background: 'rgba(31,27,53,0.55)', backdropFilter: 'blur(12px)', borderTop: `1px solid rgba(251,246,234,0.12)` }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(251,246,234,0.08)', border: `1px solid rgba(251,246,234,0.16)`, borderRadius: 999, padding: '8px 8px 8px 16px' }}>
+            <input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && submit(draft || s.userDefault)}
+              placeholder={s.input.placeholder}
+              style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontFamily: T.font.Reading, fontSize: 14, color: '#FBF6EA' }}
+            />
+            <button onClick={() => submit(draft || s.userDefault)} aria-label="Send" style={{
+              width: 34, height: 34, borderRadius: 999, background: '#E6DFF5', color: '#2A2348', border: 'none',
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+            }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+          {s.userDefault && !draft && (
+            <div style={{ marginTop: 6, fontFamily: T.font.UI, fontSize: 11, color: 'rgba(251,246,234,0.5)', textAlign: 'center', fontStyle: 'italic' }}>
+              tap send to use the suggested answer
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function WeeklyReviewConfirmCard({ parsed, consulted = [], weekId, onAccept }) {
+  const summary = (parsed && parsed.summary) || 'A solid week — the through-line is starting to form.';
+  const outcomes = (parsed && parsed.outcomes) || [];
+  const keyMoments = (parsed && parsed.key_moments) || [];
+  const nextWeek = (parsed && parsed.next_week_directions) || [];
+  return (
+    <div style={{ marginTop: 4 }}>
+      <div style={{
+        background: 'rgba(251,246,234,0.08)', border: `1px solid rgba(251,246,234,0.18)`,
+        borderRadius: 14, padding: '16px 18px', color: '#FBF6EA',
+      }}>
+        <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: 'rgba(251,246,234,0.65)', marginBottom: 8 }}>I'll save this week</div>
+        <div style={{ fontFamily: T.font.Display, fontSize: 19, lineHeight: '25px', fontStyle: 'italic', color: '#FBF6EA', letterSpacing: -0.2, marginBottom: 14 }}>"{summary}"</div>
+
+        {outcomes.length > 0 && (
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontFamily: T.font.UI, fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', color: 'rgba(251,246,234,0.55)', marginBottom: 6 }}>Outcomes</div>
+            {outcomes.map((o, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontFamily: T.font.Reading, fontSize: 13, lineHeight: '20px', color: 'rgba(251,246,234,0.86)' }}>
+                <span style={{ fontFamily: T.font.UI, fontSize: 9, fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', color: o.status === 'done' ? '#B8D0BE' : (o.status === 'doing' ? '#F5EBCF' : 'rgba(251,246,234,0.5)'), minWidth: 38 }}>{(o.status || 'todo').slice(0,4)}</span>
+                <span>{o.text || o}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {nextWeek.length > 0 && (
+          <div style={{
+            background: 'rgba(245,235,207,0.12)', border: `1px solid rgba(245,235,207,0.28)`,
+            borderRadius: 12, padding: '12px 14px', marginBottom: 12,
+          }}>
+            <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: '#F5EBCF', marginBottom: 6 }}>Setting up for next week</div>
+            {nextWeek.map((d, i) => (
+              <div key={i} style={{ fontFamily: T.font.Reading, fontSize: 13, lineHeight: '20px', color: 'rgba(251,246,234,0.92)' }}>
+                · {d.text || d}
+              </div>
+            ))}
+          </div>
+        )}
+
+        <ConsultedChips items={consulted} onDark />
+
+        <button onClick={onAccept} style={{
+          marginTop: consulted && consulted.length > 0 ? 14 : 0,
+          width: '100%', padding: '12px 18px', background: '#E6DFF5', color: '#2A2348',
+          border: 'none', borderRadius: 999, cursor: 'pointer',
+          fontFamily: T.font.UI, fontSize: 14, fontWeight: 600, letterSpacing: 0.2,
+        }}>
+          Accept &amp; close the week
+        </button>
+      </div>
+    </div>
+  );
+}
+
 Object.assign(window, {
   GOAL_DATA, PROJECT_EXTRAS,
   GoalDetail, ProjectDetailV2,
-  BriefFlow, ReviewFlow,
+  BriefFlow, ReviewFlow, WeeklyReviewFlow,
   PresentEmpty, PresentClosed,
   usePopulate, MOCK_PLAN,
 });

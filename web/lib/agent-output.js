@@ -117,7 +117,38 @@ function parseAgentReview(text) {
   return parseReviewProse(trimmed);
 }
 
+// Parse the agent's weekly-review response (prose + optional JSON tail per
+// the weekly-review Output contract).
+// Returns { summary, outcomes[], key_moments[], next_week_directions[], proseBody }
+// or a prose-only fallback shape.
+function parseAgentWeeklyReview(text) {
+  if (!text || typeof text !== 'string') return null;
+  const trimmed = text.trim();
+  const jsonMatch = trimmed.match(/```json\s*([\s\S]*?)\s*```\s*$/);
+  if (jsonMatch) {
+    try {
+      const parsed = JSON.parse(jsonMatch[1]);
+      return {
+        summary: parsed.summary || '',
+        outcomes: Array.isArray(parsed.outcomes) ? parsed.outcomes : [],
+        key_moments: Array.isArray(parsed.key_moments) ? parsed.key_moments : [],
+        next_week_directions: Array.isArray(parsed.next_week_directions) ? parsed.next_week_directions : [],
+        proseBody: trimmed.replace(/```json[\s\S]*$/, '').trim(),
+      };
+    } catch {}
+  }
+  // Prose-only fallback: take first sentence as summary, rest as proseBody.
+  const firstSentence = trimmed.match(/^[^.!?]+[.!?]/);
+  return {
+    summary: firstSentence ? firstSentence[0].trim() : trimmed.slice(0, 80),
+    outcomes: [],
+    key_moments: [],
+    next_week_directions: [],
+    proseBody: trimmed,
+  };
+}
+
 Object.assign(window, {
   kindMetaFor, formatGeneratedAt, labelForInputTrace,
-  parseReviewProse, parseBriefProse, parseAgentReview,
+  parseReviewProse, parseBriefProse, parseAgentReview, parseAgentWeeklyReview,
 });
