@@ -1787,6 +1787,30 @@ function PresentEmpty({ onStartBrief, onOpenConnections }) {
       .catch(() => setYesterdayEntry(null));
   }, []);
 
+  // Calendar status card — load today's events + connection state.
+  // Possible states:
+  //   'no-connection' — no google_calendar row in oauth_connections
+  //   'synced-empty'  — connected but 0 events today
+  //   'has-events'    — 1-3 events to surface
+  //   null            — still loading or demo mode
+  const [calCard, setCalCard] = React.useState(null);
+  React.useEffect(() => {
+    if (window.INTENTLY_DEMO) return;
+    if (!window.listOauthConnections || !window.listCalendarEvents) return;
+    Promise.all([
+      window.listOauthConnections(),
+      window.listCalendarEvents(),
+    ]).then(([connections, events]) => {
+      const hasCalConn = (connections || []).some(c => c.provider === 'google_calendar');
+      if (!hasCalConn) {
+        setCalCard({ state: 'no-connection' });
+        return;
+      }
+      const todayEvents = (events || []).slice(0, 3);
+      setCalCard({ state: todayEvents.length > 0 ? 'has-events' : 'synced-empty', events: todayEvents });
+    }).catch((_err) => { /* ignore — card stays hidden on error */ });
+  }, []);
+
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
       {/* Lock-screen-style ambient image — centered painterly dawn,
@@ -1878,6 +1902,70 @@ function PresentEmpty({ onStartBrief, onOpenConnections }) {
             >
               Connect Google
             </button>
+          </div>
+        )}
+
+        {/* Calendar status card — hidden until loaded, hidden in demo, hidden if no-connection
+            AND connect-nudge is already showing (avoid duplicate). */}
+        {calCard && !(calCard.state === 'no-connection' && showConnectNudge) && (
+          <div style={{
+            padding: '14px 16px', borderRadius: 12,
+            background: T.color.SecondarySurface,
+            border: `1px solid ${T.color.EdgeLine}`,
+            display: 'flex', flexDirection: 'column', gap: 6,
+          }}>
+            <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: T.color.SupportingText }}>
+              Today
+            </div>
+            {calCard.state === 'no-connection' && (
+              <>
+                <div style={{ fontFamily: T.font.UI, fontSize: 14, fontWeight: 600, color: T.color.PrimaryText }}>
+                  No calendar connected
+                </div>
+                <div style={{ fontFamily: T.font.Reading, fontSize: 13, lineHeight: '18px', color: T.color.SupportingText }}>
+                  Connect Google Calendar so your brief reflects your real day.
+                </div>
+                {onOpenConnections && (
+                  <button
+                    onClick={onOpenConnections}
+                    style={{
+                      alignSelf: 'flex-start', marginTop: 4,
+                      padding: '7px 14px', borderRadius: 8,
+                      background: T.color.PrimaryText,
+                      color: '#FBF6EA', border: 'none', cursor: 'pointer',
+                      fontFamily: T.font.UI, fontSize: 13, fontWeight: 600,
+                    }}
+                  >Sync your calendar</button>
+                )}
+              </>
+            )}
+            {calCard.state === 'synced-empty' && (
+              <div style={{ fontFamily: T.font.Reading, fontSize: 13, lineHeight: '18px', color: T.color.SupportingText }}>
+                Calendar synced — no events today.
+              </div>
+            )}
+            {calCard.state === 'has-events' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: 2 }}>
+                {(calCard.events || []).map((ev, i) => {
+                  const start = ev.starts_at ? new Date(ev.starts_at) : null;
+                  const timeStr = start
+                    ? start.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+                    : '';
+                  return (
+                    <div key={ev.id || i} style={{
+                      display: 'flex', gap: 10, alignItems: 'baseline',
+                      fontFamily: T.font.Reading, fontSize: 13, lineHeight: '18px',
+                      color: T.color.PrimaryText,
+                    }}>
+                      {timeStr && (
+                        <span style={{ fontFamily: T.font.Mono, fontSize: 11, color: T.color.SupportingText, minWidth: 58, flexShrink: 0 }}>{timeStr}</span>
+                      )}
+                      <span>{ev.title || '(no title)'}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 

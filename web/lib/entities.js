@@ -681,6 +681,29 @@ async function checkReviewDeferralToday() {
   return _parseDeferrals(data || []);
 }
 
+// ─── Calendar Events ────────────────────────────────────────────────────────
+
+// List calendar events for the current user in a given time window.
+// Defaults to today: midnight → end-of-day (23:59:59).
+// Returns [] in demo mode (no real calendar data to show).
+async function listCalendarEvents({ from, to } = {}) {
+  if (_isDemo()) return [];
+  const now = new Date();
+  const startOfDay = new Date(now); startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay   = new Date(now); endOfDay.setHours(23, 59, 59, 999);
+  const timeMin = (from instanceof Date ? from : startOfDay).toISOString();
+  const timeMax = (to   instanceof Date ? to   : endOfDay).toISOString();
+  const { data, error } = await _client()
+    .from('calendar_events')
+    .select('id,title,starts_at,ends_at,location,source')
+    .eq('user_id', (await _userId()))
+    .gte('starts_at', timeMin)
+    .lte('starts_at', timeMax)
+    .order('starts_at', { ascending: true });
+  if (error) _throw('listCalendarEvents', error);
+  return data || [];
+}
+
 // ─── OAuth Connections ──────────────────────────────────────────────────────
 
 async function listOauthConnections() {
@@ -803,6 +826,8 @@ Object.assign(window, {
   listLifeAreas,
   archiveLifeArea,
   getLifeArea,
+  // calendar events
+  listCalendarEvents,
   // oauth connections
   listOauthConnections,
   // setup draft persistence
