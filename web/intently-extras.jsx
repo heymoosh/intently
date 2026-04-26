@@ -115,8 +115,15 @@ function JournalComposer({ onClose, onSave }) {
 }
 
 // ─── INTEGRATION REGISTRY ────────────────────────────────────────────
-// Each integration: id, name, group, hidden (off by default), tagline,
-// pulls (what the agent ingests), color, mark (compact SVG monogram).
+// Each integration: id, name, group, visible (off by default), tagline,
+// pulls (what the agent ingests), color, mark (compact SVG monogram),
+// `provider` (mapping to the oauth-google provider key — only set for
+// integrations that share the Google OAuth flow).
+//
+// MVP scope: Google only (gcal → google_calendar, gmail → google_gmail).
+// All other entries are kept in the registry on purpose — Muxin wants the
+// design preserved for later — but flipped to `visible: false` so they
+// don't render in ConnectionsPage. Re-enable by setting `visible: true`.
 
 // MarkBox — wraps a logo image in a uniform 38×38 rounded square. The `cream`
 // flag draws a cream background behind logos that need contrast (dark/mono
@@ -148,12 +155,13 @@ function MarkImg({ src, alt, size = 32 }) {
 const INTEGRATIONS = [
   {
     id: 'gcal', name: 'Google Calendar', group: 'Calendar', visible: true,
+    provider: 'google_calendar',
     tagline: 'Today\'s events, attendees, and conflicts.',
     pulls: ['Event titles, times, attendees', 'Declined and rescheduled events'],
     Mark: () => <MarkBox><MarkImg src="assets/integrations/gcal.svg" alt="Google Calendar" size={38} /></MarkBox>,
   },
   {
-    id: 'icloud', name: 'Apple Calendar', group: 'Calendar', visible: true,
+    id: 'icloud', name: 'Apple Calendar', group: 'Calendar', visible: false,
     tagline: 'iCloud calendar — birthdays, family.',
     pulls: ['Event titles and times', 'Reminders flagged today'],
     Mark: () => (
@@ -165,31 +173,32 @@ const INTEGRATIONS = [
     ),
   },
   {
-    id: 'outlook', name: 'Outlook · Microsoft 365', group: 'Calendar', visible: true,
+    id: 'outlook', name: 'Outlook · Microsoft 365', group: 'Calendar', visible: false,
     tagline: 'Work calendar and email in one.',
     pulls: ['Calendar events', 'Email threads marked Important'],
     Mark: () => <MarkBox><MarkImg src="assets/integrations/outlook.svg" alt="Outlook" size={32} /></MarkBox>,
   },
   {
     id: 'gmail', name: 'Gmail', group: 'Email', visible: true,
+    provider: 'google_gmail',
     tagline: 'Open threads, reply pressure.',
     pulls: ['Threads waiting for your reply', 'Calendar invites in your inbox'],
     Mark: () => <MarkBox><MarkImg src="assets/integrations/gmail.svg" alt="Gmail" size={26} /></MarkBox>,
   },
   {
-    id: 'slack', name: 'Slack', group: 'Communication', visible: true, optional: true,
+    id: 'slack', name: 'Slack', group: 'Communication', visible: false, optional: true,
     tagline: 'DM and mention pressure.',
     pulls: ['Direct messages awaiting reply', 'Channel mentions of your name'],
     Mark: () => <MarkBox><MarkImg src="assets/integrations/slack.svg" alt="Slack" size={26} /></MarkBox>,
   },
   {
-    id: 'notion', name: 'Notion', group: 'Notes', visible: true, optional: true,
+    id: 'notion', name: 'Notion', group: 'Notes', visible: false, optional: true,
     tagline: 'Personal docs and project notes.',
     pulls: ['Pages tagged "todo" or "active"', 'Project status fields'],
     Mark: () => <MarkBox><MarkImg src="assets/integrations/notion.svg" alt="Notion" size={30} /></MarkBox>,
   },
   {
-    id: 'github', name: 'GitHub', group: 'Code', visible: true, optional: true,
+    id: 'github', name: 'GitHub', group: 'Code', visible: false, optional: true,
     tagline: 'Issues, PRs, and notifications.',
     pulls: ['Open PRs awaiting your review', 'Issues assigned to you'],
     Mark: () => <MarkBox><MarkImg src="assets/integrations/github.svg" alt="GitHub" size={30} /></MarkBox>,
@@ -224,21 +233,142 @@ function ProfileButton({ onClick, dim = false }) {
   );
 }
 
-// ─── OAUTH FLOW (animated handoff) ───────────────────────────────────
-// Phases: 'consent' → 'auth' → 'success'
+// ─── OAUTH FLOW ───────────────────────────────────────────────────────
+// Phases: 'consent' → 'auth' → 'success' | 'error'
+//
+// On 'consent' → user taps Allow:
+//   1. POST {SUPABASE_URL}/functions/v1/oauth-google/start (with user JWT)
+//   2. Receive { authUrl } — Google's consent screen URL
+//   3. Open authUrl in a popup (preferred) or top-level redirect
+//   4. The Edge Function /callback exchanges code → refresh_token → Vault →
+//      oauth_connections row, then redirects back with `?connected=<provider>`
+//   5. We poll the parent window (or watch the popup) for either:
+//        - the popup posts a message back, or
+//        - the popup closes and the URL has `?connected=...`
+//   6. Once connected, kick sync-calendar / sync-email to backfill, then
+//      flip phase to 'success'.
+//
+// Auth: oauth-google/start requires the browser's anon-session JWT (per
+// reminders/index.ts pattern) — we read it from getSupabaseClient() and
+// send as `Authorization: Bearer <token>`.
 function OAuthFlow({ integration, onCancel, onConnected }) {
   const [phase, setPhase] = React.useState('consent');
+  const [errorMsg, setErrorMsg] = React.useState(null);
+  const popupRef = React.useRef(null);
 
-  React.useEffect(() => {
-    if (phase === 'auth') {
-      const t = setTimeout(() => setPhase('success'), 1600);
-      return () => clearTimeout(t);
+  // Cleanup popup on unmount.
+  React.useEffect(() => () => {
+    if (popupRef.current && !popupRef.current.closed) {
+      try { popupRef.current.close(); } catch (e) { /* ignore */ }
     }
-    if (phase === 'success') {
-      const t = setTimeout(() => onConnected && onConnected(integration.id), 900);
-      return () => clearTimeout(t);
+  }, []);
+
+  const startConnect = async () => {
+    setPhase('auth');
+    setErrorMsg(null);
+    try {
+      // Non-Google integrations: skip OAuth dance entirely. They're hidden
+      // from ConnectionsPage anyway (visible:false), but guard here too in
+      // case a future entry forgets to set `provider`.
+      if (!integration.provider) {
+        setPhase('success');
+        setTimeout(() => onConnected && onConnected(integration.id), 600);
+        return;
+      }
+
+      const cfg = window.INTENTLY_CONFIG || {};
+      if (!cfg.supabaseUrl) throw new Error('SUPABASE_URL not configured');
+
+      // Resolve the user's session JWT.
+      const sb = window.getSupabaseClient && window.getSupabaseClient();
+      if (!sb) throw new Error('supabase client unavailable');
+      // Ensure the anonymous session exists before we ask for the access token.
+      if (window.ensureAuthSession) await window.ensureAuthSession();
+      const { data: sess } = await sb.auth.getSession();
+      const accessToken = sess?.session?.access_token;
+      if (!accessToken) throw new Error('no auth session — please reload');
+
+      // Step 1: ask the Edge Function for the Google auth URL.
+      const startUrl = new URL(`${cfg.supabaseUrl}/functions/v1/oauth-google/start`);
+      startUrl.searchParams.set('provider', integration.provider);
+      startUrl.searchParams.set('return_to', window.location.origin + window.location.pathname);
+      const startRes = await fetch(startUrl.toString(), {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!startRes.ok) {
+        const detail = await startRes.json().catch(() => ({}));
+        throw new Error(detail?.error?.message || `start ${startRes.status}`);
+      }
+      const { authUrl } = await startRes.json();
+
+      // Step 2: open Google's consent screen in a popup. If popups are
+      // blocked, fall back to top-level navigation.
+      const popup = window.open(authUrl, 'intently-oauth', 'width=520,height=640');
+      popupRef.current = popup;
+      if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+        // Popup blocked — top-level redirect (loses app state, but works).
+        window.location.href = authUrl;
+        return;
+      }
+
+      // Step 3: poll the popup. The /callback endpoint redirects back to
+      // our origin with `?connected=<provider>` once the dance succeeds.
+      // Browser SOP lets us read .location.href once the popup is back on
+      // our origin; before then, attempts throw.
+      const provider = integration.provider;
+      const result = await new Promise((resolve, reject) => {
+        const interval = setInterval(() => {
+          if (!popup || popup.closed) {
+            clearInterval(interval);
+            // Popup closed without making it back to our origin — assume cancel.
+            reject(new Error('connection cancelled'));
+            return;
+          }
+          let href;
+          try { href = popup.location.href; } catch { return; /* still on Google's origin */ }
+          if (!href) return;
+          try {
+            const u = new URL(href);
+            if (u.searchParams.get('connected') === provider) {
+              clearInterval(interval);
+              try { popup.close(); } catch (e) { /* ignore */ }
+              resolve(true);
+            } else if (u.searchParams.get('oauth_error')) {
+              clearInterval(interval);
+              try { popup.close(); } catch (e) { /* ignore */ }
+              reject(new Error(u.searchParams.get('oauth_error') || 'oauth error'));
+            }
+          } catch { /* href not yet parseable; keep polling */ }
+        }, 600);
+        // Hard timeout after 5 minutes.
+        setTimeout(() => {
+          clearInterval(interval);
+          reject(new Error('oauth timed out'));
+        }, 5 * 60 * 1000);
+      });
+      if (!result) throw new Error('connection failed');
+
+      // Step 4: kick the sync function to backfill. Sync errors don't fail
+      // the connect — we surface them in console for now and still flip
+      // to success (the row exists; sync can be retried).
+      const syncFn = provider === 'google_calendar' ? 'sync-calendar' : 'sync-email';
+      try {
+        await fetch(`${cfg.supabaseUrl}/functions/v1/${syncFn}`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+      } catch (err) {
+        console.warn(`[oauth] ${syncFn} backfill failed (continuing):`, err && err.message);
+      }
+
+      setPhase('success');
+      setTimeout(() => onConnected && onConnected(integration.id), 700);
+    } catch (err) {
+      console.error('[oauth] connect failed:', err);
+      setErrorMsg(err && err.message ? err.message : 'connection failed');
+      setPhase('error');
     }
-  }, [phase]);
+  };
 
   const M = integration.Mark;
 
@@ -306,14 +436,16 @@ function OAuthFlow({ integration, onCancel, onConnected }) {
 
           <div style={{ textAlign: 'center', minHeight: 44 }}>
             <div style={{ fontFamily: T.font.Display, fontSize: 20, lineHeight: '24px', fontStyle: 'italic', fontWeight: 500, color: T.color.PrimaryText, letterSpacing: -0.3 }}>
-              {phase === 'consent'  && integration.name}
-              {phase === 'auth'     && 'Connecting…'}
-              {phase === 'success'  && 'Connected'}
+              {phase === 'consent' && integration.name}
+              {phase === 'auth'    && 'Connecting…'}
+              {phase === 'success' && 'Connected'}
+              {phase === 'error'   && 'Couldn’t connect'}
             </div>
             <div style={{ fontFamily: T.font.Reading, fontSize: 13, lineHeight: '19px', color: T.color.SupportingText, marginTop: 4 }}>
               {phase === 'consent' && integration.tagline}
               {phase === 'auth'    && 'Authorizing your account.'}
               {phase === 'success' && `Pulling in your ${integration.group.toLowerCase()} data.`}
+              {phase === 'error'   && (errorMsg || 'Try again in a moment.')}
             </div>
           </div>
         </div>
@@ -355,7 +487,7 @@ function OAuthFlow({ integration, onCancel, onConnected }) {
                 borderRadius: 999, cursor: 'pointer',
                 fontFamily: T.font.UI, fontSize: 14, fontWeight: 600, color: T.color.PrimaryText,
               }}>Cancel</button>
-              <button onClick={() => setPhase('auth')} style={{
+              <button onClick={startConnect} style={{
                 flex: 2, padding: '12px 16px',
                 background: T.color.PrimaryText, color: '#FBF6EA',
                 border: 'none', borderRadius: 999, cursor: 'pointer',
@@ -363,7 +495,23 @@ function OAuthFlow({ integration, onCancel, onConnected }) {
               }}>Allow</button>
             </>
           )}
-          {phase !== 'consent' && (
+          {phase === 'error' && (
+            <>
+              <button onClick={onCancel} style={{
+                flex: 1, padding: '12px 16px',
+                background: 'transparent', border: `1px solid ${T.color.EdgeLine}`,
+                borderRadius: 999, cursor: 'pointer',
+                fontFamily: T.font.UI, fontSize: 14, fontWeight: 600, color: T.color.PrimaryText,
+              }}>Close</button>
+              <button onClick={startConnect} style={{
+                flex: 2, padding: '12px 16px',
+                background: T.color.PrimaryText, color: '#FBF6EA',
+                border: 'none', borderRadius: 999, cursor: 'pointer',
+                fontFamily: T.font.UI, fontSize: 14, fontWeight: 600,
+              }}>Try again</button>
+            </>
+          )}
+          {(phase === 'auth' || phase === 'success') && (
             <div style={{ flex: 1, height: 44 }} />
           )}
         </div>
@@ -476,6 +624,7 @@ function ConnectionsPage({ connected, onClose, onConnect, onDisconnect }) {
                   key={it.id}
                   integration={it}
                   isConnected={!!connected[it.id]}
+                  connection={connected[it.id]}
                   isLast={i === groups[g].length - 1}
                   onConnect={() => onConnect(it)}
                   onDisconnect={() => onDisconnect(it.id)}
@@ -500,7 +649,7 @@ function ConnectionsPage({ connected, onClose, onConnect, onDisconnect }) {
   );
 }
 
-function IntegrationRow({ integration, isConnected, isLast, onConnect, onDisconnect }) {
+function IntegrationRow({ integration, isConnected, connection, isLast, onConnect, onDisconnect }) {
   const M = integration.Mark;
   return (
     <div style={{
@@ -530,7 +679,7 @@ function IntegrationRow({ integration, isConnected, isLast, onConnect, onDisconn
           display: 'flex', alignItems: 'center', gap: 6,
         }}>
           {isConnected && <span style={{ width: 6, height: 6, borderRadius: 999, background: T.color.TintSageDeep, flexShrink: 0 }} />}
-          {isConnected ? 'Connected · synced 4 min ago' : integration.tagline}
+          {isConnected ? formatLastSync(connection) : integration.tagline}
         </div>
       </div>
       <button
@@ -593,20 +742,135 @@ function OnboardingConnectCard({ onOpen, onDismiss }) {
 }
 
 // ─── CONNECTIONS HOOK ────────────────────────────────────────────────
-// Tiny store; same pattern as useManualAdds.
+// DB-backed: reads `oauth_connections` for the current user, keyed by
+// integration id (gcal → google_calendar, gmail → google_gmail). Returns
+// a `connected` map of {[id]: { last_synced_at }} so the UI can render
+// "synced 4 min ago" from real data.
+//
+// `connect(id)` is now a no-op because the OAuthFlow component handles the
+// real connect dance and writes the row server-side. After it succeeds, it
+// calls `onConnected` which calls into here — we re-fetch to pick up the
+// new row + last_synced_at. `disconnect(id)` calls the
+// /functions/v1/oauth-google/disconnect endpoint.
 function useConnections() {
-  const [connected, setConnected] = React.useState({}); // {gcal: true, ...}
+  const [connected, setConnected] = React.useState({}); // {gcal: {last_synced_at: ...}}
   const [showOnboarding, setShowOnboarding] = React.useState(true);
+
+  const idToProvider = React.useMemo(() => {
+    const m = {};
+    INTEGRATIONS.forEach(i => { if (i.provider) m[i.id] = i.provider; });
+    return m;
+  }, []);
+
+  // Reverse: provider -> id (for mapping DB rows back to UI ids).
+  const providerToId = React.useMemo(() => {
+    const m = {};
+    INTEGRATIONS.forEach(i => { if (i.provider) m[i.provider] = i.id; });
+    return m;
+  }, []);
+
+  const refresh = React.useCallback(async () => {
+    if (!window.getSupabaseClient) return;
+    try {
+      const sb = window.getSupabaseClient();
+      // ensureAuthSession() makes sure RLS sees a uid().
+      if (window.ensureAuthSession) await window.ensureAuthSession();
+      const { data, error } = await sb.from('oauth_connections')
+        .select('provider,last_synced_at,connected_at')
+        .is('revoked_at', null);
+      if (error) {
+        console.warn('[useConnections] fetch failed:', error.message);
+        return;
+      }
+      const map = {};
+      (data || []).forEach(row => {
+        const id = providerToId[row.provider];
+        if (id) map[id] = { last_synced_at: row.last_synced_at, connected_at: row.connected_at };
+      });
+      setConnected(map);
+    } catch (err) {
+      console.warn('[useConnections] refresh error:', err && err.message);
+    }
+  }, [providerToId]);
+
+  // Initial fetch.
+  React.useEffect(() => { refresh(); }, [refresh]);
+
+  // Re-fetch after the popup-callback redirect — index.html watches
+  // ?connected= in the URL and dispatches an `intently:oauth-connected`
+  // event so we can pick up the new row without a full reload.
+  React.useEffect(() => {
+    const handler = () => { refresh(); };
+    window.addEventListener('intently:oauth-connected', handler);
+    return () => window.removeEventListener('intently:oauth-connected', handler);
+  }, [refresh]);
+
+  const connect = React.useCallback((id) => {
+    // The OAuthFlow already wrote the connection row server-side; re-fetch.
+    refresh();
+  }, [refresh]);
+
+  const disconnect = React.useCallback(async (id) => {
+    const provider = idToProvider[id];
+    if (!provider) {
+      // Non-Google integration — just remove locally for UI.
+      setConnected(s => { const n = { ...s }; delete n[id]; return n; });
+      return;
+    }
+    const cfg = window.INTENTLY_CONFIG || {};
+    if (!cfg.supabaseUrl) return;
+    try {
+      const sb = window.getSupabaseClient && window.getSupabaseClient();
+      if (!sb) return;
+      const { data: sess } = await sb.auth.getSession();
+      const accessToken = sess?.session?.access_token;
+      if (!accessToken) return;
+      await fetch(`${cfg.supabaseUrl}/functions/v1/oauth-google/disconnect`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ provider }),
+      });
+    } catch (err) {
+      console.warn('[useConnections] disconnect failed:', err && err.message);
+    } finally {
+      // Optimistic local clear regardless of network outcome.
+      setConnected(s => { const n = { ...s }; delete n[id]; return n; });
+      // Re-sync from DB to capture the canonical state.
+      refresh();
+    }
+  }, [idToProvider, refresh]);
+
   return {
     connected,
     showOnboarding,
-    connect: (id) => setConnected(s => ({ ...s, [id]: true })),
-    disconnect: (id) => setConnected(s => { const n = { ...s }; delete n[id]; return n; }),
+    connect,
+    disconnect,
+    refresh,
     dismissOnboarding: () => setShowOnboarding(false),
   };
 }
 
+// Render a "synced 4 min ago" or "just connected" string from a connection
+// row's last_synced_at. Returns "Connected" if no sync has happened yet.
+function formatLastSync(connection) {
+  if (!connection || typeof connection !== 'object') return 'Connected';
+  const ts = connection.last_synced_at || connection.connected_at;
+  if (!ts) return 'Connected';
+  const diffMs = Date.now() - new Date(ts).getTime();
+  if (Number.isNaN(diffMs) || diffMs < 0) return 'Connected';
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return 'Connected · just synced';
+  if (mins < 60) return `Connected · synced ${mins} min ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `Connected · synced ${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `Connected · synced ${days}d ago`;
+}
+
 Object.assign(window, {
   JournalComposer, ConnectionsPage, OAuthFlow, ProfileButton, OnboardingConnectCard,
-  INTEGRATIONS, useConnections,
+  INTEGRATIONS, useConnections, formatLastSync,
 });
