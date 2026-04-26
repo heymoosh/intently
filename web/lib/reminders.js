@@ -74,6 +74,19 @@ function formatRemindersForInput(reminders) {
 // Returns { classified: boolean, reminder?: object, reason?: string }
 // or null on transport / auth failure (caller renders a generic acknowledgment).
 async function classifyTranscript(transcript) {
+  if (window.INTENTLY_DEMO) {
+    await new Promise(function(r) { setTimeout(r, 800); });
+    // Heuristic: if input contains a time word, treat as reminder; else conversation.
+    var looksLikeReminder = /tomorrow|next week|monday|tuesday|wednesday|thursday|friday|saturday|sunday|tonight|later|remind/i.test(transcript || '');
+    if (looksLikeReminder) {
+      return {
+        classified: true,
+        reminder: { text: transcript, remind_on: 'tomorrow' },
+      };
+    }
+    return { classified: false };
+  }
+
   const supabaseUrl = window.INTENTLY_CONFIG && window.INTENTLY_CONFIG.supabaseUrl;
   if (!supabaseUrl || !transcript || !transcript.trim()) return null;
   const token = await getSessionAccessToken();
