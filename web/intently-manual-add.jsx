@@ -283,46 +283,39 @@ function useManualAdds() {
     let cancelled = false;
 
     (async () => {
-      // Sam-seed gate: only load Sam's demo data when the URL is opted in
-      // via `?demo=1` (the same pattern the future landing-page embed uses)
-      // OR when running in dev mode (`?dev=1` or localhost). Real-app
-      // visitors land on a clean empty state — Sam is no longer the
-      // unconditional first-load fixture.
-      // See `.claude/handoffs/new-user-ux-and-auth.md` § Sam-seed gate.
-      const seedAllowed = !!(window.INTENTLY_DEMO || window.INTENTLY_DEV);
-      if (seedAllowed && window.seedSamIfEmpty) {
-        try {
-          const result = await window.seedSamIfEmpty();
-          if (result && !result.skipped) {
-            console.log('[seed-sam] seeded fresh user:', result.inserted);
+      // Demo mode: entity helpers (listGoals, listProjects, etc.) already return
+      // SAM_* fixture data directly — no DB reads or writes. Skip all seed calls.
+      // Dev mode on non-demo: seed Sam into the DB as before (localhost only).
+      if (!window.INTENTLY_DEMO && window.INTENTLY_DEV) {
+        if (window.seedSamIfEmpty) {
+          try {
+            const result = await window.seedSamIfEmpty();
+            if (result && !result.skipped) {
+              console.log('[seed-sam] seeded fresh user:', result.inserted);
+            }
+          } catch (e) {
+            console.warn('[seed-sam] failed:', e && e.message ? e.message : e);
           }
-        } catch (e) {
-          console.warn('[seed-sam] failed:', e && e.message ? e.message : e);
         }
-      }
-      // Independent gate for calendar/email — covers the case where 0006 was
-      // applied AFTER the user was first seeded (calendar/email 404'd then).
-      // Same demo/dev gate so real-app users don't get seed rows surprising
-      // them once 0006 lands.
-      if (seedAllowed && window.seedSamCalendarEmailIfEmpty) {
-        try {
-          const result = await window.seedSamCalendarEmailIfEmpty();
-          if (result && !result.skipped && Object.keys(result.inserted).length > 0) {
-            console.log('[seed-sam] backfilled calendar/email:', result.inserted);
+        if (window.seedSamCalendarEmailIfEmpty) {
+          try {
+            const result = await window.seedSamCalendarEmailIfEmpty();
+            if (result && !result.skipped && Object.keys(result.inserted).length > 0) {
+              console.log('[seed-sam] backfilled calendar/email:', result.inserted);
+            }
+          } catch (e) {
+            console.warn('[seed-sam] calendar/email backfill failed:', e && e.message ? e.message : e);
           }
-        } catch (e) {
-          console.warn('[seed-sam] calendar/email backfill failed:', e && e.message ? e.message : e);
         }
-      }
-      // Independent gate for life_areas — covers users seeded before PR #195.
-      if (seedAllowed && window.seedSamLifeAreasIfEmpty) {
-        try {
-          const result = await window.seedSamLifeAreasIfEmpty();
-          if (result && !result.skipped && result.inserted && result.inserted.life_areas) {
-            console.log('[seed-sam] backfilled life_areas:', result.inserted);
+        if (window.seedSamLifeAreasIfEmpty) {
+          try {
+            const result = await window.seedSamLifeAreasIfEmpty();
+            if (result && !result.skipped && result.inserted && result.inserted.life_areas) {
+              console.log('[seed-sam] backfilled life_areas:', result.inserted);
+            }
+          } catch (e) {
+            console.warn('[seed-sam] life_areas backfill failed:', e && e.message ? e.message : e);
           }
-        } catch (e) {
-          console.warn('[seed-sam] life_areas backfill failed:', e && e.message ? e.message : e);
         }
       }
 

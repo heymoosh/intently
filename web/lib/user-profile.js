@@ -39,7 +39,11 @@ function _initialFrom(displayName, email) {
   return _firstChar(displayName) || _firstChar(email) || '?';
 }
 
+// Demo-mode shortcut: return Sam's profile immediately without touching Supabase.
+const _SAM_PROFILE = { displayName: 'Sam Tanaka', email: null, initial: 'S', isAnonymous: true };
+
 async function getCurrentProfile() {
+  if (window.INTENTLY_DEMO) return _SAM_PROFILE;
   if (_profileCache) return _profileCache;
   if (_profilePromise) return _profilePromise;
 
@@ -85,6 +89,10 @@ async function getCurrentProfile() {
 // these as the empty state (drop the name from greetings, show '?' in
 // the avatar) so first paint is stable.
 function useUserProfile() {
+  // Demo mode: return Sam's profile immediately as ready.
+  if (window.INTENTLY_DEMO) {
+    return { ..._SAM_PROFILE, ready: true };
+  }
   const initial = _profileCache || { displayName: null, email: null, initial: '?' };
   const [profile, setProfile] = React.useState({ ...initial, ready: !!_profileCache });
   React.useEffect(() => {

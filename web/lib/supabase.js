@@ -56,7 +56,9 @@ function getSupabaseClient() {
 
 // Ensure there's a session (anonymous if no real sign-in). Idempotent —
 // the same Promise is returned on concurrent calls.
+// Demo mode: return a sentinel user object — never creates a real Supabase session.
 async function ensureAuthSession() {
+  if (window.INTENTLY_DEMO) return { id: 'demo-user', email: null };
   if (_authPromise) return _authPromise;
   _authPromise = (async () => {
     const client = getSupabaseClient();
