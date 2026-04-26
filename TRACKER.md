@@ -103,6 +103,7 @@ End-to-end Playwright smoke against `intently-eta.vercel.app/?dev=1`. ma-proxy f
 
 ## Follow-ups (pending manual or flight-test)
 
+- Drop `docs/product-gaps-2026-04-25.md` content into `.claude/inbox/` once the capture/groom/execute system lands on this branch. (A parallel session shipped it 2026-04-25 per MEMORY.md, but the dir doesn't exist on `chat/0425-182455` yet.) ([PR #146](https://github.com/heymoosh/intently/pull/146))
 - **Run `supabase db push`** to apply `0006_calendar_email.sql` so the assembler can read calendar + email context (currently skips cleanly with 404s in console). ([PR #145](https://github.com/heymoosh/intently/pull/145))
 - Sam's seed lands on your session automatically. To start fresh: `await window.clearAllUserData()` in the console, then refresh. ([PR #145](https://github.com/heymoosh/intently/pull/145))
 - **Toggle persistence** (`adminReminder.done`, `projectTodo.done`) is now technically possible since real DB UUIDs are in state. Wiring needs an `updateAdminReminderStatus` helper + the existing `toggleProjectTodo` helper from entities.js. Smaller follow-up. ([PR #143](https://github.com/heymoosh/intently/pull/143))
