@@ -73,6 +73,7 @@ const SKILL_ENV: Record<string, string> = {
   'update-tracker': 'MA_AGENT_ID_UPDATE_TRACKER',
   setup: 'MA_AGENT_ID_SETUP',
   noticing: 'MA_AGENT_ID_NOTICING',
+  insight: 'MA_AGENT_ID_INSIGHT',
 };
 
 // Skill → memory store ID env var. Memory stores are provisioned once per skill

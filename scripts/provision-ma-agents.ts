@@ -25,6 +25,7 @@ export const MVP_SKILLS = [
   'noticing',
   'setup',
   'update-tracker',
+  'insight',
 ] as const;
 export type MvpSkill = (typeof MVP_SKILLS)[number];
 
@@ -39,6 +40,7 @@ export const MEMORY_SKILLS: readonly string[] = [
   'setup',
   'update-tracker',
   'noticing',
+  'insight',
 ] as const;
 
 export interface RawAgentConfig {
@@ -245,6 +247,7 @@ export function memoryStoreDescription(skill: string): string {
       "What was discussed in last month's review — themes, follow-ups, and patterns to watch.",
     noticing:
       'Working tier of pattern observations — soft accumulator before promoting to public.observations table per architecture audit Correction 2.',
+    insight: 'Prior deep-pass conclusions to avoid repeating across sessions.',
   };
   return descriptions[skill] ?? `Persistent memory for the Intently ${skill} skill.`;
 }
