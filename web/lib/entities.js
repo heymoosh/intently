@@ -48,6 +48,105 @@ function _fakeId() {
   return 'demo-' + Math.random().toString(36).slice(2, 10);
 }
 
+// ─── Demo entry builder ─────────────────────────────────────────────────────
+// Converts SAM_* fixture constants into entry-shaped rows for DayView and
+// other cross-kind readers. Called only when _isDemo() is true.
+
+function _samToEntries() {
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const entries = [];
+
+  // Today's brief (kind='brief', at=today 7am)
+  if (window.SAM_TODAY_BRIEF) {
+    const briefAt = new Date(todayStart);
+    briefAt.setHours(window.SAM_TODAY_BRIEF.hour != null ? window.SAM_TODAY_BRIEF.hour : 7);
+    entries.push({
+      id: 'demo-brief-today',
+      user_id: 'demo',
+      at: briefAt.toISOString(),
+      kind: 'brief',
+      body_markdown: window.SAM_TODAY_BRIEF.body_markdown,
+      glyph: window.SAM_TODAY_BRIEF.glyph || null,
+      mood: window.SAM_TODAY_BRIEF.mood || null,
+      source: 'agent-scheduled',
+    });
+  }
+
+  // Yesterday's review (kind='review', at=yesterday 9pm)
+  if (window.SAM_YESTERDAY_REVIEW) {
+    const revAt = new Date(todayStart);
+    revAt.setDate(revAt.getDate() - 1);
+    revAt.setHours(21);
+    entries.push({
+      id: 'demo-review-yesterday',
+      user_id: 'demo',
+      at: revAt.toISOString(),
+      kind: 'review',
+      body_markdown: window.SAM_YESTERDAY_REVIEW.body_markdown,
+      glyph: window.SAM_YESTERDAY_REVIEW.glyph || null,
+      mood: window.SAM_YESTERDAY_REVIEW.mood || null,
+      source: 'agent',
+    });
+  }
+
+  // Journal entries — days_ago relative to today
+  for (let i = 0; i < (window.SAM_JOURNAL || []).length; i++) {
+    const j = window.SAM_JOURNAL[i];
+    const at = new Date(todayStart);
+    at.setDate(at.getDate() - (j.days_ago || 0));
+    at.setHours(10);
+    entries.push({
+      id: 'demo-journal-' + (j.days_ago != null ? j.days_ago : i),
+      user_id: 'demo',
+      at: at.toISOString(),
+      kind: 'journal',
+      body_markdown: j.body_markdown,
+      glyph: j.glyph || null,
+      mood: j.mood || null,
+      source: 'text',
+    });
+  }
+
+  return entries;
+}
+
+// listEntries — cross-kind read helper for the Day view (and future callers).
+// opts:
+//   from?:       ISO string — lower bound inclusive (gte)
+//   to?:         ISO string — upper bound exclusive (lt)
+//   kinds?:      string[]  — filter to these entry kinds
+//   limit?:      number    — max rows to return
+//   ascending?:  boolean   — sort order for `at` (default true)
+async function listEntries(opts) {
+  const { from, to, kinds, limit, ascending } = opts || {};
+  const asc = ascending !== false; // default ascending
+  if (_isDemo()) {
+    let rows = _samToEntries();
+    if (from) rows = rows.filter((e) => e.at >= from);
+    if (to)   rows = rows.filter((e) => e.at < to);
+    if (kinds && kinds.length) rows = rows.filter((e) => kinds.includes(e.kind));
+    rows.sort((a, b) => {
+      if (a.at < b.at) return asc ? -1 : 1;
+      if (a.at > b.at) return asc ? 1 : -1;
+      return 0;
+    });
+    return limit ? rows.slice(0, limit) : rows;
+  }
+  let q = _client()
+    .from('entries')
+    .select('*')
+    .eq('user_id', (await _userId()))
+    .order('at', { ascending: asc });
+  if (from)  q = q.gte('at', from);
+  if (to)    q = q.lt('at', to);
+  if (kinds && kinds.length === 1) q = q.eq('kind', kinds[0]);
+  if (limit) q = q.limit(limit);
+  const { data, error } = await q;
+  if (error) _throw('listEntries', error);
+  return data || [];
+}
+
 // ─── Goals ──────────────────────────────────────────────────────────────────
 
 async function insertGoal(title) {
@@ -856,4 +955,6 @@ Object.assign(window, {
   clearSetupDraft,
   // review deferral
   checkReviewDeferralToday,
+  // cross-kind entry reader (used by DayView, context-assembler)
+  listEntries,
 });

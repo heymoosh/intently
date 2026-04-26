@@ -286,34 +286,23 @@ function DayView({ onBack, onPickEntry, date, refreshKey }) {
   // empty-state hint instead of fixture data.
   const [loaded, setLoaded] = React.useState(false);
 
-  // Hydrate today's entries from Supabase.
+  // Hydrate today's entries. Uses window.listEntries (entities.js) which handles
+  // demo mode (returning SAM_* fixtures) and real Supabase reads transparently.
   React.useEffect(() => {
-    if (!window.getSupabaseClient || !window.getCurrentUserId) {
+    if (!window.listEntries) {
       setLoaded(true);
       return;
     }
     let cancelled = false;
     (async () => {
       try {
-        const sb = window.getSupabaseClient();
-        const userId = await window.getCurrentUserId();
         const day = dayDate;
         const startOfDay = new Date(day.getFullYear(), day.getMonth(), day.getDate()).toISOString();
         const endOfDay = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1).toISOString();
-        const sevenDaysAgo = new Date(day.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        const thirtyDaysAgo = new Date(day.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
         const [todayEntries, olderEntries] = await Promise.all([
-          sb.from('entries').select('*')
-            .eq('user_id', userId)
-            .gte('at', startOfDay).lt('at', endOfDay)
-            .order('at', { ascending: true })
-            .then((r) => r.data || []),
-          sb.from('entries').select('*')
-            .eq('user_id', userId)
-            .lt('at', startOfDay).gte('at', sevenDaysAgo)
-            .eq('kind', 'journal')
-            .order('at', { ascending: false })
-            .limit(2)
-            .then((r) => r.data || []),
+          window.listEntries({ from: startOfDay, to: endOfDay }),
+          window.listEntries({ from: thirtyDaysAgo, to: startOfDay, kinds: ['journal'], limit: 2, ascending: false }),
         ]);
         if (cancelled) return;
 
