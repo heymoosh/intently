@@ -35,8 +35,6 @@ Your days feed your weeks. A year of that and you're not where life took you —
 
 ## Production Notes
 
-**⚠️ Script incomplete without monthly review.** The line "plan your days, weeks, months so that your years are lived well" makes a promise the demo can't keep with weekly review alone. Monthly review is what closes the loop on longer-horizon goals. Strongly recommend pulling it back into V1 scope. Without it, Act 3 is an aspiration, not a demonstration.
-
 **Voice:** Use your own voice, synthesized via 11 Labs if needed. Not a generic AI voice — genuine register matters. Record 5 min of natural speech first, then synthesize from that sample.
 
 **Visuals (build around VO, not the reverse):**
