@@ -1,0 +1,124 @@
+{
+  "skill": "life-areas",
+  "cases": [
+    {
+      "id": "recurring-health-mentions-propose-area",
+      "notes": "User has made 3+ mentions of health-related topics in 48h. Expected: noticing agent classifies the pattern as area-shaped (no end state, no target), sets subject_kind='area', and the promotion pathway proposes creating a life_area named 'Health' rather than a project.",
+      "input": {
+        "utterance": "Went for a run this morning — trying to get back into a regular rhythm.",
+        "memory_context": [
+          {
+            "text": "Skipped the gym again. Need to prioritize my health more.",
+            "timestamp_hours_ago": 8
+          },
+          {
+            "text": "Doctor appointment reminder — annual checkup.",
+            "timestamp_hours_ago": 22
+          }
+        ]
+      },
+      "expected": {
+        "writes_observation_row": true,
+        "subject_kind": "area",
+        "pattern_text_contains": "health",
+        "proposed_entity_kind": "life_area",
+        "proposed_entity_name_contains": "Health"
+      }
+    },
+    {
+      "id": "explicit-create-area-command",
+      "notes": "User explicitly asks to create a life area. Expected: update-tracker creates a life_areas row via insertLifeArea and returns a JSON tail with table='life_areas', op='insert'.",
+      "input": {
+        "utterance": "Add an area for family time",
+        "active_projects": [],
+        "active_goals": [],
+        "active_life_areas": [],
+        "today": "2026-04-26"
+      },
+      "expected": {
+        "updates_contains": {
+          "table": "life_areas",
+          "op": "insert",
+          "data.name": "Family"
+        },
+        "ambiguous": false
+      }
+    },
+    {
+      "id": "project-linked-to-area-entry-tracks-lineage",
+      "notes": "A project was created with area_id pointing to a Health life_area. When a journal entry is logged for that project, the entry should also carry area_id so area lineage is preserved at entry level.",
+      "input": {
+        "utterance": "Signed up for the half-marathon — training starts Monday.",
+        "active_projects": [
+          {
+            "id": "proj-uuid-1",
+            "title": "Train for half-marathon",
+            "area_id": "area-uuid-health",
+            "todos": []
+          }
+        ],
+        "active_goals": [],
+        "active_life_areas": [
+          {
+            "id": "area-uuid-health",
+            "name": "Health",
+            "slug": "health"
+          }
+        ],
+        "today": "2026-04-26"
+      },
+      "expected": {
+        "updates_contains": {
+          "table": "entries",
+          "op": "insert",
+          "data.links.project_id": "proj-uuid-1",
+          "data.links.area_id": "area-uuid-health"
+        },
+        "ambiguous": false
+      }
+    },
+    {
+      "id": "health-pattern-vs-marathon-project-distinction",
+      "notes": "Two patterns are present: generic health mentions (area-shaped: no target) AND 'train for half-marathon' mentions (project-shaped: has a target event). Expected: noticing agent distinguishes them — health maps to life_area, marathon maps to project proposal (optionally linked to the health area).",
+      "input": {
+        "utterance": "Thinking about signing up for a half-marathon to anchor my fitness routine.",
+        "memory_context": [
+          {
+            "text": "Went for a run — trying to keep health consistent.",
+            "timestamp_hours_ago": 10
+          },
+          {
+            "text": "Half-marathon in November sounds like a good target to train toward.",
+            "timestamp_hours_ago": 30
+          }
+        ]
+      },
+      "expected": {
+        "writes_observation_row": true,
+        "health_pattern": {
+          "subject_kind": "area",
+          "proposed_entity_kind": "life_area"
+        },
+        "marathon_pattern": {
+          "subject_kind": "project",
+          "proposed_entity_kind": "project"
+        }
+      }
+    },
+    {
+      "id": "no-areas-future-view-renders-goals-only",
+      "notes": "User has no life_areas rows. Expected: Future view renders only goals (no broken render, no empty area band). The listLifeAreas call returns [] and the component falls back gracefully.",
+      "input": {
+        "db_life_areas": [],
+        "db_goals": [
+          { "id": "goal-uuid-1", "title": "Move to Japan", "monthly_slice": "Find an apartment in Tokyo." }
+        ]
+      },
+      "expected": {
+        "renders_area_cards": false,
+        "renders_goal_cards": true,
+        "no_render_error": true
+      }
+    }
+  ]
+}

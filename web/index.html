@@ -601,23 +601,27 @@ function formatRelativeRemindOn(iso) {
   return target.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-// Forked Future with tappable goal cards.
+// Forked Future with tappable goal cards + life areas mixed in.
 function FutureScreenProtoTappable({ adds, onOpenProject, onOpenGoal, onAddGoal, onAddProject, onAddAdminReminder, onToggleAdminReminder, onStartMonthlyRefresh }) {
-  // Hydrate goals + projects from Supabase. Falls back to GOAL_DATA / PROJECT_DATA
+  // Hydrate goals + projects + life_areas from Supabase. Falls back to GOAL_DATA / PROJECT_DATA
   // fixtures when the user has no DB rows (so the demo is never empty).
   const [dbGoals, setDbGoals] = React.useState(null);
   const [dbProjects, setDbProjects] = React.useState(null);
+  const [dbAreas, setDbAreas] = React.useState([]);
   // Track per-goal "most recent activity" — max(updated_at) across that goal's
-  // projects. Drives the "top 3 by recent activity" cap on the goals band.
+  // projects. Drives the "top 3 by recent activity" cap on the goals+areas band.
   const [goalActivity, setGoalActivity] = React.useState({});
-  const [showAllGoals, setShowAllGoals] = React.useState(false);
+  // Combined goals+areas expand toggle — hard cap of 3 cards visible by default.
+  const [showAllCards, setShowAllCards] = React.useState(false);
   React.useEffect(() => {
     if (!window.listGoals || !window.listProjects) return;
     let cancelled = false;
+    const areasFetch = window.listLifeAreas ? window.listLifeAreas().catch(() => []) : Promise.resolve([]);
     Promise.all([
       window.listGoals().catch(() => []),
       window.listProjects().catch(() => []),
-    ]).then(([gs, ps]) => {
+      areasFetch,
+    ]).then(([gs, ps, areas]) => {
       if (cancelled) return;
       // Map DB goal row → fixture shape. Include defaults for the rich
       // GoalDetail fields (intention/milestones/projectIds/reflections) so
@@ -693,6 +697,10 @@ function FutureScreenProtoTappable({ adds, onOpenProject, onOpenGoal, onAddGoal,
         }
         setGoalActivity(activity);
       }
+      // Store life areas — already plain DB rows.
+      if (areas && areas.length > 0) {
+        setDbAreas(areas);
+      }
     });
     return () => { cancelled = true; };
   }, []);
@@ -709,8 +717,35 @@ function FutureScreenProtoTappable({ adds, onOpenProject, onOpenGoal, onAddGoal,
     scored.sort((a, b) => (b.activity - a.activity) || (a.position - b.position));
     return scored.map((s) => s.g);
   }, [allGoals, goalActivity]);
-  const visibleGoals = showAllGoals ? sortedGoals : sortedGoals.slice(0, 3);
-  const overflowCount = Math.max(0, sortedGoals.length - 3);
+
+  // Build mixed goal+area card list. Goals first (by activity), areas appended after.
+  // Combined hard cap: 3 cards visible by default.
+  const AREA_GLYPH_PALETTE = ['leaf', 'compass', 'spark', 'mountain', 'flag', 'book', 'pen', 'rocket'];
+  const AREA_PAL_PALETTE = [
+    ['#C8E0D0', '#D8ECD8', '#E8F4E8', '#F0F8F0'],
+    ['#E0C8D8', '#ECD8E8', '#F4E8F4', '#F8F0F8'],
+    ['#E0D8C8', '#EDE4D0', '#F4EDD8', '#FAF5E8'],
+    ['#C8D8E0', '#D8E8EE', '#E8F2F8', '#F0F8FF'],
+  ];
+  const mixedCards = React.useMemo(() => {
+    const goalCards = sortedGoals.map((g) => ({ _kind: 'goal', _key: `goal-${g.id}`, ...g }));
+    const areaCards = dbAreas.map((a, i) => ({
+      _kind: 'area',
+      _key: `area-${a.id}`,
+      id: a.id,
+      title: a.name,
+      month: a.description || '',
+      glyph: a.glyph || AREA_GLYPH_PALETTE[i % AREA_GLYPH_PALETTE.length],
+      pal: AREA_PAL_PALETTE[i % AREA_PAL_PALETTE.length],
+      _position: a.position,
+      _updated_at: a.updated_at || a.created_at || null,
+    }));
+    return [...goalCards, ...areaCards];
+  }, [sortedGoals, dbAreas]);
+
+  const CAP = 3;
+  const visibleCards = showAllCards ? mixedCards : mixedCards.slice(0, CAP);
+  const overflowCount = Math.max(0, mixedCards.length - CAP);
 
   const projects = dbProjects || window.PROJECT_DATA;
   // useManualAdds hydrates DB goals back into adds.goals — filter to truly
@@ -724,40 +759,65 @@ function FutureScreenProtoTappable({ adds, onOpenProject, onOpenGoal, onAddGoal,
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
       <ScreenHeader tense="Future" title="What this month is for." caption="Three long-term visions. Each one gets a monthly slice — then the agent cascades it into weekly and daily moves on Present." />
       <div style={{ flex: 1, overflowY: 'auto', padding: '4px 20px 140px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {visibleGoals.map((g, i) => (
-          <button key={g.id} onClick={() => onOpenGoal && onOpenGoal(g)} style={{
-            textAlign: 'left', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer',
-            borderRadius: T.radius.Card, boxShadow: T.shadow.Raised, flexShrink: 0, overflow: 'hidden',
-          }}>
-            <PainterlyBlock palette={g.pal} seed={i + 3} style={{ padding: '22px 24px 22px', minHeight: 210, position: 'relative', borderRadius: T.radius.Card, overflow: 'hidden' }}>
-              <div style={{ position: 'absolute', right: -18, bottom: -24, opacity: 0.20, pointerEvents: 'none', lineHeight: 0 }}>
-                <Glyph name={g.glyph} size={150} color={T.color.PrimaryText} stroke={1.4} />
+        {visibleCards.map((card, i) => {
+          if (card._kind === 'area') {
+            // Area card — same painterly treatment as goal, with "Life area" label.
+            return (
+              <div key={card._key} style={{
+                padding: 0, border: 'none', background: 'transparent',
+                borderRadius: T.radius.Card, boxShadow: T.shadow.Raised, flexShrink: 0, overflow: 'hidden',
+              }}>
+                <PainterlyBlock palette={card.pal} seed={i + 7} style={{ padding: '22px 24px 22px', minHeight: 160, position: 'relative', borderRadius: T.radius.Card, overflow: 'hidden' }}>
+                  <div style={{ position: 'absolute', right: -18, bottom: -24, opacity: 0.15, pointerEvents: 'none', lineHeight: 0 }}>
+                    <Glyph name={card.glyph} size={140} color={T.color.PrimaryText} stroke={1.4} />
+                  </div>
+                  <div style={{ position: 'relative' }}>
+                    <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: T.color.PrimaryText, opacity: 0.55, marginBottom: 8 }}>Life area</div>
+                    <div style={{ fontFamily: T.font.Display, fontSize: 26, lineHeight: '30px', fontStyle: 'italic', fontWeight: 500, color: T.color.PrimaryText, letterSpacing: -0.4, maxWidth: '88%' }}>{card.title}</div>
+                    {card.month && (
+                      <div style={{ marginTop: 14, fontFamily: T.font.Reading, fontSize: 14, lineHeight: '21px', color: T.color.PrimaryText, opacity: 0.76, maxWidth: '88%' }}>{card.month}</div>
+                    )}
+                  </div>
+                </PainterlyBlock>
               </div>
-              <div style={{ position: 'relative' }}>
-                <div style={{ fontFamily: T.font.Display, fontSize: 28, lineHeight: '32px', fontStyle: 'italic', fontWeight: 500, color: T.color.PrimaryText, letterSpacing: -0.5, textWrap: 'pretty', maxWidth: '88%' }}>{g.title}</div>
-                <div style={{ marginTop: 18, marginBottom: 14, height: 1, background: 'rgba(31,27,21,0.22)' }} />
-                <div style={{ fontFamily: T.font.Reading, fontSize: 15, lineHeight: '23px', color: T.color.PrimaryText, opacity: 0.86, maxWidth: '88%' }}>
-                  <span style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: T.color.PrimaryText, opacity: 0.6, marginRight: 8 }}>April</span>
-                  {g.month.replace(/^April:\s*/, '')}
+            );
+          }
+          // Goal card — existing painterly treatment.
+          return (
+            <button key={card._key} onClick={() => onOpenGoal && onOpenGoal(card)} style={{
+              textAlign: 'left', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer',
+              borderRadius: T.radius.Card, boxShadow: T.shadow.Raised, flexShrink: 0, overflow: 'hidden',
+            }}>
+              <PainterlyBlock palette={card.pal} seed={i + 3} style={{ padding: '22px 24px 22px', minHeight: 210, position: 'relative', borderRadius: T.radius.Card, overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', right: -18, bottom: -24, opacity: 0.20, pointerEvents: 'none', lineHeight: 0 }}>
+                  <Glyph name={card.glyph} size={150} color={T.color.PrimaryText} stroke={1.4} />
                 </div>
-              </div>
-              <div style={{ position: 'absolute', top: 14, right: 14, display: 'inline-flex', alignItems: 'center', gap: 4, fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: T.color.PrimaryText, opacity: 0.5 }}>
-                Open <Icon.Chev size={12} color={T.color.PrimaryText} />
-              </div>
-            </PainterlyBlock>
-          </button>
-        ))}
+                <div style={{ position: 'relative' }}>
+                  <div style={{ fontFamily: T.font.Display, fontSize: 28, lineHeight: '32px', fontStyle: 'italic', fontWeight: 500, color: T.color.PrimaryText, letterSpacing: -0.5, textWrap: 'pretty', maxWidth: '88%' }}>{card.title}</div>
+                  <div style={{ marginTop: 18, marginBottom: 14, height: 1, background: 'rgba(31,27,21,0.22)' }} />
+                  <div style={{ fontFamily: T.font.Reading, fontSize: 15, lineHeight: '23px', color: T.color.PrimaryText, opacity: 0.86, maxWidth: '88%' }}>
+                    <span style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: T.color.PrimaryText, opacity: 0.6, marginRight: 8 }}>April</span>
+                    {card.month.replace(/^April:\s*/, '')}
+                  </div>
+                </div>
+                <div style={{ position: 'absolute', top: 14, right: 14, display: 'inline-flex', alignItems: 'center', gap: 4, fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: T.color.PrimaryText, opacity: 0.5 }}>
+                  Open <Icon.Chev size={12} color={T.color.PrimaryText} />
+                </div>
+              </PainterlyBlock>
+            </button>
+          );
+        })}
 
         {overflowCount > 0 && (
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: -2, marginBottom: 2 }}>
-            <button onClick={() => setShowAllGoals(s => !s)} style={{
+            <button onClick={() => setShowAllCards(s => !s)} style={{
               padding: '7px 14px', background: 'transparent',
               border: `1px solid ${T.color.EdgeLine}`, borderRadius: 999,
               fontFamily: T.font.UI, fontSize: 11, fontWeight: 600, letterSpacing: 0.4,
               color: T.color.SupportingText, cursor: 'pointer',
               display: 'inline-flex', alignItems: 'center', gap: 6,
             }}>
-              {showAllGoals ? `Show top 3` : `Show all ${sortedGoals.length} goals (+${overflowCount})`}
+              {showAllCards ? `Show top 3` : `Show more (${overflowCount})`}
               <Icon.Chev size={11} color={T.color.SupportingText} />
             </button>
           </div>
