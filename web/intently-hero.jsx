@@ -421,6 +421,64 @@ function HeroListening({ onDone, onTypeInstead }) {
   );
 }
 
+// ─── SIGNAL CONFIRM CARD ─── inline tag confirmation in the chat thread.
+// Rendered when the signal classifier returns a tag with confidence < 0.8.
+// Shows the framework explanation from signals.md and Yes / No buttons.
+// "Different tag" is deferred to V1.1.
+function SignalConfirmCard({ pendingEntry, onConfirm }) {
+  const { tag, frameworkHint } = pendingEntry;
+  return (
+    <div style={{ alignSelf: 'flex-start', maxWidth: '92%' }}>
+      <div style={{
+        padding: '12px 14px', borderRadius: 16, borderTopLeftRadius: 4,
+        background: T.color.SecondarySurface,
+        border: `1.5px solid ${T.color.EdgeLine}`,
+      }}>
+        {frameworkHint && (
+          <div style={{
+            fontFamily: T.font.Reading, fontSize: 13, lineHeight: '19px',
+            color: T.color.SupportingText, marginBottom: 10,
+          }}>
+            {frameworkHint}
+          </div>
+        )}
+        <div style={{
+          fontFamily: T.font.Reading, fontSize: 15, lineHeight: '22px',
+          color: T.color.PrimaryText, marginBottom: 12,
+        }}>
+          Tag this entry as <strong>#{tag}</strong>?
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            onClick={() => onConfirm(pendingEntry, true)}
+            style={{
+              padding: '7px 16px', borderRadius: 999, border: 'none',
+              background: T.color.PrimaryText, color: T.color.InverseText,
+              fontFamily: T.font.UI, fontSize: 13, fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Yes
+          </button>
+          <button
+            onClick={() => onConfirm(pendingEntry, false)}
+            style={{
+              padding: '7px 16px', borderRadius: 999,
+              border: `1.5px solid ${T.color.EdgeLine}`,
+              background: 'transparent', color: T.color.PrimaryText,
+              fontFamily: T.font.UI, fontSize: 13, fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            No
+          </button>
+          {/* "Different tag" button deferred to V1.1 */}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── HERO CHAT ─── full-screen chat surface.
 // Mixed text/voice input; inline confirmation cards with Undo for agent actions;
 // quiet back-and-forth with the agent after a brief or a voice capture.
@@ -435,12 +493,13 @@ function HeroChat({ onDone, onMic, seedTranscript = '', onTranscriptConsumed, on
   //   1. update-tracker — if the transcript looks like a work-completion log
   //      ("I finished X", "shipped Y"), call the update-tracker agent and
   //      apply its proposed Supabase writes. See web/lib/update-tracker.js.
-  //   2. classify-as-reminder — cheap edge-function call; if classified, the
-  //      reminder is persisted server-side and we render the confirmation.
-  //   3. chat skill — the top-level MA agent that routes to specialist skills
-  //      (daily-brief, update-tracker, reminders-classifier, etc.) via tool-use.
-  //      TODO: once chat's MA routing handles reminders and tracker natively,
-  //      steps 1 and 2 can be retired — the chat agent will dispatch them.
+  //   2. classify-and-tag — chained edge-function call:
+  //      a. Haiku reminder check — if classified, persist + show confirmation.
+  //      b. If not reminder, Haiku signal classifier (V1 canonical + user-custom).
+  //         ≥0.8 confidence: silent auto-tag (write entry with tags, no prompt).
+  //         <0.8 confidence: inline ConfirmationCard asking user to confirm tag.
+  //   3. chat skill — the top-level MA agent that routes to specialist skills.
+  //      TODO: once chat's MA routing handles all above natively, steps 1–2 retire.
   // Appends each turn to the thread; falls back to a generic acknowledgement
   // only if every routed path fails.
   const sendUtterance = React.useCallback(async (text, opts) => {
@@ -464,20 +523,46 @@ function HeroChat({ onDone, onMic, seedTranscript = '', onTranscriptConsumed, on
           return;
         }
       }
-      const cls = window.classifyTranscript ? await window.classifyTranscript(trimmed) : null;
-      if (cls && cls.classified === true && cls.reminder) {
+
+      // 2. Chained classify-and-tag (reminder → signal).
+      const cls = window.classifyAndTag ? await window.classifyAndTag(trimmed) : null;
+
+      if (cls && cls.is_reminder === true && cls.reminder) {
+        // Reminder path — same as before.
         const when = cls.reminder.remind_on || 'soon';
         setThread((prev) => [...prev, { kind: 'agent', t: `Got it. I'll surface "${cls.reminder.text}" on ${when}.` }]);
-        // Bubble the persisted row up so the parent's useManualAdds can
-        // optimistically prepend it to state.adminReminders. Without this,
-        // the Future page's Admin band stays stale until a hard refresh —
-        // hydration only runs once on mount with an empty deps guard.
         if (onReminderCreated) onReminderCreated(cls.reminder);
-      } else if (window.callMaProxy) {
-        // Route through the chat MA agent — the top-level orchestrator. It
-        // reasons natively about intent and dispatches to specialist skills
-        // (daily-brief, update-tracker, reminders-classifier, etc.) via tool-use.
-        // Pass the user's text directly; the chat agent handles context.
+        return;
+      }
+
+      if (cls && cls.is_reminder === false && cls.signal_tag) {
+        const tag = cls.signal_tag;
+        const confidence = cls.signal_confidence || 0;
+        const frameworkHint = cls.signal_framework_hint || null;
+
+        if (confidence >= 0.8) {
+          // High confidence — silent auto-tag. Write entry with tags, no prompt.
+          if (window.insertEntryWithTags) {
+            await window.insertEntryWithTags({
+              kind: 'journal',
+              body_markdown: trimmed,
+              tags: [tag],
+              tag_confidence: { [tag]: confidence },
+              source,
+            });
+          }
+          setThread((prev) => [...prev, { kind: 'agent', t: `Got it. Saved as #${tag}.` }]);
+          return;
+        } else {
+          // Lower confidence — inline ConfirmationCard.
+          const pendingEntry = { text: trimmed, tag, confidence, frameworkHint, source };
+          setThread((prev) => [...prev, { kind: 'signal-confirm', pendingEntry }]);
+          return;
+        }
+      }
+
+      // 3. chat skill fallback — the top-level MA agent.
+      if (window.callMaProxy) {
         try {
           const r = await window.callMaProxy({ skill: 'chat', input: trimmed });
           const reply = (r && r.finalText && r.finalText.trim()) || "I'm here. Say more?";
@@ -492,6 +577,47 @@ function HeroChat({ onDone, onMic, seedTranscript = '', onTranscriptConsumed, on
       setPending(false);
     }
   }, [onReminderCreated]);
+
+  // Handle user confirming or rejecting a signal tag on a ConfirmationCard.
+  const onSignalConfirm = React.useCallback(async (pendingEntry, accepted) => {
+    // Replace the confirmation card in thread with a final agent bubble.
+    if (accepted) {
+      if (window.insertEntryWithTags) {
+        await window.insertEntryWithTags({
+          kind: 'journal',
+          body_markdown: pendingEntry.text,
+          tags: [pendingEntry.tag],
+          tag_confidence: { [pendingEntry.tag]: pendingEntry.confidence },
+          source: pendingEntry.source || 'text',
+        });
+      }
+      setThread((prev) =>
+        prev.map((m) =>
+          m.kind === 'signal-confirm' && m.pendingEntry === pendingEntry
+            ? { kind: 'agent', t: `Saved. Tagged as #${pendingEntry.tag}.` }
+            : m,
+        ),
+      );
+    } else {
+      // User declined — write entry without tag.
+      if (window.insertEntryWithTags) {
+        await window.insertEntryWithTags({
+          kind: 'journal',
+          body_markdown: pendingEntry.text,
+          tags: [],
+          tag_confidence: {},
+          source: pendingEntry.source || 'text',
+        });
+      }
+      setThread((prev) =>
+        prev.map((m) =>
+          m.kind === 'signal-confirm' && m.pendingEntry === pendingEntry
+            ? { kind: 'agent', t: 'Got it, saved without the tag.' }
+            : m,
+        ),
+      );
+    }
+  }, []);
 
   // Seed the thread from a voice capture the user just finished, exactly once.
   React.useEffect(() => {
@@ -562,7 +688,16 @@ function HeroChat({ onDone, onMic, seedTranscript = '', onTranscriptConsumed, on
               </div>
             );
           }
-          // Unknown kind — sendUtterance only emits 'user' and 'agent' today.
+          if (m.kind === 'signal-confirm') {
+            return (
+              <SignalConfirmCard
+                key={i}
+                pendingEntry={m.pendingEntry}
+                onConfirm={onSignalConfirm}
+              />
+            );
+          }
+          // Unknown kind — sendUtterance only emits 'user', 'agent', and 'signal-confirm'.
           // The previous 'action'-card branch (Edit / Send / Undo) was removed
           // per audit gap #5: it had no handlers wired AND was unreachable in
           // current code. Re-introduce under a fresh design when the agent

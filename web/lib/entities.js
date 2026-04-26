@@ -358,6 +358,112 @@ async function listRecentObservations({ sinceHours } = {}) {
   return data || [];
 }
 
+// ─── Entries with tags (capture-time signal tagging) ────────────────────────
+// insertEntryWithTags writes an entry row with the tags[] and tag_confidence
+// columns populated. Both channels:
+//   - body_markdown gets inline token appended (e.g. " #ant") for human-readable tags
+//   - tags[] column gets structured array for SQL queries ("show me #ant entries")
+//
+// tags: string[] — tag names without # prefix (e.g. ['ant'])
+// tag_confidence: object — { ant: 0.92, ... } per-tag confidence scores
+
+async function insertEntryWithTags({ kind, body_markdown, tags, tag_confidence, source, at } = {}) {
+  const uid = await _userId();
+  const normalizedTags = Array.isArray(tags) ? tags : [];
+  const normalizedConf = tag_confidence && typeof tag_confidence === 'object' ? tag_confidence : {};
+
+  // Append inline markdown tokens to body for human-readable tags.
+  // e.g. "I'm such an idiot" → "I'm such an idiot #ant"
+  let bodyWithTags = (body_markdown || '').trim();
+  if (normalizedTags.length > 0) {
+    const inlineTokens = normalizedTags.map((t) => `#${t}`).join(' ');
+    bodyWithTags = bodyWithTags + ' ' + inlineTokens;
+  }
+
+  const row = {
+    user_id: uid,
+    kind: kind || 'journal',
+    body_markdown: bodyWithTags,
+    tags: normalizedTags,
+    tag_confidence: normalizedConf,
+    source: source || 'text',
+  };
+  if (at !== undefined && at !== null) {
+    row.at = at instanceof Date ? at.toISOString() : at;
+  }
+
+  const { data, error } = await _client()
+    .from('entries')
+    .insert(row)
+    .select()
+    .single();
+  if (error) _throw('insertEntryWithTags', error);
+  return data;
+}
+
+// listEntriesByTag — query helper for "show me my #brag entries".
+// Uses the structured tags column: WHERE 'brag' = ANY(tags)
+// Optional `since` is an ISO timestamp to bound the lookback window.
+async function listEntriesByTag(tag, since) {
+  let q = _client()
+    .from('entries')
+    .select('*')
+    .eq('user_id', (await _userId()))
+    .contains('tags', [tag])
+    .order('at', { ascending: false });
+  if (since) {
+    q = q.gte('at', since instanceof Date ? since.toISOString() : since);
+  }
+  const { data, error } = await q;
+  if (error) _throw('listEntriesByTag', error);
+  return data || [];
+}
+
+// ─── User signals (V1.1 scaffold — read interface only) ─────────────────────
+// Full UX for adding / editing user custom signals is V1.2.
+// TODO(V1.2): build signal management UX surface
+
+async function listUserSignals() {
+  const { data, error } = await _client()
+    .from('user_signals')
+    .select('*')
+    .eq('user_id', (await _userId()))
+    .eq('enabled', true)
+    .order('created_at', { ascending: true });
+  if (error) _throw('listUserSignals', error);
+  return data || [];
+}
+
+// V1.1 scaffold — for admin/power-user use; full UX in V1.2
+async function insertUserSignal({ tag, description, framework } = {}) {
+  const { data, error } = await _client()
+    .from('user_signals')
+    .insert({
+      user_id: (await _userId()),
+      tag,
+      description: description || null,
+      framework: framework || null,
+      enabled: true,
+    })
+    .select()
+    .single();
+  if (error) _throw('insertUserSignal', error);
+  return data;
+}
+
+// V1.1 scaffold — soft-delete by setting enabled=false
+async function archiveUserSignal(id) {
+  const { data, error } = await _client()
+    .from('user_signals')
+    .update({ enabled: false })
+    .eq('id', id)
+    .eq('user_id', (await _userId()))
+    .select()
+    .single();
+  if (error) _throw('archiveUserSignal', error);
+  return data;
+}
+
 // ─── Life Areas ─────────────────────────────────────────────────────────────
 
 async function insertLifeArea({ name, description, glyph, palette, goal_id, slug } = {}) {
@@ -434,6 +540,12 @@ Object.assign(window, {
   insertObservation,
   incrementObservation,
   listRecentObservations,
+  // capture-time signal tagging (V1.1)
+  insertEntryWithTags,
+  listEntriesByTag,
+  listUserSignals,
+  insertUserSignal,
+  archiveUserSignal,
   // life areas
   insertLifeArea,
   listLifeAreas,
