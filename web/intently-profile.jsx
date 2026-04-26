@@ -72,6 +72,14 @@ function SettingGroup({ children }) {
 
 // ─── PROFILE SHEET ───────────────────────────────────────────────────
 function ProfileSheet({ connectedCount, onClose, onOpenConnections, onOpenAccount, onOpenPreferences, onOpenHelp, onSignOut, onStartSetup }) {
+  // Identity: pull display_name + email from the shared profile context.
+  // Anonymous users have no display_name and no email — render '—' for
+  // both rather than legacy hardcoded "Sam Tanaka". Setup-expansion
+  // (deferred) will populate display_name; account-upgrade (deferred)
+  // will populate email.
+  const profile = window.useUserProfile ? window.useUserProfile() : { displayName: null, email: null };
+  const nameLabel = profile.displayName || '—';
+  const emailLabel = profile.email || '—';
   return (
     <div style={{
       position: 'absolute', inset: 0, zIndex: 70,
@@ -101,26 +109,17 @@ function ProfileSheet({ connectedCount, onClose, onOpenConnections, onOpenAccoun
         padding: '14px 24px 22px',
         display: 'flex', alignItems: 'center', gap: 16,
       }}>
-        <div style={{
-          width: 64, height: 64, borderRadius: 999,
-          background: 'linear-gradient(135deg, #E8A25E 0%, #C66B3F 100%)',
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          color: '#FBF6EA',
-          fontFamily: T.font.Display, fontSize: 28, fontWeight: 600, fontStyle: 'italic',
-          letterSpacing: -0.4,
-          boxShadow: '0 6px 16px rgba(31,27,21,0.16)',
-          flexShrink: 0,
-        }}>S</div>
+        <Avatar variant="hero" />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{
             fontFamily: T.font.Display, fontSize: 22, lineHeight: '26px',
             fontStyle: 'italic', fontWeight: 500, color: T.color.PrimaryText,
             letterSpacing: -0.3,
-          }}>Sam Tanaka</div>
+          }}>{nameLabel}</div>
           <div style={{
             fontFamily: T.font.UI, fontSize: 13, color: T.color.SupportingText,
             marginTop: 2,
-          }}>sam@intently.app</div>
+          }}>{emailLabel}</div>
         </div>
       </div>
 
@@ -357,6 +356,12 @@ function ToggleRow({ label, sub, prefKey, defaultOn = false, last }) {
 }
 
 function AccountPage({ onBack }) {
+  // Same profile context as ProfileSheet — name/email come from the
+  // single source. Anonymous users see '—' until setup/account-upgrade
+  // populate them.
+  const profile = window.useUserProfile ? window.useUserProfile() : { displayName: null, email: null };
+  const nameLabel = profile.displayName || '—';
+  const emailLabel = profile.email || '—';
   return (
     <SettingsSubPage title="Account." eyebrow="Profile · Account" onBack={onBack}>
       <div style={{
@@ -364,8 +369,8 @@ function AccountPage({ onBack }) {
         border: `1px solid ${T.color.EdgeLine}`,
         borderRadius: 14, overflow: 'hidden', marginBottom: 18,
       }}>
-        <StaticRow label="Name" value="Sam Tanaka" />
-        <StaticRow label="Email" value="sam@intently.app" />
+        <StaticRow label="Name" value={nameLabel} />
+        <StaticRow label="Email" value={emailLabel} />
         <StaticRow label="Password" value="Change" />
         <StaticRow label="Plan" value="Quiet · monthly" last />
       </div>

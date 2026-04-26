@@ -170,6 +170,11 @@ function PresentScreen({ phase = 'planned' }) {
 // ─── A. morning pre-brief ───────────────────────────────────────
 // Sparse. Quiet. Big CTA to launch the daily brief conversation (handled by hero affordance).
 function PresentMorning() {
+  // Parameterized greeting — read display_name from shared profile
+  // context. Anonymous users (no name yet) get "Good morning." with
+  // no name attached, rather than the old hardcoded "Sam".
+  const profile = window.useUserProfile ? window.useUserProfile() : { displayName: null };
+  const greeting = profile.displayName ? `Good morning, ${profile.displayName}.` : 'Good morning.';
   const yesterday = {
     quote: 'Shipped the slide. Walked after dinner.',
     glyph: 'pen',
@@ -194,7 +199,7 @@ function PresentMorning() {
         <div style={{
           fontFamily: T.font.Display, fontSize: 32, fontWeight: 500, lineHeight: '38px',
           color: T.color.PrimaryText, letterSpacing: -0.6, fontStyle: 'italic',
-        }}>Good morning, Sam.</div>
+        }}>{greeting}</div>
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px 240px', display: 'flex', flexDirection: 'column', gap: 22 }}>

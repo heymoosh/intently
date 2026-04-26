@@ -10,14 +10,30 @@
 // good enough for prototype, swap for real assets in production.
 
 // ─── JOURNAL COMPOSER ─────────────────────────────────────────────────
-function JournalComposer({ onClose, onSave }) {
-  const [text, setText] = React.useState('');
+// Modes:
+//   • Insert (default): blank textarea, on save calls onSave(text); host
+//     inserts a new entries row.
+//   • Edit:  pass `initialText` (the existing body_markdown) — textarea
+//     prefills, on save the host updates the existing row (caller is
+//     responsible for tracking which entryId to update).
+// `mode` is presentational only ('Save' vs 'Save changes'); the actual
+// insert-vs-update branching lives at the call site.
+function JournalComposer({ onClose, onSave, initialText, mode = 'create' }) {
+  const [text, setText] = React.useState(initialText || '');
   const taRef = React.useRef(null);
   const [now] = React.useState(() => new Date());
 
   React.useEffect(() => {
-    if (taRef.current) taRef.current.focus();
-  }, []);
+    if (taRef.current) {
+      taRef.current.focus();
+      // Place cursor at end when editing so the user can keep writing
+      // without selecting the existing text.
+      if (initialText) {
+        const len = taRef.current.value.length;
+        taRef.current.setSelectionRange(len, len);
+      }
+    }
+  }, [initialText]);
 
   const dateLine = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
   const timeLine = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
@@ -66,7 +82,7 @@ function JournalComposer({ onClose, onSave }) {
             cursor: canSave ? 'pointer' : 'default',
             transition: 'background 160ms ease, color 160ms ease',
           }}
-        >Save</button>
+        >{mode === 'edit' ? 'Save changes' : 'Save'}</button>
       </div>
 
       {/* Date */}
@@ -108,7 +124,7 @@ function JournalComposer({ onClose, onSave }) {
         fontFamily: T.font.UI, fontSize: 11, color: T.color.SubtleText,
       }}>
         <span>{wordCount} {wordCount === 1 ? 'word' : 'words'}</span>
-        <span style={{ fontStyle: 'italic' }}>Saves to today's journal</span>
+        <span style={{ fontStyle: 'italic' }}>{mode === 'edit' ? 'Edits the saved entry' : "Saves to today's journal"}</span>
       </div>
     </div>
   );
@@ -202,25 +218,21 @@ const INTEGRATIONS = [
 ];
 
 // ─── PROFILE BUTTON (bottom-left, persistent across all tenses) ────────
+// Thin wrapper over <Avatar variant="button"> that adds the absolute
+// positioning + dim transition the home screen needs.
 function ProfileButton({ onClick, dim = false }) {
   return (
-    <button
+    <Avatar
+      variant="button"
       onClick={onClick}
-      aria-label="Open settings"
+      ariaLabel="Open settings"
       style={{
         position: 'absolute', bottom: 22, left: 24,
-        width: 44, height: 44, borderRadius: 999,
-        background: 'linear-gradient(135deg, #E8A25E 0%, #C66B3F 100%)',
-        border: 'none',
-        cursor: 'pointer', zIndex: 31,
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        boxShadow: '0 8px 24px rgba(31,27,21,0.18), 0 0 0 1px rgba(31,27,21,0.06)',
+        zIndex: 31,
         opacity: dim ? 0.3 : 1,
         transition: 'opacity 200ms ease',
-        fontFamily: T.font.Display, fontSize: 18, fontWeight: 600, fontStyle: 'italic',
-        color: '#FBF6EA', letterSpacing: -0.3,
       }}
-    >M</button>
+    />
   );
 }
 

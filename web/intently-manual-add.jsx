@@ -283,8 +283,14 @@ function useManualAdds() {
     let cancelled = false;
 
     (async () => {
-      // Seed Sam's life on first ever load. No-op if user has goals already.
-      if (window.seedSamIfEmpty) {
+      // Sam-seed gate: only load Sam's demo data when the URL is opted in
+      // via `?demo=1` (the same pattern the future landing-page embed uses)
+      // OR when running in dev mode (`?dev=1` or localhost). Real-app
+      // visitors land on a clean empty state — Sam is no longer the
+      // unconditional first-load fixture.
+      // See `.claude/handoffs/new-user-ux-and-auth.md` § Sam-seed gate.
+      const seedAllowed = !!(window.INTENTLY_DEMO || window.INTENTLY_DEV);
+      if (seedAllowed && window.seedSamIfEmpty) {
         try {
           const result = await window.seedSamIfEmpty();
           if (result && !result.skipped) {
@@ -296,7 +302,9 @@ function useManualAdds() {
       }
       // Independent gate for calendar/email — covers the case where 0006 was
       // applied AFTER the user was first seeded (calendar/email 404'd then).
-      if (window.seedSamCalendarEmailIfEmpty) {
+      // Same demo/dev gate so real-app users don't get seed rows surprising
+      // them once 0006 lands.
+      if (seedAllowed && window.seedSamCalendarEmailIfEmpty) {
         try {
           const result = await window.seedSamCalendarEmailIfEmpty();
           if (result && !result.skipped && Object.keys(result.inserted).length > 0) {
