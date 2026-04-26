@@ -2056,19 +2056,91 @@ const SETUP_DEFAULT_PALETTES = [
   ['#7A4A5B', '#B87A82', '#DCBEC4', '#F0DCC4'], // peach
 ];
 
+// ─── SetupFlow helpers ────────────────────────────────────────────────────────
+
+// Shared input style for setup forms.
+const SETUP_INPUT_STYLE = {
+  width: '100%', padding: '12px 14px', resize: 'vertical', minHeight: 48,
+  border: '1px solid rgba(31,27,21,0.14)', borderRadius: 12,
+  background: 'rgba(255,255,255,0.7)', boxSizing: 'border-box',
+  fontFamily: T.font.Reading, fontSize: 15, lineHeight: '21px', color: T.color.PrimaryText,
+  outline: 'none',
+};
+
+const SETUP_LABEL_STYLE = {
+  fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2,
+  textTransform: 'uppercase', color: T.color.SubtleText, marginBottom: 6, display: 'block',
+};
+
+const SETUP_SECTION_HEADING = {
+  fontFamily: T.font.Display, fontSize: 22, lineHeight: '28px', fontStyle: 'italic',
+  fontWeight: 500, color: T.color.PrimaryText, letterSpacing: -0.3, marginBottom: 8,
+};
+
+const SETUP_BODY_TEXT = {
+  fontFamily: T.font.Reading, fontSize: 15, lineHeight: '22px',
+  color: T.color.SupportingText, marginBottom: 18,
+};
+
+const SETUP_BTN_PRIMARY = {
+  width: '100%', padding: '12px 18px',
+  background: T.color.PrimaryText, color: '#FBF6EA',
+  border: 'none', borderRadius: 999, cursor: 'pointer',
+  fontFamily: T.font.UI, fontSize: 14, fontWeight: 600, letterSpacing: 0.2,
+};
+
+const SETUP_BTN_GHOST = {
+  width: '100%', padding: '11px 18px',
+  background: 'transparent', color: T.color.SupportingText,
+  border: `1px solid ${T.color.EdgeLine}`, borderRadius: 999, cursor: 'pointer',
+  fontFamily: T.font.UI, fontSize: 14, fontWeight: 500, letterSpacing: 0.1,
+};
+
+// ─── SetupFlow ────────────────────────────────────────────────────────────────
+
 function SetupFlow({ onClose, onComplete }) {
-  const [step, setStep] = React.useState('intro'); // intro | input | drafting | review | error | saving
-  const [goalDrafts, setGoalDrafts] = React.useState(['', '', '']);
-  const [enriched, setEnriched] = React.useState([]); // [{title, monthly_slice, glyph}]
+  // Steps: intro | goals_input | drafting | goals_review | projects | outcome | prefs | journal_prompt | saving | error
+  const [step, setStep] = React.useState('intro');
   const [errorMsg, setErrorMsg] = React.useState('');
 
+  // Phase 1 — goals
+  const [goalDrafts, setGoalDrafts] = React.useState(['', '', '']);
+  const [enriched, setEnriched] = React.useState([]); // [{title, monthly_slice, glyph}]
+
+  // Phase 2 — projects [{title, goalIdx}]  (goalIdx is index into enriched[])
+  const [projects, setProjects] = React.useState([{ title: '', goalIdx: '' }]);
+
+  // Phase 3 — this-week outcome
+  const [weekOutcome, setWeekOutcome] = React.useState('');
+
+  // Phase 4 — preferences (pre-filled defaults)
+  const [prefs, setPrefs] = React.useState({
+    focus_area: '',
+    work_start: '09:00',
+    work_end: '18:00',
+    energy_pattern: 'unset',
+    daily_brief_time: '07:00',
+    weekly_review_day: 'Sunday',
+  });
+
+  // Phase 5 — journal seed
+  const [journalText, setJournalText] = React.useState('');
+
+  // ── helpers ──────────────────────────────────────────────────────────────
+
   const updateGoal = (i, v) => setGoalDrafts((g) => g.map((x, j) => j === i ? v : x));
+  const updateSlice = (i, v) => setEnriched((e) => e.map((x, j) => j === i ? { ...x, monthly_slice: v } : x));
+
+  const addProjectRow = () => setProjects((p) => [...p, { title: '', goalIdx: '' }]);
+  const removeProjectRow = (i) => setProjects((p) => p.filter((_, j) => j !== i));
+  const updateProject = (i, field, val) => setProjects((p) => p.map((x, j) => j === i ? { ...x, [field]: val } : x));
+  const updatePref = (key, val) => setPrefs((p) => ({ ...p, [key]: val }));
+
+  // ── Phase 1: call agent after goals entered ───────────────────────────────
 
   const draftWithAgent = async () => {
     const titles = goalDrafts.map((g) => g.trim()).filter(Boolean);
-    if (titles.length === 0) {
-      setErrorMsg('Add at least one goal first.'); return;
-    }
+    if (titles.length === 0) { setErrorMsg('Add at least one goal first.'); return; }
     setStep('drafting');
     try {
       const ctx = window.assembleSetupContext(titles);
@@ -2076,7 +2148,6 @@ function SetupFlow({ onClose, onComplete }) {
       const text = (r && r.finalText) || '';
       const parsed = window.parseSetupResponse(text);
       if (!parsed || !parsed.slices || parsed.slices.length === 0) {
-        // Fallback: empty slices, agent failed — let user fill in manually.
         setEnriched(titles.map((t) => ({ title: t, monthly_slice: '', glyph: 'leaf' })));
       } else {
         setEnriched(titles.map((t, i) => {
@@ -2088,25 +2159,28 @@ function SetupFlow({ onClose, onComplete }) {
           };
         }));
       }
-      setStep('review');
+      // Pre-fill focus_area from first goal title
+      if (titles[0]) setPrefs((p) => ({ ...p, focus_area: titles[0] }));
+      setStep('goals_review');
     } catch (e) {
-      setErrorMsg((e && e.message) || 'setup call failed');
+      setErrorMsg((e && e.message) || 'setup agent call failed');
       setStep('error');
     }
   };
 
-  const updateSlice = (i, v) => setEnriched((e) => e.map((x, j) => j === i ? { ...x, monthly_slice: v } : x));
+  // ── Final persist ─────────────────────────────────────────────────────────
 
-  const acceptAndPersist = async () => {
+  const finalPersist = async () => {
     setStep('saving');
     try {
-      // Wipe prior data so the user starts clean (Sam's seed gets removed).
-      if (window.clearAllUserData) {
-        await window.clearAllUserData();
-      }
+      // Wipe prior seed data.
+      if (window.clearAllUserData) await window.clearAllUserData();
+
       const sb = window.getSupabaseClient();
       const userId = await window.getCurrentUserId();
-      const rows = enriched.map((g, i) => ({
+
+      // Phase 1 — insert goals and collect their IDs.
+      const goalRows = enriched.map((g, i) => ({
         user_id: userId,
         title: g.title,
         monthly_slice: g.monthly_slice,
@@ -2114,8 +2188,18 @@ function SetupFlow({ onClose, onComplete }) {
         palette: SETUP_DEFAULT_PALETTES[i] || SETUP_DEFAULT_PALETTES[0],
         position: i,
       }));
-      await sb.from('goals').insert(rows);
-      // Also insert an Admin project so the AddZone admin band has a target.
+      const { data: insertedGoals, error: goalsErr } = await sb
+        .from('goals').insert(goalRows).select();
+      if (goalsErr) throw new Error('goals: ' + goalsErr.message);
+
+      // Phase 2 — insert user-entered projects (skip blank titles).
+      const activeProjects = projects.filter((p) => p.title && p.title.trim());
+      for (const p of activeProjects) {
+        const goalId = (insertedGoals && insertedGoals[parseInt(p.goalIdx)]) ?
+          insertedGoals[parseInt(p.goalIdx)].id : null;
+        await window.insertProject(p.title.trim(), goalId);
+      }
+      // Always ensure an Admin project exists.
       await sb.from('projects').insert([{
         user_id: userId,
         title: 'Admin',
@@ -2123,11 +2207,28 @@ function SetupFlow({ onClose, onComplete }) {
         status: 'active',
         is_admin: true,
       }]);
+
+      // Phase 3 + Phase 4 — merge into life_ops_config.
+      const configPatch = {
+        focus_area: prefs.focus_area || (enriched[0] && enriched[0].title) || '',
+        work_hours: { start: prefs.work_start, end: prefs.work_end },
+        energy_pattern: prefs.energy_pattern,
+        daily_brief_time: prefs.daily_brief_time,
+        weekly_review_day: prefs.weekly_review_day,
+        first_run_complete: true,
+      };
+      if (weekOutcome && weekOutcome.trim()) {
+        configPatch.this_week_outcome = weekOutcome.trim();
+      }
+      await window.updateLifeOpsConfig(configPatch);
+
+      // Phase 5 — optional journal entry.
+      if (journalText && journalText.trim()) {
+        await window.insertJournalEntry(journalText.trim());
+      }
+
       if (window.showUndoToast) {
-        window.showUndoToast({
-          message: `Set up ${enriched.length} goals — fresh start`,
-          // No undo for setup — wiping is part of the deal; user expects fresh.
-        });
+        window.showUndoToast({ message: `Set up ${enriched.length} goal${enriched.length !== 1 ? 's' : ''} — fresh start` });
       }
       if (onComplete) onComplete({ goals: enriched.length });
     } catch (e) {
@@ -2136,12 +2237,19 @@ function SetupFlow({ onClose, onComplete }) {
     }
   };
 
+  // ── Phase 4 confirm → Phase 5 ─────────────────────────────────────────────
+
+  const confirmPrefs = () => setStep('journal_prompt');
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
   return (
     <div style={{
       position: 'absolute', inset: 0, zIndex: 70,
       background: `linear-gradient(180deg, ${T.color.PrimarySurface} 0%, #F5EBD6 60%, #F0D9B5 100%)`,
       display: 'flex', flexDirection: 'column',
     }}>
+      {/* Header */}
       <div style={{ flexShrink: 0, padding: '14px 18px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
           <Icon.Sparkles size={14} color={T.color.FocusObject} />
@@ -2158,59 +2266,58 @@ function SetupFlow({ onClose, onComplete }) {
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '8px 22px 28px' }}>
+
+        {/* ── Step: intro ── */}
         {step === 'intro' && (
           <div>
             <div style={{ fontFamily: T.font.Display, fontSize: 28, lineHeight: '34px', fontStyle: 'italic', fontWeight: 500, color: T.color.PrimaryText, letterSpacing: -0.5, marginBottom: 14 }}>
-              Three long-term things that matter most to you.
+              Ten minutes to set up your system.
             </div>
-            <div style={{ fontFamily: T.font.Reading, fontSize: 15, lineHeight: '22px', color: T.color.SupportingText, marginBottom: 22 }}>
-              Not goals as KPIs — goals as directions. The agent will draft a concrete this-month slice for each one. Edit anything before saving.
+            <div style={{ ...SETUP_BODY_TEXT }}>
+              We'll cover four things: the areas of life that matter most to you, what you're actively working on, what you want to move this week, and a few preferences. The agent drafts this-month slices for your goals — edit anything before saving.
             </div>
-            <div style={{ background: '#FBF6EA88', border: `1px dashed ${T.color.EdgeLine}`, borderRadius: 14, padding: '14px 16px', marginBottom: 18, fontFamily: T.font.Reading, fontSize: 13, lineHeight: '19px', color: T.color.SupportingText, fontStyle: 'italic' }}>
-              Heads up: this wipes any seeded sample data for your session and replaces it with these goals. Daily brief tomorrow morning will be from-scratch.
+            <div style={{ background: '#FBF6EA88', border: `1px dashed ${T.color.EdgeLine}`, borderRadius: 14, padding: '14px 16px', marginBottom: 22, fontFamily: T.font.Reading, fontSize: 13, lineHeight: '19px', color: T.color.SupportingText, fontStyle: 'italic' }}>
+              This wipes any sample data and replaces it with yours. Daily brief tomorrow morning will be from your goals.
             </div>
-            <button onClick={() => setStep('input')} style={{
-              padding: '12px 22px', background: T.color.PrimaryText, color: '#FBF6EA',
-              border: 'none', borderRadius: 999, cursor: 'pointer',
-              fontFamily: T.font.UI, fontSize: 14, fontWeight: 600, letterSpacing: 0.2,
-            }}>Start</button>
+            <button onClick={() => setStep('goals_input')} style={{ ...SETUP_BTN_PRIMARY }}>Start</button>
           </div>
         )}
 
-        {step === 'input' && (
+        {/* ── Step: goals_input ── */}
+        {step === 'goals_input' && (
           <div>
-            <div style={{ marginBottom: 16, fontFamily: T.font.Display, fontSize: 22, lineHeight: '28px', fontStyle: 'italic', fontWeight: 500, color: T.color.PrimaryText, letterSpacing: -0.3 }}>
-              Name your three goals.
+            <div style={{ ...SETUP_SECTION_HEADING }}>What areas of life matter most to you?</div>
+            <div style={{ ...SETUP_BODY_TEXT, marginBottom: 20 }}>
+              2–5 areas — career, health, a relationship, creative work, financial. Not aspirations as KPIs, just directions. Add a short rationale if it helps.
             </div>
-            {[0, 1, 2].map((i) => (
-              <div key={i} style={{ marginBottom: 12 }}>
-                <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: T.color.SubtleText, marginBottom: 6 }}>Goal {i + 1}</div>
+            {goalDrafts.map((val, i) => (
+              <div key={i} style={{ marginBottom: 14 }}>
+                <label style={{ ...SETUP_LABEL_STYLE }}>
+                  {i === 0 ? 'Goal 1 (required)' : `Goal ${i + 1} (optional)`}
+                </label>
                 <textarea
-                  value={goalDrafts[i]}
+                  value={val}
                   onChange={(e) => updateGoal(i, e.target.value)}
                   rows={2}
-                  placeholder="e.g. Ship something people rely on daily"
-                  style={{
-                    width: '100%', padding: '12px 14px', resize: 'vertical', minHeight: 56,
-                    border: `1px solid ${T.color.EdgeLine}`, borderRadius: 12,
-                    background: 'rgba(255,255,255,0.7)', boxSizing: 'border-box',
-                    fontFamily: T.font.Reading, fontSize: 15, lineHeight: '21px', color: T.color.PrimaryText,
-                    outline: 'none',
-                  }}
+                  placeholder={i === 0 ? 'e.g. Ship something people rely on daily' : i === 1 ? 'e.g. Build a consistent health routine' : 'e.g. More quality time with family'}
+                  style={{ ...SETUP_INPUT_STYLE }}
                 />
               </div>
             ))}
-            <button onClick={draftWithAgent} style={{
-              marginTop: 8, width: '100%', padding: '12px 18px',
-              background: T.color.PrimaryText, color: '#FBF6EA',
-              border: 'none', borderRadius: 999, cursor: 'pointer',
-              fontFamily: T.font.UI, fontSize: 14, fontWeight: 600, letterSpacing: 0.2,
-            }}>
-              Draft monthly slices →
-            </button>
+            <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+              <button
+                onClick={() => setGoalDrafts((g) => [...g, ''])}
+                style={{ ...SETUP_BTN_GHOST, width: 'auto', padding: '9px 16px', fontSize: 13 }}
+                disabled={goalDrafts.length >= 5}
+              >+ Add goal</button>
+              <button onClick={draftWithAgent} style={{ ...SETUP_BTN_PRIMARY }}>
+                Draft this-month slices →
+              </button>
+            </div>
           </div>
         )}
 
+        {/* ── Step: drafting ── */}
         {step === 'drafting' && (
           <div style={{ padding: '40px 8px', textAlign: 'center' }}>
             <AgentTyping />
@@ -2220,10 +2327,14 @@ function SetupFlow({ onClose, onComplete }) {
           </div>
         )}
 
-        {step === 'review' && (
+        {/* ── Step: goals_review ── */}
+        {step === 'goals_review' && (
           <div>
-            <div style={{ marginBottom: 14, fontFamily: T.font.Display, fontSize: 22, lineHeight: '28px', fontStyle: 'italic', fontWeight: 500, color: T.color.PrimaryText, letterSpacing: -0.3 }}>
+            <div style={{ ...SETUP_SECTION_HEADING, marginBottom: 6 }}>
               Edit anything that doesn't sound like you.
+            </div>
+            <div style={{ fontFamily: T.font.Reading, fontSize: 13, color: T.color.SubtleText, marginBottom: 16, fontStyle: 'italic' }}>
+              Phase 1 of 4
             </div>
             {enriched.map((g, i) => (
               <div key={i} style={{
@@ -2242,39 +2353,243 @@ function SetupFlow({ onClose, onComplete }) {
                   onChange={(e) => updateSlice(i, e.target.value)}
                   rows={3}
                   style={{
-                    width: '100%', resize: 'vertical', minHeight: 60,
-                    padding: '10px 12px', border: `1px solid ${T.color.EdgeLine}`,
-                    borderRadius: 10, background: 'rgba(255,255,255,0.6)', boxSizing: 'border-box',
-                    fontFamily: T.font.Reading, fontSize: 14, lineHeight: '20px', color: T.color.PrimaryText, outline: 'none',
+                    ...SETUP_INPUT_STYLE, minHeight: 60,
+                    background: 'rgba(255,255,255,0.6)',
                   }}
                 />
               </div>
             ))}
-            <button onClick={acceptAndPersist} style={{
-              marginTop: 8, width: '100%', padding: '12px 18px',
-              background: T.color.PrimaryText, color: '#FBF6EA',
-              border: 'none', borderRadius: 999, cursor: 'pointer',
-              fontFamily: T.font.UI, fontSize: 14, fontWeight: 600, letterSpacing: 0.2,
-            }}>
-              Save and start fresh
+            <button onClick={() => setStep('projects')} style={{ ...SETUP_BTN_PRIMARY, marginTop: 4 }}>
+              Looks good — next: active projects →
             </button>
           </div>
         )}
 
-        {step === 'saving' && (
-          <div style={{ padding: '40px 8px', textAlign: 'center' }}>
-            <AgentTyping />
-            <div style={{ marginTop: 14, fontFamily: T.font.UI, fontSize: 12, color: T.color.SupportingText, fontStyle: 'italic' }}>
-              Wiping seed data and saving your goals…
+        {/* ── Step: projects (Phase 2) ── */}
+        {step === 'projects' && (
+          <div>
+            <div style={{ ...SETUP_SECTION_HEADING, marginBottom: 6 }}>
+              What are you actively working on?
+            </div>
+            <div style={{ fontFamily: T.font.Reading, fontSize: 13, color: T.color.SubtleText, marginBottom: 4, fontStyle: 'italic' }}>
+              Phase 2 of 4
+            </div>
+            <div style={{ ...SETUP_BODY_TEXT, marginBottom: 16 }}>
+              Things you've touched in the last two weeks — not aspirations. Link each to a goal if it fits. You can skip this phase.
+            </div>
+            {projects.map((p, i) => (
+              <div key={i} style={{ marginBottom: 14, padding: '12px 14px', background: 'rgba(255,255,255,0.5)', borderRadius: 12, border: `1px solid ${T.color.EdgeLine}` }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ ...SETUP_LABEL_STYLE }}>Project name</label>
+                    <input
+                      type="text"
+                      value={p.title}
+                      onChange={(e) => updateProject(i, 'title', e.target.value)}
+                      placeholder="e.g. Intently launch"
+                      style={{ ...SETUP_INPUT_STYLE, minHeight: 0, resize: 'none' }}
+                    />
+                  </div>
+                  {projects.length > 1 && (
+                    <button
+                      onClick={() => removeProjectRow(i)}
+                      aria-label="Remove project"
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.color.SubtleText, padding: '24px 0 0 0' }}
+                    >
+                      <Icon.X size={14} />
+                    </button>
+                  )}
+                </div>
+                <div style={{ marginTop: 10 }}>
+                  <label style={{ ...SETUP_LABEL_STYLE }}>Serves which goal? (optional)</label>
+                  <select
+                    value={p.goalIdx}
+                    onChange={(e) => updateProject(i, 'goalIdx', e.target.value)}
+                    style={{ ...SETUP_INPUT_STYLE, minHeight: 0, resize: 'none', appearance: 'none', cursor: 'pointer' }}
+                  >
+                    <option value="">— none / not sure —</option>
+                    {enriched.map((g, gi) => (
+                      <option key={gi} value={gi}>{g.title}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            ))}
+            <button
+              onClick={addProjectRow}
+              style={{ ...SETUP_BTN_GHOST, marginBottom: 10 }}
+              disabled={projects.length >= 10}
+            >+ Add another project</button>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setStep('outcome')} style={{ ...SETUP_BTN_GHOST, flex: '0 0 auto', width: 'auto', padding: '11px 18px' }}>
+                Skip this step
+              </button>
+              <button onClick={() => setStep('outcome')} style={{ ...SETUP_BTN_PRIMARY }}>
+                Next: this week →
+              </button>
             </div>
           </div>
         )}
 
+        {/* ── Step: outcome (Phase 3) ── */}
+        {step === 'outcome' && (
+          <div>
+            <div style={{ ...SETUP_SECTION_HEADING, marginBottom: 6 }}>
+              What does a good week look like?
+            </div>
+            <div style={{ fontFamily: T.font.Reading, fontSize: 13, color: T.color.SubtleText, marginBottom: 4, fontStyle: 'italic' }}>
+              Phase 3 of 4
+            </div>
+            <div style={{ ...SETUP_BODY_TEXT, marginBottom: 18 }}>
+              One specific thing you want to have moved forward by Sunday. Keep it concrete enough to evaluate.
+            </div>
+            <textarea
+              value={weekOutcome}
+              onChange={(e) => setWeekOutcome(e.target.value)}
+              rows={3}
+              placeholder="e.g. Have the onboarding flow working end-to-end"
+              style={{ ...SETUP_INPUT_STYLE, minHeight: 72, marginBottom: 14 }}
+            />
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setStep('prefs')} style={{ ...SETUP_BTN_GHOST, flex: '0 0 auto', width: 'auto', padding: '11px 18px' }}>
+                Skip
+              </button>
+              <button onClick={() => setStep('prefs')} style={{ ...SETUP_BTN_PRIMARY }}>
+                Next: preferences →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Step: prefs (Phase 4) ── */}
+        {step === 'prefs' && (
+          <div>
+            <div style={{ ...SETUP_SECTION_HEADING, marginBottom: 6 }}>
+              A few defaults to get started.
+            </div>
+            <div style={{ fontFamily: T.font.Reading, fontSize: 13, color: T.color.SubtleText, marginBottom: 4, fontStyle: 'italic' }}>
+              Phase 4 of 4
+            </div>
+            <div style={{ ...SETUP_BODY_TEXT, marginBottom: 16 }}>
+              These are pre-filled with sensible defaults. Change anything; all editable later in settings.
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ ...SETUP_LABEL_STYLE }}>Focus area (primary context for daily briefs)</label>
+              <input
+                type="text"
+                value={prefs.focus_area}
+                onChange={(e) => updatePref('focus_area', e.target.value)}
+                placeholder="e.g. Product work"
+                style={{ ...SETUP_INPUT_STYLE, minHeight: 0, resize: 'none' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ ...SETUP_LABEL_STYLE }}>Work start</label>
+                <input
+                  type="time"
+                  value={prefs.work_start}
+                  onChange={(e) => updatePref('work_start', e.target.value)}
+                  style={{ ...SETUP_INPUT_STYLE, minHeight: 0, resize: 'none' }}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ ...SETUP_LABEL_STYLE }}>Work end</label>
+                <input
+                  type="time"
+                  value={prefs.work_end}
+                  onChange={(e) => updatePref('work_end', e.target.value)}
+                  style={{ ...SETUP_INPUT_STYLE, minHeight: 0, resize: 'none' }}
+                />
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ ...SETUP_LABEL_STYLE }}>Daily brief time</label>
+              <input
+                type="time"
+                value={prefs.daily_brief_time}
+                onChange={(e) => updatePref('daily_brief_time', e.target.value)}
+                style={{ ...SETUP_INPUT_STYLE, minHeight: 0, resize: 'none' }}
+              />
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ ...SETUP_LABEL_STYLE }}>Weekly review day</label>
+              <select
+                value={prefs.weekly_review_day}
+                onChange={(e) => updatePref('weekly_review_day', e.target.value)}
+                style={{ ...SETUP_INPUT_STYLE, minHeight: 0, resize: 'none', appearance: 'none', cursor: 'pointer' }}
+              >
+                {['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'].map((d) => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ marginBottom: 18 }}>
+              <label style={{ ...SETUP_LABEL_STYLE }}>Energy pattern</label>
+              <select
+                value={prefs.energy_pattern}
+                onChange={(e) => updatePref('energy_pattern', e.target.value)}
+                style={{ ...SETUP_INPUT_STYLE, minHeight: 0, resize: 'none', appearance: 'none', cursor: 'pointer' }}
+              >
+                <option value="unset">Not sure yet</option>
+                <option value="morning_peak">Morning peak (best focus AM)</option>
+                <option value="afternoon_peak">Afternoon peak (best focus PM)</option>
+                <option value="even">Fairly even through the day</option>
+              </select>
+            </div>
+
+            <button onClick={confirmPrefs} style={{ ...SETUP_BTN_PRIMARY }}>
+              Confirm →
+            </button>
+          </div>
+        )}
+
+        {/* ── Step: journal_prompt (Phase 5 — optional) ── */}
+        {step === 'journal_prompt' && (
+          <div>
+            <div style={{ ...SETUP_SECTION_HEADING, marginBottom: 6 }}>
+              Anything on your mind right now?
+            </div>
+            <div style={{ ...SETUP_BODY_TEXT, marginBottom: 18 }}>
+              Optional — drop a quick note about why you're starting Intently or what you're hoping it changes. It'll be your first journal entry.
+            </div>
+            <textarea
+              value={journalText}
+              onChange={(e) => setJournalText(e.target.value)}
+              rows={4}
+              placeholder="Write anything, or leave blank to skip…"
+              style={{ ...SETUP_INPUT_STYLE, minHeight: 88, marginBottom: 14 }}
+            />
+            <button onClick={finalPersist} style={{ ...SETUP_BTN_PRIMARY }}>
+              {journalText.trim() ? 'Save note and finish' : 'Finish setup'}
+            </button>
+          </div>
+        )}
+
+        {/* ── Step: saving ── */}
+        {step === 'saving' && (
+          <div style={{ padding: '40px 8px', textAlign: 'center' }}>
+            <AgentTyping />
+            <div style={{ marginTop: 14, fontFamily: T.font.UI, fontSize: 12, color: T.color.SupportingText, fontStyle: 'italic' }}>
+              Saving your goals, projects, and preferences…
+            </div>
+          </div>
+        )}
+
+        {/* ── Step: error ── */}
         {step === 'error' && (
-          <div style={{
-            padding: '16px 18px', background: T.color.SecondarySurface, border: `1px solid ${T.color.EdgeLine}`,
-            borderRadius: 14, fontFamily: T.font.Reading, fontSize: 14, color: T.color.PrimaryText, marginBottom: 14,
-          }}>{errorMsg}</div>
+          <div>
+            <div style={{
+              padding: '16px 18px', background: T.color.SecondarySurface, border: `1px solid ${T.color.EdgeLine}`,
+              borderRadius: 14, fontFamily: T.font.Reading, fontSize: 14, color: T.color.PrimaryText, marginBottom: 14,
+            }}>{errorMsg}</div>
+            <button onClick={() => setStep('intro')} style={{ ...SETUP_BTN_GHOST }}>Start over</button>
+          </div>
         )}
       </div>
     </div>

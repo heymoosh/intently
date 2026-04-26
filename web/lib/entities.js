@@ -199,6 +199,44 @@ async function listJournalEntries(opts) {
   return data || [];
 }
 
+// ─── Life ops config ─────────────────────────────────────────────────────────
+
+async function updateLifeOpsConfig(patch) {
+  // Upsert a row for this user, merging `patch` into the existing JSONB config.
+  // Supabase does not natively deep-merge JSONB on upsert, so we read-merge-write.
+  // Single-user V1: read/write race is acceptable.
+  const sb = _client();
+  const uid = await _userId();
+
+  // Fetch existing config (may not exist yet for brand-new users).
+  const { data: existing, error: readErr } = await sb
+    .from('life_ops_config')
+    .select('config')
+    .eq('user_id', uid)
+    .maybeSingle();
+  if (readErr) _throw('updateLifeOpsConfig (read)', readErr);
+
+  const merged = Object.assign({}, (existing && existing.config) || {}, patch);
+
+  const { data, error } = await sb
+    .from('life_ops_config')
+    .upsert({ user_id: uid, config: merged }, { onConflict: 'user_id' })
+    .select()
+    .single();
+  if (error) _throw('updateLifeOpsConfig (write)', error);
+  return data;
+}
+
+async function getLifeOpsConfig() {
+  const { data, error } = await _client()
+    .from('life_ops_config')
+    .select('config')
+    .eq('user_id', (await _userId()))
+    .maybeSingle();
+  if (error) _throw('getLifeOpsConfig', error);
+  return (data && data.config) || {};
+}
+
 // ─── Admin reminders (uses the existing public.reminders table) ─────────────
 
 async function insertAdminReminder(text, remindOn) {
@@ -254,6 +292,8 @@ Object.assign(window, {
   listPlanItems,
   insertJournalEntry,
   listJournalEntries,
+  updateLifeOpsConfig,
+  getLifeOpsConfig,
   insertAdminReminder,
   listAdminReminders,
   markAdminReminderDone,
