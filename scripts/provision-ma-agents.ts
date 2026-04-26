@@ -22,6 +22,7 @@ export const MVP_SKILLS = [
   'daily-review',
   'weekly-review',
   'monthly-review',
+  'noticing',
   'setup',
   'update-tracker',
 ] as const;

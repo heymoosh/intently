@@ -56,6 +56,7 @@ const SKILL_ENV: Record<string, string> = {
   'monthly-review': 'MA_AGENT_ID_MONTHLY_REVIEW',
   'update-tracker': 'MA_AGENT_ID_UPDATE_TRACKER',
   setup: 'MA_AGENT_ID_SETUP',
+  noticing: 'MA_AGENT_ID_NOTICING',
 };
 
 // Skill → memory store ID env var. Memory stores are provisioned once per skill
