@@ -36,7 +36,7 @@
 // Sentry error monitoring — no-op when SENTRY_DSN is unset.
 import * as Sentry from 'https://esm.sh/@sentry/deno@8';
 
-const _sentryDsn = Deno.env.get('SENTRY_DSN');
+const _sentryDsn = Deno.env.get('SENTRY_DSN_EDGE');
 if (_sentryDsn) {
   Sentry.init({
     dsn: _sentryDsn,
