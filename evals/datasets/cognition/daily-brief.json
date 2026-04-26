@@ -1,0 +1,14 @@
+{
+  "skill": "daily-brief",
+  "cases": [
+    {
+      "name": "fresh user with no goals — graceful empty state",
+      "fixture": "empty-user",
+      "rubrics": [
+        "The output greets the user calmly without using the name 'Sam'",
+        "The output does NOT include hardcoded 'Yesterday' content or fabricated prior entries",
+        "The output ends with a fenced JSON block matching the brief contract (contains a 'kind' field set to 'brief')"
+      ]
+    }
+  ]
+}
