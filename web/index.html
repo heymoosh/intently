@@ -1187,12 +1187,15 @@ function PrototypePhone({ dayState, setDayState, idx, setIdx }) {
         <ProfileButton onClick={() => setProfileView('sheet')} dim={micDim} />
       )}
 
-      {/* Journal composer overlay */}
+      {/* Journal editor overlay — substantial create path (hero radial → journal).
+          AddZone quick-note paths are unchanged and stay wired to JournalComposer
+          / useManualAdds for fast inline capture. */}
       {showJournal && (
-        <JournalComposer
-          onClose={() => setShowJournal(false)}
-          onSave={(text) => {
-            m.addJournal('today', text);
+        <JournalEditor
+          mode="create"
+          onCancel={() => setShowJournal(false)}
+          onSave={({ body }) => {
+            m.addJournal('today', body);
             setShowJournal(false);
           }}
         />
@@ -1254,32 +1257,36 @@ function PrototypePhone({ dayState, setDayState, idx, setIdx }) {
           onClose={() => setOpenEntry(null)}
           onEdit={
             currentEntry.kind === 'journal' && currentEntry.id
-              ? () => setEditingEntry({ id: currentEntry.id, text: currentEntry.bodyMarkdown || '' })
+              ? () => setEditingEntry({
+                  id: currentEntry.id,
+                  text: currentEntry.bodyMarkdown || '',
+                  title: currentEntry.title || '',
+                  dayLabel: currentEntry.dayLabel,
+                  mood: currentEntry.mood,
+                })
               : undefined
           }
         />
       )}
 
-      {/* Edit-mode JournalComposer — re-uses the composer with the
-          entry's existing body pre-filled. On save, UPDATE the row
-          (no insert) so reading mode + journal list re-fetch the
-          edited content. */}
+      {/* Full-page journal editor — edit mode.
+          JournalEditor handles the updateJournalEntry call internally; we close
+          both the editor and reading mode on save so the user sees fresh content
+          on next open (the resolver re-fetches by id). */}
       {editingEntry && (
-        <JournalComposer
+        <JournalEditor
           mode="edit"
-          initialText={editingEntry.text}
-          onClose={() => setEditingEntry(null)}
-          onSave={async (text) => {
-            try {
-              if (window.updateJournalEntry) {
-                await window.updateJournalEntry(editingEntry.id, text);
-              }
-            } catch (err) {
-              console.warn('[journal-edit] update failed:', err && err.message);
-            }
+          entry={{
+            id: editingEntry.id,
+            title: editingEntry.title || '',
+            bodyMarkdown: editingEntry.text,
+            dayLabel: editingEntry.dayLabel,
+            mood: editingEntry.mood,
+          }}
+          onCancel={() => setEditingEntry(null)}
+          onSave={() => {
             setEditingEntry(null);
-            // Close reading mode so the user sees the freshly-edited
-            // entry on next open (the resolver re-fetches by id).
+            // Close reading mode so fresh content loads on next open.
             setOpenEntry(null);
           }}
         />

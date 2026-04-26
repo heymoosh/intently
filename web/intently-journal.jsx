@@ -618,4 +618,197 @@ function TenseNavArrows({ index = 1, onIndex }) {
   );
 }
 
-Object.assign(window, { PastJournal, YearView, MonthView, WeekView, DayView, JournalHeader, TenseNav, TenseNavArrows });
+// ─── JOURNAL EDITOR ─── full-page editor for edit + substantial create ────────
+// Modes:
+//   • edit:   receives `entry` (existing DB row with id + bodyMarkdown).
+//             Save → window.updateJournalEntry(id, text). Cancel → onCancel.
+//   • create: blank title + body. Save → window.insertJournalEntry(text).
+//             Cancel → onCancel (caller returns to Day view or wherever).
+//
+// TODOs (V2+):
+//   - Edit-permissions gate: assume yes for V1; add per-entry lock for old entries later.
+//   - Versioning / edit history.
+//   - Markdown rendering inside textarea — V1 is plain textarea; rich text later.
+//   - Image / attachment support.
+function JournalEditor({ entry, mode = 'create', onSave, onCancel }) {
+  // `entry` (edit mode only): { id, title, bodyMarkdown, dayLabel, mood }
+  const isEdit = mode === 'edit';
+
+  const [title, setTitle] = React.useState(isEdit ? (entry && entry.title) || '' : '');
+  const [body, setBody] = React.useState(isEdit ? (entry && entry.bodyMarkdown) || '' : '');
+  const [saving, setSaving] = React.useState(false);
+  const [error, setError] = React.useState(null);
+
+  const bodyRef = React.useRef(null);
+  const [now] = React.useState(() => new Date());
+
+  React.useEffect(() => {
+    // Focus body on mount. In edit mode, place cursor at end.
+    if (bodyRef.current) {
+      bodyRef.current.focus();
+      if (isEdit) {
+        const len = bodyRef.current.value.length;
+        bodyRef.current.setSelectionRange(len, len);
+      }
+    }
+  }, []); // mount-only: focus on first render, not on every prop change
+
+  // Escape key → cancel (matches ReadingMode behaviour).
+  React.useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onCancel && onCancel(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onCancel]);
+
+  const canSave = body.trim().length > 0 && !saving;
+
+  const handleSave = async () => {
+    if (!canSave) return;
+    setSaving(true);
+    setError(null);
+    try {
+      if (isEdit) {
+        if (window.updateJournalEntry) {
+          await window.updateJournalEntry(entry.id, body.trim());
+        }
+      } else {
+        if (window.insertJournalEntry) {
+          await window.insertJournalEntry(body.trim());
+        }
+      }
+      onSave && onSave({ title: title.trim(), body: body.trim() });
+    } catch (err) {
+      console.warn('[JournalEditor] save failed:', err && err.message);
+      setError('Save failed. Try again.');
+      setSaving(false);
+    }
+  };
+
+  const mood = (entry && entry.mood) || 'dusk';
+  const eyebrow = isEdit
+    ? `Editing · ${entry && entry.dayLabel || 'Today'}`
+    : now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+
+  const wordCount = body.trim() ? body.trim().split(/\s+/).length : 0;
+
+  return (
+    <div style={{
+      position: 'absolute', inset: 0, zIndex: 92,
+      background: T.color.SecondarySurface,
+      display: 'flex', flexDirection: 'column', overflow: 'hidden',
+      animation: 'reading-up 280ms cubic-bezier(0.2, 0.7, 0.2, 1)',
+    }}>
+      <style>{`
+        @keyframes reading-up {
+          from { transform: translateY(28px); opacity: 0; }
+          to   { transform: translateY(0);    opacity: 1; }
+        }
+      `}</style>
+
+      {/* Painterly banner — same height + panel as ReadingMode */}
+      <div style={{ position: 'relative', height: 200, flexShrink: 0 }}>
+        <LandscapePanel mood={mood} style={{ height: 200 }} />
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: 'linear-gradient(180deg, rgba(43,33,24,0.20) 0%, rgba(43,33,24,0) 40%, rgba(43,33,24,0.50) 100%)',
+        }} />
+
+        {/* Header chrome: Cancel (left) · eyebrow (center) · Save (right) */}
+        <div style={{
+          position: 'absolute', top: 16, left: 20, right: 20,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          color: '#FBF6EA',
+        }}>
+          <button onClick={onCancel} style={{
+            background: 'rgba(47,38,27,0.32)', border: 'none', borderRadius: 999,
+            padding: '0 14px', height: 36, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', fontFamily: T.font.UI, fontSize: 12, fontWeight: 600, color: '#FBF6EA',
+          }}>Cancel</button>
+
+          <div style={{
+            fontFamily: T.font.UI, fontSize: 11, fontWeight: 700,
+            letterSpacing: 1.2, textTransform: 'uppercase', opacity: 0.92,
+          }}>Journal</div>
+
+          <button
+            onClick={handleSave}
+            disabled={!canSave}
+            style={{
+              background: canSave ? 'rgba(251,246,234,0.92)' : 'rgba(47,38,27,0.22)',
+              border: 'none', borderRadius: 999,
+              padding: '0 16px', height: 36, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              cursor: canSave ? 'pointer' : 'default',
+              fontFamily: T.font.UI, fontSize: 12, fontWeight: 700,
+              color: canSave ? T.color.PrimaryText : 'rgba(251,246,234,0.4)',
+              transition: 'background 160ms ease, color 160ms ease',
+            }}
+          >{isEdit ? 'Save changes' : 'Save'}</button>
+        </div>
+
+        {/* Eyebrow label at bottom of banner */}
+        <div style={{
+          position: 'absolute', bottom: 14, left: 20, right: 20,
+          fontFamily: T.font.UI, fontSize: 10, fontWeight: 700,
+          letterSpacing: 1.2, textTransform: 'uppercase',
+          color: '#FBF6EA', opacity: 0.88,
+        }}>{eyebrow}</div>
+      </div>
+
+      {/* Body area — cream surface, wide measure, generous leading */}
+      <div style={{
+        flex: 1, overflowY: 'auto',
+        background: T.color.SecondarySurface,
+        borderTopLeftRadius: 24, borderTopRightRadius: 24,
+        marginTop: -24,
+        padding: '24px 36px 100px',
+        position: 'relative',
+        display: 'flex', flexDirection: 'column', gap: 0,
+      }}>
+        {/* Title input — matches ReadingMode's display title style */}
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder={isEdit ? '' : 'Title (optional)'}
+          style={{
+            width: '100%', border: 'none', outline: 'none',
+            background: 'transparent', padding: 0, margin: 0,
+            fontFamily: T.font.Display, fontSize: 28, lineHeight: '34px',
+            fontStyle: 'italic', fontWeight: 500, letterSpacing: -0.5,
+            color: T.color.PrimaryText,
+            marginBottom: 16,
+          }}
+        />
+
+        {/* Body textarea — plain, generous leading */}
+        <textarea
+          ref={bodyRef}
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          placeholder="Just write."
+          style={{
+            flex: 1, width: '100%', minHeight: 280,
+            border: 'none', outline: 'none', background: 'transparent',
+            resize: 'none', padding: 0, margin: 0,
+            fontFamily: T.font.Reading, fontSize: 19, lineHeight: '32px',
+            color: T.color.PrimaryText,
+          }}
+        />
+
+        {/* Footer: word count + hint */}
+        <div style={{
+          marginTop: 18,
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          fontFamily: T.font.UI, fontSize: 11, color: T.color.SubtleText,
+        }}>
+          <span>{wordCount} {wordCount === 1 ? 'word' : 'words'}</span>
+          {error
+            ? <span style={{ color: T.color.TintClay }}>{error}</span>
+            : <span style={{ fontStyle: 'italic' }}>{isEdit ? 'Edits the saved entry' : "Saves to today's journal"}</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+Object.assign(window, { PastJournal, YearView, MonthView, WeekView, DayView, JournalHeader, TenseNav, TenseNavArrows, JournalEditor });

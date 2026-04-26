@@ -199,6 +199,18 @@ async function listJournalEntries(opts) {
   return data || [];
 }
 
+async function updateJournalEntry(id, text) {
+  const { data, error } = await _client()
+    .from('entries')
+    .update({ body_markdown: text })
+    .eq('id', id)
+    .eq('user_id', (await _userId()))
+    .select()
+    .single();
+  if (error) _throw('updateJournalEntry', error);
+  return data;
+}
+
 // ─── Life ops config ─────────────────────────────────────────────────────────
 
 async function updateLifeOpsConfig(patch) {
@@ -291,6 +303,7 @@ Object.assign(window, {
   insertPlanItem,
   listPlanItems,
   insertJournalEntry,
+  updateJournalEntry,
   listJournalEntries,
   updateLifeOpsConfig,
   getLifeOpsConfig,
