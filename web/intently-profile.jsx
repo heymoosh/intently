@@ -143,25 +143,18 @@ function ProfileSheet({ connectedCount, onClose, onOpenConnections, onOpenAccoun
             label="Preferences"
             sub="Voice, notifications, day rhythm"
             onClick={onOpenPreferences}
-          />
-          <SettingRow
-            icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={T.color.PrimaryText} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>}
-            label="Agent activity"
-            sub="When the agent ran while you were away"
-            onClick={onOpenAgentActivity}
             last
           />
         </SettingGroup>
 
-        <SettingGroup>
-          <SettingRow
-            icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={T.color.PrimaryText} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>}
-            label="Help & support"
-            sub="Guides, contact, what's new"
-            onClick={onOpenHelp}
-            last
-          />
-        </SettingGroup>
+        {/* Support contact inline — no nav link to Help & support */}
+        <div style={{
+          padding: '12px 4px 6px',
+          fontFamily: T.font.UI, fontSize: 12, color: T.color.SupportingText,
+          textAlign: 'center',
+        }}>
+          Support: <a href="mailto:muxin.li.pro@gmail.com" style={{ color: T.color.SupportingText, textDecoration: 'underline' }}>muxin.li.pro@gmail.com</a>
+        </div>
 
         {onStartSetup && (
           <SettingGroup>
@@ -405,14 +398,272 @@ function SaveAccountModal({ onClose }) {
   );
 }
 
+// EditableRow — inline editable field. Tapping "Edit" reveals an input;
+// save calls onSave(value) and shows a brief success/error message.
+function EditableRow({ label, currentValue, onSave, inputType = 'text', placeholder, last }) {
+  const [editing, setEditing] = React.useState(false);
+  const [draft, setDraft] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
+  const [msg, setMsg] = React.useState(null); // { text, ok }
+
+  const startEdit = () => { setDraft(currentValue || ''); setMsg(null); setEditing(true); };
+  const cancel = () => { setEditing(false); setMsg(null); };
+
+  const save = async () => {
+    if (!draft.trim()) { setMsg({ text: 'Cannot be empty.', ok: false }); return; }
+    setSaving(true);
+    try {
+      await onSave(draft.trim());
+      setMsg({ text: 'Saved.', ok: true });
+      setEditing(false);
+    } catch (e) {
+      setMsg({ text: e.message || 'Save failed.', ok: false });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{
+      padding: '12px 16px',
+      borderBottom: last ? 'none' : `1px solid ${T.color.EdgeLine}`,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: 28 }}>
+        <span style={{ fontFamily: T.font.UI, fontSize: 14, fontWeight: 500, color: T.color.PrimaryText }}>{label}</span>
+        {!editing ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontFamily: T.font.UI, fontSize: 13, color: T.color.SupportingText, textAlign: 'right' }}>
+              {currentValue || '—'}
+            </span>
+            <button onClick={startEdit} style={{
+              background: T.color.SecondarySurface, border: `1px solid ${T.color.EdgeLine}`,
+              borderRadius: 6, padding: '3px 10px', cursor: 'pointer',
+              fontFamily: T.font.UI, fontSize: 12, fontWeight: 600, color: T.color.PrimaryText,
+            }}>Edit</button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, justifyContent: 'flex-end' }}>
+            <input
+              type={inputType}
+              value={draft}
+              placeholder={placeholder}
+              autoFocus
+              onChange={e => setDraft(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') cancel(); }}
+              style={{
+                flex: 1, maxWidth: 180, padding: '5px 10px', borderRadius: 8,
+                border: `1.5px solid ${T.color.EdgeLine}`,
+                background: T.color.PrimarySurface,
+                fontFamily: T.font.Reading, fontSize: 14, color: T.color.PrimaryText,
+                outline: 'none',
+              }}
+            />
+            <button onClick={cancel} style={{
+              background: 'none', border: 'none', cursor: 'pointer', padding: '4px 6px',
+              fontFamily: T.font.UI, fontSize: 12, color: T.color.SupportingText,
+            }}>Cancel</button>
+            <button onClick={save} disabled={saving} style={{
+              background: T.color.PrimaryText, border: 'none', borderRadius: 6,
+              padding: '4px 12px', cursor: saving ? 'default' : 'pointer',
+              fontFamily: T.font.UI, fontSize: 12, fontWeight: 700,
+              color: T.color.PrimarySurface, opacity: saving ? 0.5 : 1,
+            }}>{saving ? '…' : 'Save'}</button>
+          </div>
+        )}
+      </div>
+      {msg && (
+        <div style={{
+          marginTop: 4,
+          fontFamily: T.font.Reading, fontSize: 12,
+          color: msg.ok ? '#2A7A2A' : '#A8421C',
+        }}>{msg.text}</div>
+      )}
+    </div>
+  );
+}
+
+// PasswordChangeRow — tap "Change" to reveal old+new password inputs.
+function PasswordChangeRow({ last }) {
+  const [open, setOpen] = React.useState(false);
+  const [newPw, setNewPw] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
+  const [msg, setMsg] = React.useState(null);
+
+  const save = async () => {
+    if (newPw.length < 8) { setMsg({ text: 'Password must be at least 8 characters.', ok: false }); return; }
+    setSaving(true);
+    try {
+      const sb = window.getSupabaseClient();
+      const { error } = await sb.auth.updateUser({ password: newPw });
+      if (error) throw error;
+      setMsg({ text: 'Password updated.', ok: true });
+      setOpen(false);
+      setNewPw('');
+    } catch (e) {
+      setMsg({ text: e.message || 'Failed to update password.', ok: false });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{
+      padding: '12px 16px',
+      borderBottom: last ? 'none' : `1px solid ${T.color.EdgeLine}`,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: 28 }}>
+        <span style={{ fontFamily: T.font.UI, fontSize: 14, fontWeight: 500, color: T.color.PrimaryText }}>Password</span>
+        {!open ? (
+          <button onClick={() => { setOpen(true); setMsg(null); }} style={{
+            background: T.color.SecondarySurface, border: `1px solid ${T.color.EdgeLine}`,
+            borderRadius: 6, padding: '3px 10px', cursor: 'pointer',
+            fontFamily: T.font.UI, fontSize: 12, fontWeight: 600, color: T.color.PrimaryText,
+          }}>Change</button>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, justifyContent: 'flex-end' }}>
+            <input
+              type="password"
+              value={newPw}
+              placeholder="New password"
+              autoFocus
+              onChange={e => setNewPw(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') { setOpen(false); setMsg(null); } }}
+              style={{
+                flex: 1, maxWidth: 160, padding: '5px 10px', borderRadius: 8,
+                border: `1.5px solid ${T.color.EdgeLine}`,
+                background: T.color.PrimarySurface,
+                fontFamily: T.font.Reading, fontSize: 14, color: T.color.PrimaryText,
+                outline: 'none',
+              }}
+            />
+            <button onClick={() => { setOpen(false); setMsg(null); }} style={{
+              background: 'none', border: 'none', cursor: 'pointer', padding: '4px 6px',
+              fontFamily: T.font.UI, fontSize: 12, color: T.color.SupportingText,
+            }}>Cancel</button>
+            <button onClick={save} disabled={saving} style={{
+              background: T.color.PrimaryText, border: 'none', borderRadius: 6,
+              padding: '4px 12px', cursor: saving ? 'default' : 'pointer',
+              fontFamily: T.font.UI, fontSize: 12, fontWeight: 700,
+              color: T.color.PrimarySurface, opacity: saving ? 0.5 : 1,
+            }}>{saving ? '…' : 'Save'}</button>
+          </div>
+        )}
+      </div>
+      {msg && (
+        <div style={{
+          marginTop: 4,
+          fontFamily: T.font.Reading, fontSize: 12,
+          color: msg.ok ? '#2A7A2A' : '#A8421C',
+        }}>{msg.text}</div>
+      )}
+    </div>
+  );
+}
+
+// DeleteAccountRow — confirm dialog → wipe user data + sign out.
+// V1 simplification: clears user data rows and signs out; auth.users row
+// is left intact (Supabase requires service-role to delete it, which we'd
+// wire via an Edge Function in V2). The session becomes a fresh anon session.
+function DeleteAccountRow() {
+  const [confirming, setConfirming] = React.useState(false);
+  const [working, setWorking] = React.useState(false);
+  const [msg, setMsg] = React.useState(null);
+
+  const doDelete = async () => {
+    setWorking(true);
+    try {
+      // Wipe all user-owned data rows
+      if (window.clearAllUserData) await window.clearAllUserData();
+      // Sign out — will redirect to fresh anon session
+      const sb = window.getSupabaseClient();
+      await sb.auth.signOut();
+    } catch (e) {
+      setMsg('Error: ' + (e.message || String(e)));
+      setWorking(false);
+      setConfirming(false);
+    }
+  };
+
+  if (confirming) {
+    return (
+      <div style={{ padding: '14px 16px' }}>
+        <div style={{
+          fontFamily: T.font.UI, fontSize: 13, fontWeight: 600,
+          color: '#A8421C', marginBottom: 10,
+        }}>Delete your account?</div>
+        <div style={{
+          fontFamily: T.font.Reading, fontSize: 13, lineHeight: '18px',
+          color: T.color.SupportingText, marginBottom: 14,
+        }}>
+          This will delete all your data and sign you out. This cannot be undone.
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={() => setConfirming(false)} disabled={working} style={{
+            flex: 1, padding: '10px 0', borderRadius: 10,
+            background: T.color.SecondarySurface, border: `1px solid ${T.color.EdgeLine}`,
+            cursor: 'pointer', fontFamily: T.font.UI, fontSize: 13, fontWeight: 600,
+            color: T.color.PrimaryText,
+          }}>Cancel</button>
+          <button onClick={doDelete} disabled={working} style={{
+            flex: 1, padding: '10px 0', borderRadius: 10,
+            background: '#A8421C', border: 'none',
+            cursor: working ? 'default' : 'pointer',
+            fontFamily: T.font.UI, fontSize: 13, fontWeight: 700,
+            color: '#FBF6EA', opacity: working ? 0.6 : 1,
+          }}>{working ? 'Deleting…' : 'Delete'}</button>
+        </div>
+        {msg && <div style={{ marginTop: 8, fontFamily: T.font.Reading, fontSize: 12, color: '#A8421C' }}>{msg}</div>}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: 52 }}>
+      <span style={{ fontFamily: T.font.UI, fontSize: 14, fontWeight: 500, color: '#A8421C' }}>Delete account</span>
+      <button onClick={() => setConfirming(true)} style={{
+        background: '#F2D7CB', border: `1px solid #DDB29C`,
+        borderRadius: 6, padding: '3px 10px', cursor: 'pointer',
+        fontFamily: T.font.UI, fontSize: 12, fontWeight: 600, color: '#A8421C',
+      }}>Delete</button>
+    </div>
+  );
+}
+
 function AccountPage({ onBack }) {
   // Same profile context as ProfileSheet — name/email come from the
   // single source. Anonymous users see '—' until setup/account-upgrade
   // populate them.
   const profile = window.useUserProfile ? window.useUserProfile() : { displayName: null, email: null, isAnonymous: true };
   const [saveModalOpen, setSaveModalOpen] = React.useState(false);
-  const nameLabel = profile.displayName || '—';
-  const emailLabel = profile.email || '—';
+
+  const saveName = async (name) => {
+    const sb = window.getSupabaseClient();
+    const userId = await window.getCurrentUserId();
+    const { error } = await sb.from('profiles').upsert({ id: userId, display_name: name }, { onConflict: 'id' });
+    if (error) throw new Error(error.message);
+    // Refresh profile in context if possible
+    if (window.refreshUserProfile) window.refreshUserProfile();
+  };
+
+  const saveEmail = async (email) => {
+    const sb = window.getSupabaseClient();
+    if (profile.isAnonymous) {
+      // Link email identity to anonymous account
+      const { error } = await sb.auth.linkIdentity({
+        provider: 'email',
+        email,
+        options: { emailRedirectTo: window.location.origin },
+      });
+      if (error) throw new Error(error.message);
+      throw new Error('Check your email — we sent a magic link to claim this account.');
+    } else {
+      // Update email for existing account
+      const { error } = await sb.auth.updateUser({ email });
+      if (error) throw new Error(error.message);
+      throw new Error('Confirmation sent to ' + email + '. Check your inbox.');
+    }
+  };
+
   return (
     <SettingsSubPage title="Account." eyebrow="Profile · Account" onBack={onBack}>
       {saveModalOpen && <SaveAccountModal onClose={() => setSaveModalOpen(false)} />}
@@ -424,9 +675,20 @@ function AccountPage({ onBack }) {
         border: `1px solid ${T.color.EdgeLine}`,
         borderRadius: 14, overflow: 'hidden', marginBottom: 18,
       }}>
-        <StaticRow label="Name" value={nameLabel} />
-        <StaticRow label="Email" value={emailLabel} />
-        <StaticRow label="Password" value="Change" />
+        <EditableRow
+          label="Name"
+          currentValue={profile.displayName}
+          onSave={saveName}
+          placeholder="Your name"
+        />
+        <EditableRow
+          label="Email"
+          currentValue={profile.email}
+          onSave={saveEmail}
+          inputType="email"
+          placeholder="you@example.com"
+        />
+        <PasswordChangeRow />
         <StaticRow label="Plan" value="Quiet · monthly" last />
       </div>
 
@@ -435,8 +697,7 @@ function AccountPage({ onBack }) {
         border: `1px solid ${T.color.EdgeLine}`,
         borderRadius: 14, overflow: 'hidden', marginBottom: 18,
       }}>
-        <StaticRow label="Export your journal" value="Download" />
-        <StaticRow label="Delete account" value="·" last />
+        <DeleteAccountRow />
       </div>
 
       <div style={{
@@ -444,7 +705,7 @@ function AccountPage({ onBack }) {
         color: T.color.SupportingText, fontStyle: 'italic',
         textAlign: 'center', padding: '0 20px',
       }}>
-        Your journal belongs to you. Export anytime, in markdown.
+        Your data is yours.
       </div>
     </SettingsSubPage>
   );
@@ -579,8 +840,7 @@ function HelpPage({ onBack }) {
         border: `1px solid ${T.color.EdgeLine}`,
         borderRadius: 14, overflow: 'hidden', marginBottom: 18,
       }}>
-        <StaticRow label="Contact support" value="hi@intently.app" href="mailto:hi@intently.app" />
-        <StaticRow label="What's new" value="Apr 2026" last />
+        <StaticRow label="Contact support" value="muxin.li.pro@gmail.com" href="mailto:muxin.li.pro@gmail.com" last />
       </div>
 
       <div style={{
