@@ -71,7 +71,8 @@ Don't push. No push = no PR trigger = no merge.
 ### Stop the babysit loop
 
 Running as a session-only `/loop`: close the Claude Code session that started it.
-Running via launchd (post-promotion): `launchctl unload ~/Library/LaunchAgents/com.intently.babysit-prs.plist`.
+
+Running inline as part of the overnight build loop (current default per `.claude/handoffs/overnight-build-loops.md`): stop the overnight build loop. There is no standalone launchd schedule — the prior promotion to `~/Library/LaunchAgents/com.intently.babysit-prs.plist` was decommissioned 2026-04-25 per ADR 0007 (60+ no-op invocations/day; inline-hourly inside the overnight loop is sufficient).
 
 ## Setup (one-time)
 
@@ -99,6 +100,6 @@ ln -s "$(pwd)/scripts/intently-track.sh" /usr/local/bin/intently-track
 
 ## Follow-ups after first use
 
-- If babysit consistently runs no-op (no conflicts, nothing stuck): drop to 30-min cadence, or promote to launchd and forget.
+- If babysit consistently runs no-op (no conflicts, nothing stuck): see ADR 0007 — that was the observed behavior and the standalone schedule was decommissioned in favor of inline-hourly invocation by the overnight build loop.
 - If babysit over-flags (adds `needs-user-review` on obvious merges): tighten the "semantic vs mechanical" heuristic in the brief.
 - If `ci.yml` runs too slow: cache `node_modules` more aggressively (already caching npm); consider splitting typecheck + tests into parallel jobs.

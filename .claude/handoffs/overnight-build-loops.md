@@ -21,7 +21,7 @@
 
 - **No iteration cap.** Loop continues until TRACKER's "Next" + "Follow-ups" queues have zero items passing the safe-task gate. Replaces the prior 6-cap.
 - **Safe-task gate (4 ANDed conditions).** An item is eligible only if: (1) no ambiguity in scope, (2) no unmet dependencies, (3) obviously needed (not stretch / "way later"), (4) no pending decisions or validations from Muxin. Iter starts ONLY if a candidate clears all four.
-- **`/babysit-prs` hourly inline.** Fires once per overnight hour as part of the build loop's cadence, not on its own 15-min schedule. Cheaper, less noisy.
+- **`/babysit-prs` hourly inline.** Fires once per overnight hour as part of the build loop's cadence, not on its own 15-min schedule. Cheaper, less noisy. **As of 2026-04-25 this is the only invocation path** — the standalone launchd schedule was decommissioned per ADR 0007 after firing 60+ no-ops/day.
 - **Morning summary = terminal output only.** Loop writes a structured summary to stdout when it exits; no notifications, no separate channels.
 - **launchd plist replaces caffeinate dependency** (per the 2026-04-24/25 robustness ask). launchd wakes the Mac if asleep; doesn't depend on user remembering to run `caffeinate`.
 
