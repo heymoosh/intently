@@ -246,6 +246,58 @@ function StaticRow({ label, value, last }) {
   );
 }
 
+// Persisted preferences. Single object keyed by `intently:prefs`. Update with
+// setPref(key, value); read with getPref(key, fallback). Reads run synchronously
+// from localStorage so consumers can decide what to render in their first paint.
+const _PREFS_KEY = 'intently:prefs';
+function getAllPrefs() {
+  try {
+    const raw = localStorage.getItem(_PREFS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) { return {}; }
+}
+function getPref(key, fallback) {
+  const all = getAllPrefs();
+  return (key in all) ? all[key] : fallback;
+}
+function setPref(key, value) {
+  try {
+    const all = getAllPrefs();
+    all[key] = value;
+    localStorage.setItem(_PREFS_KEY, JSON.stringify(all));
+  } catch (e) {}
+}
+Object.assign(window, { getPref, setPref, getAllPrefs });
+
+const _DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+// SelectRow — tap to cycle through options. For the small option sets here
+// (week-day pickers) cycling is faster than opening a sheet/select.
+function SelectRow({ label, sub, prefKey, options, defaultValue, last }) {
+  const [value, setValue] = React.useState(() => getPref(prefKey, defaultValue));
+  const cycle = () => {
+    const i = options.indexOf(value);
+    const next = options[(i + 1) % options.length];
+    setValue(next);
+    setPref(prefKey, next);
+  };
+  return (
+    <button onClick={cycle} style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      width: '100%', padding: '14px 16px',
+      borderBottom: last ? 'none' : `1px solid ${T.color.EdgeLine}`,
+      minHeight: 52, gap: 12,
+      background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left',
+    }}>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: 'block', fontFamily: T.font.UI, fontSize: 14, fontWeight: 500, color: T.color.PrimaryText }}>{label}</span>
+        {sub && <span style={{ display: 'block', marginTop: 2, fontFamily: T.font.Reading, fontSize: 12, color: T.color.SupportingText }}>{sub}</span>}
+      </span>
+      <span style={{ fontFamily: T.font.UI, fontSize: 13, color: T.color.SupportingText, textAlign: 'right' }}>{value}</span>
+    </button>
+  );
+}
+
 function ToggleRow({ label, sub, defaultOn = false, last }) {
   const [on, setOn] = React.useState(defaultOn);
   return (
@@ -342,7 +394,8 @@ function PreferencesPage({ onBack }) {
       }}>
         <StaticRow label="Brief time" value="7:00 AM" />
         <StaticRow label="Review window" value="After 8:00 PM" />
-        <StaticRow label="Week start" value="Monday" last />
+        <SelectRow label="Week start" prefKey="weekStart" defaultValue="Monday" options={_DAYS} />
+        <SelectRow label="Weekly review day" sub="When the weekly review CTA appears" prefKey="weeklyReviewDay" defaultValue="Sunday" options={_DAYS} last />
       </div>
 
       <div style={{
@@ -356,8 +409,7 @@ function PreferencesPage({ onBack }) {
         borderRadius: 14, overflow: 'hidden',
       }}>
         <ToggleRow label="Brief reminder" defaultOn />
-        <ToggleRow label="Review nudge" sub="If you haven't logged a review by 10pm" defaultOn />
-        <ToggleRow label="Weekly summary email" sub="Sundays at 6pm" last />
+        <ToggleRow label="Review nudge" sub="If you haven't logged a review by 10pm" defaultOn last />
       </div>
     </SettingsSubPage>
   );

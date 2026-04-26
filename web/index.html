@@ -31,6 +31,10 @@
   .intro-note p { font-family: "Source Serif 4", Georgia, serif; font-size: 14px; line-height: 21px; color: #6E604D; margin: 0 0 6px; }
   .phone-stage { display: flex; justify-content: center; align-items: flex-start; gap: 24px; padding: 20px 20px 80px; }
   html:not(.dev-mode) .phone-stage { padding-top: 40px; }
+  /* Desktop step-arrows live OUTSIDE the phone frame so the device chrome
+     stays clean of dev/prototype affordances. Hidden on narrow viewports. */
+  .tense-nav-outside { position: sticky; top: 50%; align-self: center; }
+  @media (max-width: 880px) { .tense-nav-outside { display: none; } }
 
   /* Dev toggle — outside phone frame */
   .dev-panel {
@@ -700,8 +704,7 @@ const DAY_STATES = [
   { key: 'closed',        label: 'Closed · reflected' },
 ];
 
-function PrototypePhone({ dayState, setDayState }) {
-  const [idx, setIdx] = React.useState(1);
+function PrototypePhone({ dayState, setDayState, idx, setIdx }) {
   const [heroState, setHeroState] = React.useState('idle');
   const [capturedTranscript, setCapturedTranscript] = React.useState('');
   // Hero state-machine wrapper: extracts a transcript payload from voice→chat
@@ -1166,11 +1169,15 @@ function App() {
     return inferDayState();
   })();
   const [dayState, setDayState] = React.useState(initial);
+  const [idx, setIdx] = React.useState(1);
   const dev = !!window.INTENTLY_DEV;
   return (
     <div className="phone-stage">
       {dev && <DevPanel dayState={dayState} setDayState={setDayState} />}
-      <PrototypePhone dayState={dayState} setDayState={setDayState} />
+      <PrototypePhone dayState={dayState} setDayState={setDayState} idx={idx} setIdx={setIdx} />
+      <div className="tense-nav-outside">
+        <TenseNavArrows index={idx} onIndex={setIdx} />
+      </div>
     </div>
   );
 }
