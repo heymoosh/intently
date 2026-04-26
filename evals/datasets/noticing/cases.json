@@ -1,0 +1,99 @@
+{
+  "skill": "noticing",
+  "cases": [
+    {
+      "id": "single-mention-no-observation",
+      "notes": "User mentions a theme exactly once. Expected: agent stores a soft observation in MA memory, does NOT write an observations row.",
+      "input": {
+        "utterance": "Feeling stressed about the lease renewal this week.",
+        "memory_context": []
+      },
+      "expected": {
+        "writes_observation_row": false,
+        "stores_soft_memory": true
+      }
+    },
+    {
+      "id": "three-mentions-in-48h-triggers-observation",
+      "notes": "Same theme appears 3 times within 48 hours. Expected: agent writes an observation row with times_observed >= 3 and a descriptive pattern_text.",
+      "input": {
+        "utterance": "Still thinking about the apartment move — so much to coordinate.",
+        "memory_context": [
+          {
+            "text": "Need to start packing for the apartment move.",
+            "timestamp_hours_ago": 12
+          },
+          {
+            "text": "Called the movers about the apartment move date.",
+            "timestamp_hours_ago": 30
+          }
+        ]
+      },
+      "expected": {
+        "writes_observation_row": true,
+        "times_observed_gte": 3,
+        "pattern_text_contains": "apartment move",
+        "subject_kind": null
+      }
+    },
+    {
+      "id": "three-mentions-spread-over-7-days-no-observation",
+      "notes": "Same theme appears 3 times but spread over 7+ days — outside the 48-hour window. Expected: agent does NOT write an observation row (threshold not met within window).",
+      "input": {
+        "utterance": "Thinking about the side project pitch again.",
+        "memory_context": [
+          {
+            "text": "Had an idea for the side project pitch format.",
+            "timestamp_hours_ago": 96
+          },
+          {
+            "text": "Sketched out the side project pitch deck.",
+            "timestamp_hours_ago": 168
+          }
+        ]
+      },
+      "expected": {
+        "writes_observation_row": false,
+        "stores_soft_memory": true
+      }
+    },
+    {
+      "id": "explicit-tracking-request-deferred",
+      "notes": "User explicitly requests to track or add something. Expected: agent does NOT write an observation and defers to chat / update-tracker instead.",
+      "input": {
+        "utterance": "I'm working on a new project — apartment move by May 15. Please add it.",
+        "memory_context": []
+      },
+      "expected": {
+        "writes_observation_row": false,
+        "defers_to_update_tracker": true
+      }
+    },
+    {
+      "id": "increment-existing-observation",
+      "notes": "Pattern already has a hard observation row in the DB. A new mention arrives. Expected: agent calls incrementObservation rather than insertObservation, updating times_observed and last_observed_at.",
+      "input": {
+        "utterance": "The lease renewal stress is really getting to me.",
+        "memory_context": [
+          {
+            "text": "Stressed about the lease renewal again.",
+            "timestamp_hours_ago": 5
+          },
+          {
+            "text": "Lease renewal deadline is coming up fast.",
+            "timestamp_hours_ago": 20
+          }
+        ],
+        "existing_observation": {
+          "id": "obs-uuid-placeholder",
+          "pattern_text": "user mentioned 'lease renewal' 3x in 48h",
+          "times_observed": 3
+        }
+      },
+      "expected": {
+        "calls_increment_observation": true,
+        "calls_insert_observation": false
+      }
+    }
+  ]
+}

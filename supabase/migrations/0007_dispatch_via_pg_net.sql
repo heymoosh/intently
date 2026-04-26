@@ -2,8 +2,8 @@
 --
 -- SUPERSEDED 2026-04-26: the ALTER DATABASE manual followups below DO NOT
 -- WORK on Supabase hosted Postgres (postgres role is not a true superuser
--- for custom GUCs). Migration 0009 switches tick_skills to read from
--- Supabase Vault. Apply 0009 + run vault.create_secret per its header.
+-- for custom GUCs). Migration 0010 switches tick_skills to read from
+-- Supabase Vault. Apply 0010 + run vault.create_secret per its header.
 --
 -- 0002_schedules.sql scaffolded the dispatcher (cron_log + should_fire +
 -- tick_skills) but stopped at a "would-have-fired" log row. This migration

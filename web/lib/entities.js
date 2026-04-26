@@ -293,6 +293,71 @@ async function markAdminReminderDone(id) {
   return data;
 }
 
+// ─── Observations (noticing layer) ──────────────────────────────────────────
+// Helpers for the `public.observations` table (schema: 0009_graph_schema.sql).
+// Called by the noticing MA agent when a pattern crosses the 3/48h threshold.
+
+async function insertObservation({ patternText, subjectKind, subjectId, timesObserved, metadata }) {
+  const uid = await _userId();
+  const row = {
+    user_id: uid,
+    pattern_text: patternText,
+    times_observed: timesObserved != null ? timesObserved : 1,
+    metadata: metadata || {},
+  };
+  if (subjectKind !== undefined && subjectKind !== null) row.subject_kind = subjectKind;
+  if (subjectId !== undefined && subjectId !== null) row.subject_id = subjectId;
+  const { data, error } = await _client()
+    .from('observations')
+    .insert(row)
+    .select()
+    .single();
+  if (error) _throw('insertObservation', error);
+  return data;
+}
+
+async function incrementObservation(observationId) {
+  // Increments times_observed by 1 and stamps last_observed_at = now().
+  // Uses a Postgres RPC call-style update via raw SQL through supabase-js
+  // (no RPC function needed — supabase-js can run the arithmetic on the column).
+  const uid = await _userId();
+  const { data, error } = await _client()
+    .from('observations')
+    .update({ last_observed_at: new Date().toISOString() })
+    .eq('id', observationId)
+    .eq('user_id', uid)
+    .select('times_observed')
+    .single();
+  if (error) _throw('incrementObservation (read)', error);
+
+  // Increment times_observed now that we have the current value.
+  const { data: updated, error: updateErr } = await _client()
+    .from('observations')
+    .update({ times_observed: data.times_observed + 1, last_observed_at: new Date().toISOString() })
+    .eq('id', observationId)
+    .eq('user_id', uid)
+    .select()
+    .single();
+  if (updateErr) _throw('incrementObservation (write)', updateErr);
+  return updated;
+}
+
+async function listRecentObservations({ sinceHours } = {}) {
+  // Returns unpromoted observations for the current user within the look-back
+  // window (default: 48 hours). Ordered newest-first.
+  const hours = sinceHours != null ? sinceHours : 48;
+  const since = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+  const { data, error } = await _client()
+    .from('observations')
+    .select('*')
+    .eq('user_id', (await _userId()))
+    .is('promoted_at', null)
+    .gte('last_observed_at', since)
+    .order('last_observed_at', { ascending: false });
+  if (error) _throw('listRecentObservations', error);
+  return data || [];
+}
+
 Object.assign(window, {
   insertGoal,
   listGoals,
@@ -310,4 +375,8 @@ Object.assign(window, {
   insertAdminReminder,
   listAdminReminders,
   markAdminReminderDone,
+  // noticing layer
+  insertObservation,
+  incrementObservation,
+  listRecentObservations,
 });

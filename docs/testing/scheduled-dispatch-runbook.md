@@ -14,7 +14,7 @@ pg_cron tick → tick_skills() → Vault read → pg_net POST
 | Requirement | How to verify |
 |---|---|
 | Migration `0007_dispatch_via_pg_net.sql` applied | `select count(*) from cron_log;` returns without error |
-| Migration `0009_dispatch_via_vault.sql` applied | `\df tick_skills` shows function; `select * from vault.decrypted_secrets where name like 'dispatch_%';` returns 2 rows |
+| Migration `0010_dispatch_via_vault.sql` applied | `\df tick_skills` shows function; `select * from vault.decrypted_secrets where name like 'dispatch_%';` returns 2 rows |
 | Vault secrets created | See SQL below |
 | `dispatch-skill` Edge Function deployed | `supabase functions list` shows `dispatch-skill` |
 | `ma-proxy` Edge Function deployed | `supabase functions list` shows `ma-proxy` |
