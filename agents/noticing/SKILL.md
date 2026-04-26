@@ -155,7 +155,7 @@ The classifier (chained, Haiku) tags entries at write time using `docs/product/s
 **Implementation:**
 - Edge Function: `supabase/functions/reminders/index.ts` route `POST /classify-and-tag`
 - Chained: Haiku reminder check → if not reminder, Haiku signal classifier using CANONICAL_SIGNALS constant (derived from `docs/product/signals.md`)
-- Schema: `entries.tags text[]` + `entries.tag_confidence jsonb` (migration `0011_entry_tags.sql`)
+- Schema: `entries.tags text[]` + `entries.tag_confidence jsonb` (migration `0012_entry_tags.sql`)
 - User customs: `user_signals` table scaffold (V1.1 read interface; V1.2 for full management UX)
 - Frontend: `web/intently-hero.jsx` `HeroChat.sendUtterance` — routes through `classifyAndTag()` in `web/lib/reminders.js`; renders `SignalConfirmCard` for lower-confidence tags
 

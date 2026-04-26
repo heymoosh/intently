@@ -80,7 +80,7 @@ Hackathon submission (2026-04-26 8 PM EDT deadline) ships without the noticing l
 Implemented in PR `feat/capture-time-signal-tagging`.
 
 **What was built:**
-- **Schema:** `supabase/migrations/0011_entry_tags.sql` — `entries.tags text[]` + `entries.tag_confidence jsonb` columns + GIN indexes. `user_signals` table scaffold (V1.1 schema only; full UX is V1.2).
+- **Schema:** `supabase/migrations/0012_entry_tags.sql` — `entries.tags text[]` + `entries.tag_confidence jsonb` columns + GIN indexes. `user_signals` table scaffold (V1.1 schema only; full UX is V1.2).
 - **Classifier:** `supabase/functions/reminders/index.ts` route `POST /classify-and-tag`. Chained: Haiku reminder check → if not reminder, Haiku signal classifier using `CANONICAL_SIGNALS` constant (7 tags from `docs/product/signals.md`) + per-user `user_signals` rows. V1 picks single strongest tag per utterance.
 - **UX:** `web/intently-hero.jsx` `sendUtterance` calls `classifyAndTag()` (in `web/lib/reminders.js`). ≥0.8 confidence → silent auto-tag (inline `#tag` in body + structured `tags[]`). <0.8 → `SignalConfirmCard` in thread ("Tag as #ant? Yes / No"). "Different tag" deferred to V1.2.
 - **Entities:** `web/lib/entities.js` — `insertEntryWithTags`, `listEntriesByTag`, `listUserSignals`, `insertUserSignal`, `archiveUserSignal`.

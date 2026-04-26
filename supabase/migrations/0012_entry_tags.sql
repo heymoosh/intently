@@ -1,4 +1,4 @@
--- 0011_entry_tags.sql — structured tag column on entries for capture-time signal tagging
+-- 0012_entry_tags.sql — structured tag column on entries for capture-time signal tagging
 --
 -- Adds:
 --   entries.tags text[]         — array of signal tags (e.g. ['ant', 'brag'])
