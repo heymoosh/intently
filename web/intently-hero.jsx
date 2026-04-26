@@ -142,12 +142,15 @@ function HeroAffordance({ state = 'idle', onChange, onPick, seedTranscript = '',
   }, [isExpanded, onChange]);
 
   if (isListening) {
-    return <HeroListening onDone={(transcript) => {
-      // Empty transcript = X-close (no routing); non-empty = Stop (route to chat with seed).
-      if (!onChange) return;
-      if (transcript && transcript.trim()) onChange('chat', { transcript });
-      else onChange('idle');
-    }} />;
+    return <HeroListening
+      onDone={(transcript) => {
+        // Empty transcript = X-close (no routing); non-empty = Stop (route to chat with seed).
+        if (!onChange) return;
+        if (transcript && transcript.trim()) onChange('chat', { transcript });
+        else onChange('idle');
+      }}
+      onTypeInstead={() => onChange && onChange('chat')}
+    />;
   }
   if (isChat) {
     return <HeroChat
@@ -286,7 +289,7 @@ function ProcessingArc() {
 
 // Full-screen takeover — "big empty space feels like an invitation to fill it."
 // Wired to the live Web Speech API via window.useVoiceInput (web/lib/voice.js).
-function HeroListening({ onDone }) {
+function HeroListening({ onDone, onTypeInstead }) {
   const { state, start, stop } = useVoiceInput();
   const stopRequested = React.useRef(false);
   const closeRequested = React.useRef(false);
@@ -317,6 +320,16 @@ function HeroListening({ onDone }) {
     stop();
     if (onDone) onDone('');
   }, [stop, onDone]);
+
+  // "Type instead" button — abort the recognizer (no point keeping the mic
+  // hot while the user types) and ask the parent to transition to chat.
+  // We don't route the (likely-empty) interim transcript onward; the user
+  // explicitly opted out of voice for this turn.
+  const handleTypeInstead = React.useCallback(() => {
+    closeRequested.current = true;
+    stop();
+    if (onTypeInstead) onTypeInstead();
+  }, [stop, onTypeInstead]);
 
   // Watch for the recognizer reaching a terminal state after Stop was pressed,
   // then forward the captured transcript to the parent (which decides routing).
@@ -378,7 +391,7 @@ function HeroListening({ onDone }) {
         padding: '0 24px 36px', display: 'flex', alignItems: 'center',
         justifyContent: 'space-between', gap: 16,
       }}>
-        <button aria-label="Type instead" style={{
+        <button onClick={handleTypeInstead} aria-label="Type instead" style={{
           width: 48, height: 48, borderRadius: 999,
           background: T.color.SecondarySurface, border: `1px solid ${T.color.EdgeLine}`,
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -542,62 +555,12 @@ function HeroChat({ onDone, onMic, seedTranscript = '', onTranscriptConsumed }) 
               </div>
             );
           }
-          // kind === 'action' — inline confirmation card with Undo / Send
-          const IC = Icon[m.icon === 'mail' ? 'Mail' : 'Calendar'] || Icon.Sparkles;
-          return (
-            <div key={i} style={{ alignSelf: 'flex-start', maxWidth: '92%', width: '92%' }}>
-              <div style={{
-                padding: 14, borderRadius: 14,
-                background: T.color.SecondarySurface, border: `1px dashed ${T.color.EdgeLine}`,
-                display: 'flex', flexDirection: 'column', gap: 10,
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{
-                    width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-                    background: m.draft ? T.color.TintLilac + '33' : T.color.TintSage,
-                    border: `1px solid ${m.draft ? T.color.TintLilac : T.color.TintSageDeep}`,
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    <IC size={16} color={m.draft ? T.color.TintLilac : T.color.TintMoss} />
-                  </span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontFamily: T.font.UI, fontSize: 13, fontWeight: 600, color: T.color.PrimaryText }}>{m.title}</div>
-                    <div style={{ fontFamily: T.font.UI, fontSize: 11, color: T.color.SupportingText, marginTop: 2 }}>{m.meta}</div>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                  {m.draft ? (
-                    <>
-                      <button style={{
-                        height: 32, padding: '0 12px', borderRadius: 999,
-                        background: 'transparent', border: `1px solid ${T.color.EdgeLine}`,
-                        fontFamily: T.font.UI, fontSize: 12, fontWeight: 600, color: T.color.SupportingText, cursor: 'pointer',
-                      }}>Edit</button>
-                      <button style={{
-                        height: 32, padding: '0 14px', borderRadius: 999,
-                        background: T.color.PrimaryText, color: T.color.InverseText, border: 'none',
-                        fontFamily: T.font.UI, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                        display: 'inline-flex', alignItems: 'center', gap: 6,
-                      }}>
-                        <Icon.Check size={12} color={T.color.InverseText} />
-                        Send
-                      </button>
-                    </>
-                  ) : (
-                    <button style={{
-                      height: 32, padding: '0 12px', borderRadius: 999,
-                      background: 'transparent', border: `1px solid ${T.color.EdgeLine}`,
-                      fontFamily: T.font.UI, fontSize: 12, fontWeight: 600, color: T.color.SupportingText, cursor: 'pointer',
-                      display: 'inline-flex', alignItems: 'center', gap: 6,
-                    }}>
-                      <Icon.Undo size={12} color={T.color.SupportingText} />
-                      Undo
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          );
+          // Unknown kind — sendUtterance only emits 'user' and 'agent' today.
+          // The previous 'action'-card branch (Edit / Send / Undo) was removed
+          // per audit gap #5: it had no handlers wired AND was unreachable in
+          // current code. Re-introduce under a fresh design when the agent
+          // gains action-card capabilities (drafted email/calendar etc.).
+          return null;
         })}
         {/* Thinking bubble — visible while we wait on classify + LLM. Same agent-bubble */}
         {/* alignment / shape, but content is three dots staggered on the existing */}
