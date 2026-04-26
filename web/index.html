@@ -1036,6 +1036,36 @@ function PrototypePhone({ dayState, setDayState, idx, setIdx }) {
   const m = useManualAdds();
   const conn = useConnections();
 
+  // ─── Preload: fire the daily-review agent call in background when the
+  // evening CTA becomes visible, so clicking "Start your daily review" is
+  // instant.  Guarded by:
+  //   • demo mode (never burn tokens on demo)
+  //   • review already completed today (localStorage flag)
+  //   • time-of-day: only fire when it's evening (≥17:00 local) OR dayState=evening
+  //   • idempotent: a ref prevents double-firing on re-renders / dayState changes
+  //
+  // preloadedDailyReview — resolved response object (cache hit → instant open)
+  // preloadDailyReviewPending — the in-flight Promise (handed to the flow if
+  //   the user clicks before the response arrives)
+  const [preloadedDailyReview, setPreloadedDailyReview] = React.useState(null);
+  const preloadDailyReviewRef = React.useRef(false);
+  const preloadDailyReviewPendingRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (window.INTENTLY_DEMO) return;
+    if (isCompletedToday('review')) return;
+    const isEvening = new Date().getHours() >= 17 || dayState === 'evening';
+    if (!isEvening) return;
+    if (preloadDailyReviewRef.current) return; // already fired
+    if (!window.callMaProxy) return;
+    preloadDailyReviewRef.current = true;
+    const promise = window.callMaProxy({ skill: 'daily-review', input: "Let's review today." })
+      .then(r => { setPreloadedDailyReview(r); return r; })
+      .catch(err => { console.warn('[preload] daily-review failed', err && err.message); return null; });
+    preloadDailyReviewPendingRef.current = promise;
+  }, [dayState]);
+
+
   // On mount: (1) resume an in-flight setup draft, or (2) force setup for a
   // fresh empty-state user (no goals, no projects, no draft, not demo mode).
   React.useEffect(() => {
@@ -1348,11 +1378,16 @@ function PrototypePhone({ dayState, setDayState, idx, setIdx }) {
         />
       )}
 
-      {/* Review flow overlay — conversational, mirrors daily-brief pattern */}
+      {/* Review flow overlay — conversational, mirrors daily-brief pattern.
+          preloadedDailyReview / preloadPending are passed so the flow renders
+          the agent's first message instantly (cache hit) or shows the typing
+          indicator while the in-flight promise resolves (cache pending). */}
       {dayState === 'review' && (
         <DailyReviewConversationFlow
           onClose={() => setDayState('evening')}
           onComplete={onReviewComplete}
+          preloadedResponse={preloadedDailyReview}
+          preloadPending={!preloadedDailyReview ? preloadDailyReviewPendingRef.current : null}
         />
       )}
 

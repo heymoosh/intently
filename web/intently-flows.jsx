@@ -1012,17 +1012,49 @@ function buildSkillThreadInput(skill, messages, userReply) {
   return lines.join('\n');
 }
 
-function SkillConversationFlow({ skill, kickoff, label, icon, background, onClose, onComplete, persistEntry }) {
-  const [messages, setMessages] = React.useState([]);
-  const [agentTyping, setAgentTyping] = React.useState(false);
+function SkillConversationFlow({ skill, kickoff, label, icon, background, onClose, onComplete, persistEntry, preloadedResponse, preloadPending }) {
+  // If preloadedResponse is already resolved, seed messages immediately so
+  // the conversation surface renders with the agent's first message on open
+  // (zero visible wait). Lazy initialiser avoids the [] → reply flicker.
+  const [messages, setMessages] = React.useState(() => {
+    if (preloadedResponse) {
+      const reply = (preloadedResponse.finalText && preloadedResponse.finalText.trim()) || "Let's get started.";
+      return [{ role: 'agent', text: reply }];
+    }
+    return [];
+  });
+  // Show typing indicator while the preload promise is still in-flight.
+  const [agentTyping, setAgentTyping] = React.useState(() => !preloadedResponse && !!preloadPending);
   const [draft, setDraft] = React.useState('');
-  const [inputDisabled, setInputDisabled] = React.useState(false);
-  const kickedOffRef = React.useRef(false);
+  const [inputDisabled, setInputDisabled] = React.useState(() => !preloadedResponse && !!preloadPending);
+  // If preload already provided a response OR we are waiting on the pending
+  // promise, mark as kicked off so the normal on-mount callMaProxy is skipped.
+  const kickedOffRef = React.useRef(!!preloadedResponse || !!preloadPending);
   const scrollRef = React.useRef(null);
 
   React.useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, agentTyping]);
+
+  // If opened while the preload promise was still in-flight, attach to it so
+  // the typing indicator resolves as soon as Opus responds.
+  React.useEffect(() => {
+    if (!preloadPending || preloadedResponse) return;
+    let cancelled = false;
+    preloadPending.then(r => {
+      if (cancelled) return;
+      const reply = (r && r.finalText && r.finalText.trim()) || "Let's get started.";
+      setMessages([{ role: 'agent', text: reply }]);
+      setAgentTyping(false);
+      setInputDisabled(false);
+    }).catch(() => {
+      if (cancelled) return;
+      setMessages([{ role: 'agent', text: "Let's get started. What's on your mind?" }]);
+      setAgentTyping(false);
+      setInputDisabled(false);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   React.useEffect(() => {
     if (kickedOffRef.current) return;
@@ -1155,7 +1187,7 @@ function SkillConversationFlow({ skill, kickoff, label, icon, background, onClos
 // Thin wrappers — each provides skill-specific context + persistence,
 // then delegates rendering to SkillConversationFlow.
 
-function DailyReviewConversationFlow({ onClose, onComplete }) {
+function DailyReviewConversationFlow({ onClose, onComplete, preloadedResponse, preloadPending }) {
   const [kickoff, setKickoff] = React.useState("Let's review today.");
   React.useEffect(() => {
     if (window.assembleReviewContext) {
@@ -1195,6 +1227,8 @@ function DailyReviewConversationFlow({ onClose, onComplete }) {
       onClose={onClose}
       onComplete={onComplete}
       persistEntry={persistEntry}
+      preloadedResponse={preloadedResponse}
+      preloadPending={preloadPending}
     />
   );
 }
