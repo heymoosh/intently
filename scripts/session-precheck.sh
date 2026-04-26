@@ -37,6 +37,40 @@ MAIN_REPO="$(cd "$SCRIPT_DIR/.." && pwd 2>/dev/null)"
 CWD="$(pwd -P 2>/dev/null)"
 if [ -n "$MAIN_REPO" ] && [ "$CWD" != "$MAIN_REPO" ]; then exit 0; fi
 
+# ---------- inbox check (universal: per-worktree, fires regardless of drift) ----------
+# Surfaces .claude/inbox/ count + latest captures so sessions know there's pending
+# grooming work. Sibling-aware: suggests "groom now" only when no other session is active.
+
+INBOX_DIR="$MAIN_REPO/.claude/inbox"
+if [ -d "$INBOX_DIR" ]; then
+  INBOX_COUNT=$(find "$INBOX_DIR" -maxdepth 1 -name "*.md" -not -name ".gitkeep" 2>/dev/null | wc -l | tr -d ' ')
+  if [ "${INBOX_COUNT:-0}" -gt 0 ]; then
+    LATEST=$(find "$INBOX_DIR" -maxdepth 1 -name "*.md" -not -name ".gitkeep" 2>/dev/null \
+      | xargs -I{} stat -f "%m %N" {} 2>/dev/null \
+      | sort -rn \
+      | head -3 \
+      | awk '{print $2}')
+    OTHER_LOCKS=0
+    if [ -d "$MAIN_REPO/.claude/sessions" ]; then
+      OTHER_LOCKS=$(find "$MAIN_REPO/.claude/sessions" -name "*.lock" -mmin -45 2>/dev/null | wc -l | tr -d ' ')
+    fi
+    {
+      echo "[inbox]"
+      echo "  $INBOX_COUNT item(s) captured, awaiting groom:"
+      while IFS= read -r f; do
+        [ -z "$f" ] && continue
+        title=$(grep -m1 '^# ' "$f" 2>/dev/null | sed 's/^# //' | head -c 80)
+        echo "    - $(basename "$f"): ${title:-<no title>}"
+      done <<< "$LATEST"
+      if [ "${OTHER_LOCKS:-0}" -le 1 ]; then
+        echo "  No active siblings — safe to /groom now (or /capture more first)."
+      else
+        echo "  $((OTHER_LOCKS - 1)) sibling session(s) active — capture-only mode recommended (groom would write TRACKER)."
+      fi
+    } | tee /dev/stderr
+  fi
+fi
+
 # ---------- drift checks ----------
 
 FAILURES=()

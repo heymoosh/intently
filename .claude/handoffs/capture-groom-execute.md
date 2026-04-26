@@ -122,45 +122,46 @@ Phase 2 work is itself in `.claude/inbox/` as captures — first /groom session 
 
 System-level AC. Phase 1 must satisfy items marked ✅; Phase 2 closes the rest.
 
-**Capture surface:**
+**Capture surface (Phase 1, shipped 2026-04-25 in PR #149):**
 - ✅ `/capture` is loaded as a slash command (Claude Code recognizes it)
 - ✅ `/capture <text>` writes a new file at `.claude/inbox/<timestamp>-<slug>.md` with frontmatter (captured, session, source) + body
 - ✅ `/capture` echoes one line: `captured: <slug>` — no other commentary
 - ✅ `/capture` does NOT commit, paraphrase, suggest TRACKER destinations, or pre-groom
 - ✅ Inbox files survive across sessions (committed to git; `.claude/inbox/` is NOT gitignored)
 - ✅ Auto-capture posture during discussion documented as memory (`feedback-auto-capture-during-discussion.md`)
-- ⏳ Capture works correctly when invoked from a sibling worktree session (verified by future use)
 
-**Grooming surface (Phase 2):**
-- ⏳ `/groom` reads `.claude/inbox/*.md` and processes each per the § Grooming checklist
-- ⏳ Order of writes is fixed: handoff → TRACKER row → AC → inbox `resolved:` field → delete inbox file
-- ⏳ Partial-failure rule honored: if any of (handoff/TRACKER/AC/resolved) fails or is blocked, inbox file is RETAINED, not deleted
-- ⏳ Per-item audit line emitted: `groomed: <slug> → <destination>; handoff: <ref or "none">; AC: <ref or "none">; inbox: deleted/retained`
-- ⏳ Cross-doc reference check runs after each item (handoff ↔ TRACKER row, AC ↔ skill name)
-- ⏳ Defers when sibling worktree session is active (refuses to start, suggests "capture-only mode")
+**Grooming surface (Phase 2, shipped 2026-04-26):**
+- ✅ `/groom` skill at `.claude/commands/groom.md` — reads `.claude/inbox/*.md` and processes each per the § Grooming checklist
+- ✅ Order of writes specified and load-bearing: handoff → TRACKER row → AC → inbox `resolved:` field → delete inbox file
+- ✅ Partial-failure rule encoded: if any of (handoff/TRACKER/AC/resolved) fails or is blocked, inbox file is RETAINED
+- ✅ Per-item audit line format specified: `groomed: <slug> → <destination>; handoff: <ref>; AC: <ref>; inbox: deleted/retained`
+- ✅ Cross-doc reference check specified (handoff ↔ TRACKER row, AC ↔ task-type matrix)
+- ✅ Sibling-aware preflight: refuses to start when sibling session is active; suggests capture-only mode
+- ⏳ End-to-end live verification (pending first real grooming session)
 
-**Execution surface (Phase 2):**
-- ⏳ `/work-next` reads TRACKER § Next, picks top item
-- ⏳ Refuses items still in `.claude/inbox/` with "groom this first"
-- ⏳ Branches from `origin/main` (always current)
-- ⏳ AC self-check is mandatory before claiming done; PR description lists each AC criterion with passed/failed
-- ⏳ PR includes "## Manual follow-ups" section so existing scraper handles merge-done sync
+**Execution surface (Phase 2, shipped 2026-04-26):**
+- ✅ `/work-next` skill at `.claude/commands/work-next.md`
+- ✅ Refuses items still in `.claude/inbox/` with "groom this first"
+- ✅ Branches from `origin/main` (always current)
+- ✅ AC self-check mandatory; PR description lists each AC criterion with passed/failed
+- ✅ PR includes `## Manual follow-ups` section so existing scraper handles merge-done sync
+- ⏳ End-to-end live verification (pending first real execution session)
 
-**Session lifecycle integration (Phase 2):**
-- ⏳ `scripts/session-precheck.sh` counts `.claude/inbox/*.md` and surfaces in `[inbox]` block of precheck output
-- ⏳ Surfaces sibling-aware action: "groom now? (y/defer/show)" when no sibling, "capture-only mode" when sibling active
-- ⏳ Stale-inbox detection: files older than N days flagged
+**Session lifecycle integration (Phase 2, shipped 2026-04-26):**
+- ✅ `scripts/session-precheck.sh` counts `.claude/inbox/*.md` and surfaces in `[inbox]` block on every session start
+- ✅ Sibling-aware suggestion: "no active siblings — safe to /groom now" vs "sibling session active — capture-only mode recommended"
+- ⏳ Stale-inbox detection deferred to drift-check Pass 3 (not in precheck)
 
-**Cross-skill invariants (Phase 2 — drift-check loop):**
-- ⏳ Every TRACKER § Active handoffs row points at a real `.claude/handoffs/<slug>.md` file (and vice versa)
-- ⏳ Every shipped non-trivial task has AC at an appropriate location (per § AC location matrix)
-- ⏳ Every TRACKER "Active decisions" row points at a non-superseded ADR
-- ⏳ Stale inbox files (>N days) reported
+**Cross-skill invariants (Phase 2 drift-check Pass 3, shipped 2026-04-26):**
+- ✅ `.claude/loops/decision-drift-check.md` Pass 3 added: workflow integrity invariants
+- ✅ Verifies handoff ↔ TRACKER row consistency, AC for shipped non-trivial items, ADR consistency, stale inbox files
+- ⏳ Loop wired to launchd cron (deferred per existing TRACKER follow-up — post-hackathon)
 
-**Doc-system docs:**
-- ⏳ ADR documenting file-isolation decision (`.claude/inbox/` vs TRACKER § Inbox)
-- ⏳ TRACKER doc-hierarchy row referencing the inbox
-- ⏳ CLAUDE.md one-line pointer to this handoff (within 100-line cap)
+**Doc-system docs (Phase 2, shipped 2026-04-26):**
+- ✅ ADR 0006 at `docs/decisions/0006-file-isolation-for-capture-inbox.md`
+- ✅ TRACKER doc-hierarchy row updated: `launch-plan → TRACKER → .claude/inbox/ → .claude/handoffs/ → docs/product/acceptance-criteria/`
+- ✅ CLAUDE.md one-line pointer added (within 100-line cap)
+- ✅ TRACKER § Active handoffs rows for `capture-groom-execute` (shipped) and `agent-noticing-layer` (deferred V1.1)
 
 ## Integrity invariants — what /groom and /work-next MUST enforce
 

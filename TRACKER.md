@@ -37,7 +37,7 @@ Project briefs at `.claude/handoffs/<slug>.md` — persist across sessions; neve
 - **`overnight-build-loops`** — active. Robustness rewrite for the overnight build loop (no iter cap, safe-task gate, hourly inline `/babysit-prs`, terminal-only summary, launchd-not-caffeinate).
 - **`critical-flow-check`** — active (routine disabled on launchd). Re-enablement gated on real verification infra (E2E + AI eval rubric) and a rewritten report-only brief.
 - **`agent-noticing-layer`** → `.claude/handoffs/agent-noticing-layer.md` — promoted from product-gaps thesis. V1.1 post-hackathon, not active yet.
-- **`capture-groom-execute`** — Phase 1 shipped in #149 (inbox + capture skill). Phase 2 pending: `/groom`, `/work-next`, session-precheck integration, drift-check extension. Items queued in `.claude/inbox/`.
+- **`capture-groom-execute`** — three-mode workflow (capture / groom / execute) with `.claude/inbox/` per-item surface, `/capture` + `/groom` + `/work-next` skills, integrity invariants, AC location matrix. Phase 1 shipped #149 (inbox + capture); **Phase 2 shipped this PR** (/groom + /work-next + session-precheck inbox block + drift-check Pass 3 + ADR 0006 + CLAUDE.md pointer). Status: shipped.
 - **`steward-redesign`**, **`ma-agents-complete`**, **`decision-drift-check`** — all shipped earlier; docs preserved for pattern review.
 
 ## Critical items (post-launch reconciliation)
@@ -65,7 +65,6 @@ These were deferred during the cognition push and remain valid:
 - **Stewards leave working-tree mods uncommitted.** Release-readiness + spec-conformance stewards edit tracked files overnight without committing. Design fix: auto-commit to `auto/steward/*` branches + draft PR.
 - **Post-first-live-run baseline floor.** Run daily-brief against `evals/datasets/daily-brief/cases.json` once, raise per-axis `minScores` in `evals/baselines/daily-brief.json` from 0 to observed floor.
 - **Wire `decision-drift-check` to launchd.** Spec at `.claude/loops/decision-drift-check.md`. Add `com.intently.decision-drift.plist` matching the existing pack, daily evening.
-- **Drop `docs/product-gaps-2026-04-25.md` content into `.claude/inbox/`** once the capture/groom/execute system lands on the active branch (parallel session shipped it 2026-04-25).
 - **Stale `session-handoff.md` reference sweep.** Doc-only, no runtime effect. Stale pointers in `docs/Claude Code Repo-Ready Blueprint.md` (4 spots), `docs/design/claude-code-implementation.md`, `docs/process/acceptance-criteria.md`, `docs/process/session-prompt-seed-data-v1.md`.
 - **Post-merge hook refusing commits on `main`** — prevent recurrence of the accidental direct-to-main commit pattern.
 - **Fix `--clean` squash-merge false-positive** in `scripts/intently-track.sh`. Replace `git cherry` with `git diff --quiet main HEAD`.
