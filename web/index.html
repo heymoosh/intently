@@ -452,7 +452,7 @@ function FutureWithGoalTap(props) {
 }
 
 // Forked Future with tappable goal cards.
-function FutureScreenProtoTappable({ adds, onOpenProject, onOpenGoal, onAddGoal, onAddProject, onAddAdminReminder, onToggleAdminReminder }) {
+function FutureScreenProtoTappable({ adds, onOpenProject, onOpenGoal, onAddGoal, onAddProject, onAddAdminReminder, onToggleAdminReminder, onStartMonthlyRefresh }) {
   // Hydrate goals + projects from Supabase. Falls back to GOAL_DATA / PROJECT_DATA
   // fixtures when the user has no DB rows (so the demo is never empty).
   const [dbGoals, setDbGoals] = React.useState(null);
@@ -540,6 +540,21 @@ function FutureScreenProtoTappable({ adds, onOpenProject, onOpenGoal, onAddGoal,
           helper="Just a one-liner · AI can help you flesh it out later"
           onCommit={(v) => onAddGoal && onAddGoal(v)}
         />
+
+        {onStartMonthlyRefresh && (
+          <div style={{ marginTop: 6, display: 'flex', justifyContent: 'center' }}>
+            <button onClick={onStartMonthlyRefresh} style={{
+              padding: '8px 16px', background: 'transparent',
+              border: `1px dashed ${T.color.FocusObject}88`, borderRadius: 999,
+              fontFamily: T.font.UI, fontSize: 11, fontWeight: 600, letterSpacing: 0.5,
+              color: T.color.FocusObject, cursor: 'pointer',
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+            }}>
+              <Icon.Sun size={11} color={T.color.FocusObject} />
+              Refresh monthly slices
+            </button>
+          </div>
+        )}
 
         <div style={{ marginTop: 26 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 }}>
@@ -656,6 +671,7 @@ function PrototypePhone({ dayState, setDayState }) {
   const [livePlan, setLivePlan] = React.useState(null);   // agent-driven plan from latest BriefFlow accept
   const [liveReview, setLiveReview] = React.useState(null); // agent-driven review summary from latest ReviewFlow accept
   const [showWeeklyReview, setShowWeeklyReview] = React.useState(false);
+  const [showMonthlyRefresh, setShowMonthlyRefresh] = React.useState(false);
   const [showJournal, setShowJournal] = React.useState(false);
   const [showConnections, setShowConnections] = React.useState(false);
   const [profileView, setProfileView] = React.useState(null); // null | 'sheet' | 'account' | 'preferences' | 'help'
@@ -860,6 +876,7 @@ function PrototypePhone({ dayState, setDayState }) {
               onAddProject={m.addProject}
               onAddAdminReminder={m.addAdminReminder}
               onToggleAdminReminder={m.toggleAdminReminder}
+              onStartMonthlyRefresh={() => setShowMonthlyRefresh(true)}
             />,
           ]}
         </SwipeShell>
@@ -915,8 +932,20 @@ function PrototypePhone({ dayState, setDayState }) {
         />
       )}
 
+      {/* Monthly slice refresh overlay — opens from Future → "Refresh monthly
+          slices" CTA. Persists each accepted slice to goals.monthly_slice. */}
+      {showMonthlyRefresh && (
+        <MonthlyRefreshFlow
+          onClose={() => setShowMonthlyRefresh(false)}
+          onComplete={() => setShowMonthlyRefresh(false)}
+        />
+      )}
+
+      {/* Global Undo toast — fires from any flow's persist via window.showUndoToast. */}
+      <UndoToast />
+
       {/* Profile button — bottom-left, persistent across all tenses */}
-      {dayState !== 'brief' && dayState !== 'review' && !showWeeklyReview && !openGoal && !openProject && !showJournal && !showConnections && !profileView && !openEntry && (
+      {dayState !== 'brief' && dayState !== 'review' && !showWeeklyReview && !showMonthlyRefresh && !openGoal && !openProject && !showJournal && !showConnections && !profileView && !openEntry && (
         <ProfileButton onClick={() => setProfileView('sheet')} dim={micDim} />
       )}
 
@@ -978,7 +1007,7 @@ function PrototypePhone({ dayState, setDayState }) {
       )}
 
       {/* Chrome: tense nav + hero — hidden during brief/review chat / overlays */}
-      {dayState !== 'brief' && dayState !== 'review' && !showWeeklyReview && !openGoal && !openProject && !showJournal && !showConnections && !profileView && !openEntry && (
+      {dayState !== 'brief' && dayState !== 'review' && !showWeeklyReview && !showMonthlyRefresh && !openGoal && !openProject && !showJournal && !showConnections && !profileView && !openEntry && (
         <>
           <TenseNav index={idx} onIndex={setIdx} dim={micDim} />
           <HeroAffordance
@@ -997,7 +1026,7 @@ function PrototypePhone({ dayState, setDayState }) {
           />
         </>
       )}
-      {(openGoal || openProject) && dayState !== 'brief' && dayState !== 'review' && !showWeeklyReview && !showJournal && !showConnections && !profileView && (
+      {(openGoal || openProject) && dayState !== 'brief' && dayState !== 'review' && !showWeeklyReview && !showMonthlyRefresh && !showJournal && !showConnections && !profileView && (
         <HeroAffordance
           state={heroState}
           onChange={onHeroChange}

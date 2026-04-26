@@ -490,4 +490,123 @@ function labelForConsulted(key) {
   return map[key] || key;
 }
 
-Object.assign(window, { assembleBriefContext, assembleReviewContext, assembleWeeklyReviewContext, labelForConsulted });
+// ─── Monthly goal slice refresh context ─────────────────────────────────────
+
+async function _gatherMonthState() {
+  const sb = window.getSupabaseClient ? window.getSupabaseClient() : null;
+  if (!sb) return null;
+  const userId = await window.getCurrentUserId();
+  const today = new Date();
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString();
+
+  const [goals, projects, monthEntries] = await Promise.all([
+    sb.from('goals').select('*').eq('user_id', userId).is('archived_at', null)
+      .order('position', { ascending: true, nullsFirst: false }).limit(3)
+      .then((r) => r.data || []),
+    sb.from('projects').select('*').eq('user_id', userId).eq('status', 'active')
+      .order('updated_at', { ascending: false }).then((r) => r.data || []),
+    sb.from('entries').select('*').eq('user_id', userId).gte('at', monthStart)
+      .order('at', { ascending: false }).then((r) => r.data || []),
+  ]);
+
+  return { today, goals, projects, monthEntries };
+}
+
+async function assembleMonthlyRefreshContext() {
+  const state = await _gatherMonthState();
+  if (!state) return { input: '', consulted: [] };
+
+  const monthName = state.today.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+  const nextMonthName = new Date(state.today.getFullYear(), state.today.getMonth() + 1, 1)
+    .toLocaleString('en-US', { month: 'long', year: 'numeric' });
+
+  const goalsBlock = state.goals.length === 0
+    ? '## Active goals\nNo goals set yet.\n'
+    : '## Active goals (with current monthly slice)\n' + state.goals.map((g, i) =>
+        `${i + 1}. **${g.title}**\n   - ${monthName} slice: ${g.monthly_slice || '(not set)'}`
+      ).join('\n') + '\n';
+
+  // Compress: weekly-review entries are summaries; daily reviews + journals are signal.
+  const weeklyReviews = state.monthEntries.filter((e) => e.kind === 'review' && e.links && e.links.scope === 'week');
+  const dailyReviews = state.monthEntries.filter((e) => e.kind === 'review' && (!e.links || e.links.scope !== 'week'));
+  const journals = state.monthEntries.filter((e) => e.kind === 'journal');
+
+  const monthBlock = ['## What landed this month'];
+  if (weeklyReviews.length > 0) {
+    monthBlock.push('### Weekly reviews this month');
+    weeklyReviews.forEach((r) => {
+      const at = new Date(r.at);
+      const weekLabel = (r.links && r.links.week_id) || at.toLocaleString('en-US', { month: 'short', day: 'numeric' });
+      const prose = (r.body_markdown || '').replace(/```json[\s\S]*$/, '').trim();
+      monthBlock.push(`- **${weekLabel}**: ${prose.slice(0, 400)}`);
+    });
+  }
+  if (weeklyReviews.length === 0 && dailyReviews.length > 0) {
+    monthBlock.push('### Daily reviews (no weekly summaries this month)');
+    dailyReviews.slice(0, 6).forEach((r) => {
+      const at = new Date(r.at);
+      const day = at.toLocaleString('en-US', { month: 'short', day: 'numeric' });
+      const prose = (r.body_markdown || '').replace(/```json[\s\S]*$/, '').trim();
+      monthBlock.push(`- **${day}**: ${prose.slice(0, 200)}`);
+    });
+  }
+  if (journals.length > 0 && weeklyReviews.length === 0) {
+    monthBlock.push('### Journal entries');
+    journals.slice(0, 4).forEach((j) => {
+      const at = new Date(j.at);
+      const day = at.toLocaleString('en-US', { month: 'short', day: 'numeric' });
+      monthBlock.push(`- **${day}**: ${(j.body_markdown || '').slice(0, 160)}`);
+    });
+  }
+
+  const sections = [
+    `# Monthly goal slice refresh — moving from ${monthName} to ${nextMonthName}`,
+    '',
+    goalsBlock,
+    monthBlock.length > 1 ? monthBlock.join('\n') + '\n' : '',
+    '## Your task',
+    `Draft a fresh ${nextMonthName} monthly_slice for EACH of the user's ${state.goals.length} active goals. Each slice is one sentence — concrete, scoped to next month, building on what landed this month (cite specific moments). Frame as the user's own voice; they'll edit before accepting.`,
+    '',
+    'Output ONLY a fenced JSON block of this shape:',
+    '```json',
+    '{',
+    `  "month": "${nextMonthName}",`,
+    '  "slices": [',
+    '    { "goal_index": 0, "monthly_slice": "..." },',
+    '    { "goal_index": 1, "monthly_slice": "..." },',
+    '    { "goal_index": 2, "monthly_slice": "..." }',
+    '  ]',
+    '}',
+    '```',
+    '',
+    'No prose before or after the JSON. Order matches the goals list above.',
+  ].filter(Boolean);
+
+  const consulted = [];
+  if (state.goals.length) consulted.push('goals');
+  if (state.projects.filter(p => !p.is_admin).length) consulted.push('projects');
+  if (weeklyReviews.length || dailyReviews.length) consulted.push('yesterday-review');
+  if (journals.length) consulted.push('journal');
+
+  return { input: sections.join('\n'), consulted, goals: state.goals, nextMonthName };
+}
+
+function parseMonthlyRefreshResponse(text) {
+  if (!text || typeof text !== 'string') return null;
+  const trimmed = text.trim();
+  const jsonMatch = trimmed.match(/```json\s*([\s\S]*?)\s*```/);
+  const raw = jsonMatch ? jsonMatch[1] : trimmed;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.slices)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+Object.assign(window, {
+  assembleBriefContext, assembleReviewContext, assembleWeeklyReviewContext,
+  assembleMonthlyRefreshContext, parseMonthlyRefreshResponse,
+  labelForConsulted,
+});
