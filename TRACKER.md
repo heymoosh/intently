@@ -61,6 +61,8 @@ Top of queue — `/work-next` picks from the top. Items 1+2 are paired (run as p
 
 ## Critical items (post-launch reconciliation)
 
+- **Post-hackathon scheduled-dispatch verification** (`.claude/handoffs/post-hackathon-scheduled-dispatch-verification.md`) — 10 PRs shipped (#175–#186 exc. #177, #184); functions deploy + agent provision + e2e test pending.
+
 1. **Design folder reconciliation.** `docs/design/Intently - App/` was never formally reconciled against the entries-architecture session prompt; cognition layer bypassed via "ship the prototype directly" (ADR 0004). Reconcile now.
 2. **Reminders intent reconciliation.** Muxin's intent: reminders as "track this and surface in daily briefing," not narrow date-anchored. Current classify rejects undated input. Confirm against new design folder + update.
 3. **Worktree at `~/worktrees/intently/entries-architecture`** — decide: continue, destroy + recreate, or skip after reconciliation.
