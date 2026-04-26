@@ -363,12 +363,26 @@ function DayView({ onBack, onPickEntry, date }) {
     chat:    { tint: T.color.TintMint,   label: 'Chat',    glyph: 'message' },
     review:  { tint: T.color.TintPeachSoft, label: 'Review', glyph: 'moon' },
   };
+  // Hero tap target: prefer the first DB-backed journal entry (UUID) so the
+  // edit button appears in ReadingMode. Falls back to the fixture key only
+  // when today has no DB journal entries (e.g. FALLBACK_ENTRIES in play).
+  // Fixture-keyed entries (ids like 'journal-10-32') have no DB row → onEdit
+  // is undefined → edit button intentionally hidden (no row to update).
+  const heroEntryId = (() => {
+    const dbJournal = entries.find(
+      (e) => e.kind === 'journal' && e.id && !e.id.startsWith('journal-') && !e.id.startsWith('brief-') && !e.id.startsWith('chat-') && !e.id.startsWith('review-') && !e.id.startsWith('archive-')
+    );
+    return dbJournal ? dbJournal.id : 'journal-10-32';
+  })();
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px 140px' }}>
       {/* Hero — the day's marquee journal entry, presented like a reading-mode
-          preview. Banner image, italic title, tap to open the full reader. */}
+          preview. Banner image, italic title, tap to open the full reader.
+          Uses the first DB-backed journal UUID when available so ReadingMode
+          shows the edit button; falls back to the 'journal-10-32' fixture key
+          (edit button hidden — fixture entries have no DB row to update). */}
       <button
-        onClick={() => onPickEntry && onPickEntry('journal-10-32')}
+        onClick={() => onPickEntry && onPickEntry(heroEntryId)}
         style={{
           all: 'unset', display: 'block', width: '100%',
           borderRadius: 18, overflow: 'hidden',
