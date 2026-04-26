@@ -8,9 +8,11 @@ status: active
 
 # Setup — First-Run Onboarding
 
-## Memory (Layer 3 — MA memory store)
+## Memory protocol (Layer 3 — MA memory store)
 
-At session start, read `/mnt/memory/onboarding-state.md` for any partial state from a prior incomplete setup run (e.g. "user named goals but left before projects"). Resume from where they left off rather than starting over. Before finishing, write `/mnt/memory/onboarding-state.md` with the current completion state. Once `first_run_complete` is set to `true`, write `/mnt/memory/onboarding-state.md` as `status: complete` — the file stays but the agent skips the resume check on future runs.
+**At session start:** List `/mnt/memory/` with the file tool. Read `/mnt/memory/onboarding-state.md` if present — resume from the last completed phase rather than restarting (e.g. "user named goals but left before projects").
+
+**At session end:** Write `/mnt/memory/onboarding-state.md` with the current phase + what was entered. Once `first_run_complete` is `true`, write `status: complete` — the file persists but the agent skips the resume check on future re-runs.
 
 A ~10 minute conversation that leaves the user with a working Life Ops system. Four phases: goals, active projects, this-week outcome, and preferences.
 

@@ -8,9 +8,11 @@ status: hackathon-mvp
 
 # Weekly Review
 
-## Memory (Layer 3 — MA memory store)
+## Memory protocol (Layer 3 — MA memory store)
 
-At session start, read `/mnt/memory/multi-week-patterns.md` for themes that have persisted across multiple weeks. Before finishing, update `/mnt/memory/multi-week-patterns.md`: add any weekly pattern worth tracking longer-term (a theme that showed up in this week's review AND appeared in the file already), remove patterns older than 8 weeks. Also write `/mnt/memory/last-week-summary.md` with a 2–3 sentence summary of this week (outcome, tone, carry-forward). Keep both files under 400 words.
+**At session start:** List `/mnt/memory/` with the file tool. Read `/mnt/memory/multi-week-patterns.md` for themes persisting across multiple weeks. Read `/mnt/memory/last-week-summary.md` for last week's carry-forward. Use both to inform the review and surface multi-week compounding.
+
+**At session end:** Update `/mnt/memory/multi-week-patterns.md` — add patterns that appeared this week AND were already in the file; remove entries older than 8 weeks. Write `/mnt/memory/last-week-summary.md` with a 2–3 sentence summary (outcome, tone, carry-forward). Keep both under 400 words.
 
 The compounding engine. This is a conversation, not a report — pause and wait for the user's input at each step.
 

@@ -21,18 +21,13 @@ V1 is on-demand only. Scheduled invocation via pg_cron is deferred to V2.
 
 ---
 
-## Memory
+## Memory protocol (Layer 3 — MA memory store)
 
-MA memory is enabled. The agent uses memory to accumulate soft observations across sessions before a threshold is crossed.
+**At session start:** List `/mnt/memory/` with the file tool. Read `/mnt/memory/observations.md` for the current soft-observation accumulator — named entities and themes with their timestamps and counts.
 
-**Remember:**
-- Each user utterance / entry, timestamped, keyed to the user.
-- Named entities and themes detected (e.g. "apartment move", "feeling overwhelmed", "side project pitch").
-- Up to 30 days of activity per user. Older entries can expire from working memory.
+**During session:** For each new utterance processed, append or upsert a timestamped entry in `/mnt/memory/observations.md` (theme, count, last-seen). When a theme's count crosses 3 in 48h, write to `public.observations` via `insertObservation` and clear the soft entry. Entries older than 30 days can be pruned.
 
-**Recall:**
-- On each new utterance, scan memory for thematically similar entries from the same user in the last 48h.
-- Count occurrences per distinct theme or named entity.
+**Recall:** Before processing a new utterance, read `/mnt/memory/observations.md` and count occurrences per distinct theme or named entity in the last 48h. That count drives the threshold decision.
 
 ---
 

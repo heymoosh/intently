@@ -38,6 +38,7 @@ export const MEMORY_SKILLS: readonly string[] = [
   'weekly-review',
   'setup',
   'update-tracker',
+  'noticing',
 ] as const;
 
 export interface RawAgentConfig {
@@ -240,6 +241,8 @@ export function memoryStoreDescription(skill: string): string {
     setup: 'Partial onboarding state so a user who walks away mid-setup can resume.',
     'update-tracker':
       'Projects the user has mentioned multiple times — signals for noticing-layer promotion.',
+    noticing:
+      'Working tier of pattern observations — soft accumulator before promoting to public.observations table per architecture audit Correction 2.',
   };
   return descriptions[skill] ?? `Persistent memory for the Intently ${skill} skill.`;
 }
