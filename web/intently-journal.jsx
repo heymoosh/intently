@@ -273,7 +273,7 @@ function WeekView({ onPickDay, onStartWeeklyReview }) {
 // existing "open Day directly" path keeps working. MonthView/WeekView pass
 // the picked day through so DayView shows that day, not always-today
 // (wiring-audit Gap #9).
-function DayView({ onBack, onPickEntry, date }) {
+function DayView({ onBack, onPickEntry, date, refreshKey }) {
   const dayDate = date || new Date();
   // Fallback used while DB load is pending OR when the user has no entries
   // for the picked day — keeps the screen looking real instead of empty.
@@ -354,9 +354,10 @@ function DayView({ onBack, onPickEntry, date }) {
       }
     })();
     return () => { cancelled = true; };
-    // Re-hydrate when the picked day changes (Gap #9). Compare by Y/M/D so
-    // identical-day Date instances don't re-fire.
-  }, [dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate()]);
+    // Re-hydrate when the picked day changes (Gap #9), or when a new entry is
+    // saved (refreshKey increments). Compare Y/M/D so identical-day Date
+    // instances don't re-fire; refreshKey catches post-save refresh.
+  }, [dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), refreshKey]);
   const kindMeta = {
     brief:   { tint: T.color.TintSage,   label: 'Brief',   glyph: 'sunrise' },
     journal: { tint: T.color.TintLilac,  label: 'Journal', glyph: 'pen' },
