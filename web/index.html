@@ -1096,7 +1096,7 @@ function PrototypePhone({ dayState, setDayState, idx, setIdx }) {
   // Choose the Present view based on day state
   const presentView = (() => {
     if (dayState === 'morning-empty') {
-      return <PresentEmpty onStartBrief={() => setDayState('brief')} />;
+      return <PresentEmpty onStartBrief={() => setDayState('brief')} onOpenConnections={() => { setShowConnections(true); }} />;
     }
     if (dayState === 'closed') {
       return <PresentClosed review={liveReview} />;

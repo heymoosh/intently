@@ -1344,7 +1344,7 @@ function usePopulate(bands, delayStart = 200, perItem = 90) {
 }
 
 // ─── EMPTY-PRESENT (pre-brief, start of day) ────────────────────────
-function PresentEmpty({ onStartBrief }) {
+function PresentEmpty({ onStartBrief, onOpenConnections }) {
   // Live user profile — displayName is null until loaded; greeting drops the
   // name entirely per user-profile.js comment ("Good morning." not "Good morning, .").
   const profile = window.useUserProfile ? window.useUserProfile() : { displayName: null };
@@ -1357,6 +1357,22 @@ function PresentEmpty({ onStartBrief }) {
   const dayName = now.toLocaleDateString(undefined, { weekday: 'long' });
   const monthDay = now.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   const dateLabel = `${dayName} · ${monthDay}`;
+
+  // Connect-account nudge — shown when user has data but no oauth_connections row.
+  const [showConnectNudge, setShowConnectNudge] = React.useState(false);
+  React.useEffect(() => {
+    if (window.INTENTLY_DEMO) return;
+    if (!window.listGoals || !window.listProjects || !window.listOauthConnections) return;
+    Promise.all([
+      window.listGoals({ archived: false }),
+      window.listProjects({ archived: false }),
+      window.listOauthConnections(),
+    ]).then(([goals, projects, connections]) => {
+      const hasData = (goals && goals.length > 0) || (projects && projects.length > 0);
+      const noConnections = !connections || connections.length === 0;
+      setShowConnectNudge(hasData && noConnections);
+    }).catch((_err) => { /* ignore — nudge stays hidden on error */ });
+  }, []);
 
   // Yesterday's most recent journal entry (pre-today). Loaded async; hidden if none.
   const [yesterdayEntry, setYesterdayEntry] = React.useState(undefined); // undefined = loading
@@ -1432,6 +1448,38 @@ function PresentEmpty({ onStartBrief }) {
             color: T.color.SupportingText, maxWidth: 280, margin: '8px auto 0',
           }}>Start the brief — I'll ask you three things, then lay out your day.</div>
         </div>
+
+        {/* Connect-account nudge — returning user, no Google connection */}
+        {showConnectNudge && onOpenConnections && (
+          <div style={{
+            padding: '14px 16px', borderRadius: 12,
+            background: T.color.SecondarySurface,
+            border: `1px solid ${T.color.EdgeLine}`,
+            display: 'flex', flexDirection: 'column', gap: 6,
+          }}>
+            <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: T.color.SupportingText }}>
+              Unlock richer briefs
+            </div>
+            <div style={{ fontFamily: T.font.UI, fontSize: 14, fontWeight: 600, color: T.color.PrimaryText, lineHeight: '19px' }}>
+              Connect your calendar so Daily Brief can pull your day
+            </div>
+            <div style={{ fontFamily: T.font.Reading, fontSize: 13, lineHeight: '18px', color: T.color.SupportingText }}>
+              Right now your brief uses goals and journal — connecting calendar + email lets it factor in real meetings and urgent threads.
+            </div>
+            <button
+              onClick={onOpenConnections}
+              style={{
+                alignSelf: 'flex-start', marginTop: 4,
+                padding: '7px 14px', borderRadius: 8,
+                background: T.color.AccentBlue || '#4A7CF6',
+                color: '#fff', border: 'none', cursor: 'pointer',
+                fontFamily: T.font.UI, fontSize: 13, fontWeight: 600,
+              }}
+            >
+              Connect Google
+            </button>
+          </div>
+        )}
 
         <div style={{ flex: 1 }} />
       </div>
