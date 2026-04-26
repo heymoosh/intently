@@ -8,6 +8,10 @@ status: hackathon-mvp
 
 # Update Tracker — Universal Project Progress Logger (Supabase-backed)
 
+## Memory (Layer 3 — MA memory store)
+
+At session start, read `/mnt/memory/project-mentions.md` for projects the user has mentioned multiple times — this is the noticing-layer signal for promotion candidates. Before finishing, update `/mnt/memory/project-mentions.md`: increment the mention count for any project touched in this run, and flag any project with 3+ mentions as a "promotion candidate" for the noticing layer. Keep the file under 300 words.
+
 Your job: figure out which project was worked on, propose the right Supabase row writes, and confirm conversationally. The user should never need to remember which project something belongs to — this skill does that mapping.
 
 **Architectural note.** This skill is post-cognition (ADR 0001): state-of-truth lives in Supabase tables (`projects` with `todos` JSONB, `goals`, `entries`, `plan_items`), not Markdown files. There is no `Ops Plan.md` / `Tracker.md` / `Strategy.md` to read or write. The agent's job is to emit a structured intent that the UI applies to the right rows.

@@ -8,6 +8,10 @@ status: hackathon-mvp
 
 # Daily Review
 
+## Memory (Layer 3 — MA memory store)
+
+At session start, read `/mnt/memory/recent-patterns.md` for recurring themes spotted in the last 7–14 days. Before finishing, update `/mnt/memory/recent-patterns.md` with any new pattern that appeared today (e.g. "third day this week with an afternoon energy dip"). Only record patterns that appeared more than once; delete or overwrite stale patterns older than 14 days. Keep the file under 400 words.
+
 End-of-day review. The administrative steps below need to run, but **the output to the user must lead with the day, not the checklist.** See "How to present this" before writing any final response.
 
 ## How to present this (READ THIS FIRST)
