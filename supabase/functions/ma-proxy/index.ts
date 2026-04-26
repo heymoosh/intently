@@ -58,8 +58,12 @@ const SESSIONS_PATH = '/v1/sessions';
 // secret. Mapping here keeps the web client's `skill` string load-bearing
 // without leaking agent IDs to the browser.
 //
-// TODO: populate these env vars after agent resources are created. Until then,
-// unmapped skills return 400 with a clear error.
+// IMPORTANT: adding a skill here requires a new Edge Function deploy — the
+// deployed function image is immutable and won't pick up changes to this map
+// until redeployed. Root cause of the 2026-04-26 incident where `chat` was
+// mapped here but the deployed version (v47) predated the mapping, returning
+// `unknown skill: chat` (400) on every non-reminder utterance.
+// Deploy: `supabase functions deploy ma-proxy --project-ref <ref>`
 const SKILL_ENV: Record<string, string> = {
   chat: 'MA_AGENT_ID_CHAT',
   'daily-brief': 'MA_AGENT_ID_DAILY_BRIEF',
