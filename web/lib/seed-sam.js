@@ -104,6 +104,60 @@ async function seedSamIfEmpty() {
   if (reviewErr) throw new Error(`seed review: ${reviewErr.message}`);
   summary.inserted.review = 1;
 
+  // 4a. Today's daily brief — entries kind='brief' at ~7am today. Carries
+  // the agent prose plus a JSON tail per the daily-brief Output contract.
+  if (window.SAM_TODAY_BRIEF) {
+    const briefAt = new Date(today);
+    briefAt.setHours(window.SAM_TODAY_BRIEF.hour || 7, 14, 0, 0);
+    const briefBody = [
+      window.SAM_TODAY_BRIEF.body_markdown,
+      '',
+      '```json',
+      JSON.stringify(window.SAM_TODAY_BRIEF.json_tail, null, 2),
+      '```',
+    ].join('\n');
+    const { error: briefErr } = await sb.from('entries').insert([{
+      user_id: userId,
+      at: briefAt.toISOString(),
+      kind: 'brief',
+      body_markdown: briefBody,
+      glyph: window.SAM_TODAY_BRIEF.glyph,
+      mood: window.SAM_TODAY_BRIEF.mood,
+      source: 'agent',
+    }]);
+    if (briefErr) console.warn('[seed-sam] today brief skipped:', briefErr.message);
+    else summary.inserted.brief = 1;
+  }
+
+  // 4b. Last week's review — entries kind='review' with links.scope='week'.
+  // Anchored to the prior Sunday so the assembler's weekly window finds it
+  // and Past→Week's "This week's outcomes" + Present morning's "This week"
+  // bullets have content on first load.
+  if (window.SAM_WEEKLY_REVIEW) {
+    const weeklyAt = new Date(today);
+    while (weeklyAt.getDay() !== 0) weeklyAt.setDate(weeklyAt.getDate() - 1);
+    weeklyAt.setHours(20, 0, 0, 0);
+    const weeklyBody = [
+      window.SAM_WEEKLY_REVIEW.body_markdown,
+      '',
+      '```json',
+      JSON.stringify(window.SAM_WEEKLY_REVIEW.json_tail, null, 2),
+      '```',
+    ].join('\n');
+    const { error: weeklyErr } = await sb.from('entries').insert([{
+      user_id: userId,
+      at: weeklyAt.toISOString(),
+      kind: 'review',
+      body_markdown: weeklyBody,
+      glyph: window.SAM_WEEKLY_REVIEW.glyph,
+      mood: window.SAM_WEEKLY_REVIEW.mood,
+      source: 'agent',
+      links: { scope: 'week' },
+    }]);
+    if (weeklyErr) console.warn('[seed-sam] weekly review skipped:', weeklyErr.message);
+    else summary.inserted.weekly_review = 1;
+  }
+
   // 5. Today's plan items — plan_items table.
   const todayDateStr = today.toISOString().slice(0, 10);
   const planRows = window.SAM_TODAY_PLAN.map((p, i) => ({

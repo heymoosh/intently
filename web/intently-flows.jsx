@@ -578,8 +578,11 @@ function BriefFlow({ onClose, onComplete }) {
           {liveBrief && <ChatBubble role="agent" text={(parseAgentPlan(liveBrief, MOCK_PLAN).proseBody) || liveBrief} />}
           {briefError && <ChatBubble role="agent" text="(I couldn't reach the brief generator just now — here's your day shape anyway.)" />}
           {showConfirm && <BriefConfirmCard plan={parseAgentPlan(liveBrief, MOCK_PLAN)} consulted={consulted} onAccept={async () => {
-            // Persist the brief response as entries.kind='brief' + fire undo toast.
+            // Persist the brief response as entries.kind='brief' AND insert one
+            // plan_items row per band item so the populated plan survives a
+            // refresh. Undo rolls back both the entry and the plan_items rows.
             let insertedId = null;
+            const insertedPlanIds = [];
             if (liveBrief && window.getSupabaseClient && window.getCurrentUserId) {
               try {
                 const sb = window.getSupabaseClient();
@@ -591,13 +594,36 @@ function BriefFlow({ onClose, onComplete }) {
                 if (data) insertedId = data.id;
               } catch (e) { console.warn('[brief] persist failed:', e && e.message); }
             }
+            // Plan items: one row per agent-suggested band item. We don't
+            // dedupe against existing today rows — the brief is the
+            // authoritative shape of "today's intent" at accept time.
+            try {
+              const parsed = parseAgentPlan(liveBrief, MOCK_PLAN);
+              if (parsed && Array.isArray(parsed.bands) && window.insertPlanItem) {
+                const today = new Date().toISOString().slice(0, 10);
+                for (const band of parsed.bands) {
+                  const bandKey = String(band.when || '').toLowerCase();
+                  if (!['morning', 'afternoon', 'evening'].includes(bandKey)) continue;
+                  for (const it of (band.items || [])) {
+                    if (!it || !it.t) continue;
+                    try {
+                      const row = await window.insertPlanItem(today, bandKey, it.t, it.tier || null, it.duration_min || null);
+                      if (row && row.id) insertedPlanIds.push(row.id);
+                    } catch (e) { console.warn('[brief] plan_item insert failed:', e && e.message); }
+                  }
+                }
+              }
+            } catch (e) { console.warn('[brief] parse-for-plan failed:', e && e.message); }
             if (insertedId && window.showUndoToast) {
               window.showUndoToast({
-                message: "Saved today's brief",
+                message: `Saved today's brief${insertedPlanIds.length ? ` + ${insertedPlanIds.length} plan items` : ''}`,
                 onUndo: async () => {
                   const sb = window.getSupabaseClient();
                   const userId = await window.getCurrentUserId();
                   await sb.from('entries').delete().eq('id', insertedId).eq('user_id', userId);
+                  if (insertedPlanIds.length) {
+                    await sb.from('plan_items').delete().in('id', insertedPlanIds).eq('user_id', userId);
+                  }
                 },
               });
             }
@@ -756,6 +782,8 @@ function parseAgentPlan(prose, fallback) {
           items: (b.items || []).map((it) => ({
             g: glyphForTier(it.tier),
             t: it.text || '',
+            tier: it.tier || null,
+            duration_min: it.duration_min || null,
           })),
         }));
       }
