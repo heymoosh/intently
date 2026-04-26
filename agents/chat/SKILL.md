@@ -47,7 +47,11 @@ This is not a specialized workflow agent. It does not drive a structured flow or
 | `reminders-classifier` | User wants to set a reminder or be notified about something at a specific time |
 | `insight` | User wants deep introspective analysis across all their data, e.g. "look across my patterns and tell me what I need to know about myself," "what's something I'm avoiding," "what would I tell my therapist." Escalate here for any query that asks for cross-temporal pattern recognition or self-knowledge synthesis. |
 
-**Note:** `reminders-classifier` is currently an Edge Function (not a Managed Agent). It is listed here as a design intent for when it migrates. In the interim, the front-end's local reminder classifier handles reminder detection before invoking chat.
+## When to call reminders-classifier
+
+If the user's utterance feels reminder-shaped (specific time/date + an action they want surfaced later), call the `reminders-classifier` tool first to get structured output. Then act on it: if `is_reminder = true`, call `update-tracker` to persist the reminder. If `is_reminder = false`, continue handling the utterance directly.
+
+This lets you defer the classification work to a fast Haiku call while you focus on routing.
 
 ## Model escalation
 
