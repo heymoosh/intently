@@ -235,7 +235,7 @@ function PastJournalProto({ adds, onAddJournal, onPickEntry, onStartWeeklyReview
 
 // Planned-phase Present, with optional populate-animation and optional evening CTA.
 // `plan` (optional) is the agent-driven plan from BriefFlow; falls back to PLAN_DATA seed.
-function PresentPlanProtoAnimated({ phase, adds, onAddPlan, onAddJournal, animate, onStartReview, plan }) {
+function PresentPlanProtoAnimated({ phase, adds, onAddPlan, onAddJournal, onPickEntry, animate, onStartReview, plan }) {
   const activePlan = plan || PLAN_DATA;
   const populated = window.usePopulate(activePlan.bands);
   const total = activePlan.bands.reduce((a, b) => a + b.items.length, 0);
@@ -257,6 +257,7 @@ function PresentPlanProtoAnimated({ phase, adds, onAddPlan, onAddJournal, animat
       adds={adds}
       onAddPlan={onAddPlan}
       onAddJournal={onAddJournal}
+      onPickEntry={onPickEntry}
       bands={visibleBands}
       hideFlags={animate && populated < 2}
       onStartReview={onStartReview}
@@ -268,7 +269,7 @@ function PresentPlanProtoAnimated({ phase, adds, onAddPlan, onAddJournal, animat
 
 // Shell copy of PresentPlanProto but accepts a bands override. Keeps add-zones
 // hidden until animation completes.
-function PresentPlanShell({ phase, adds, onAddPlan, onAddJournal, bands, hideFlags, onStartReview, addZonesReady, plan = PLAN_DATA }) {
+function PresentPlanShell({ phase, adds, onAddPlan, onAddJournal, onPickEntry, bands, hideFlags, onStartReview, addZonesReady, plan = PLAN_DATA }) {
   const isEvening = phase === 'evening';
   const done = {
     'Hackathon build — light touch. One trial run for the demo.': true,
@@ -396,16 +397,24 @@ function PresentPlanShell({ phase, adds, onAddPlan, onAddJournal, bands, hideFla
               helper="Saves to today in Past · no AI"
               onCommit={(v) => onAddJournal && onAddJournal('today', v)}
             />
-            {(adds && adds.journal && adds.journal.today || []).slice().reverse().map((j) => (
-              <div key={j.id} style={{
-                marginTop: 8, padding: '10px 12px',
-                background: T.color.TintLilac + '22',
-                border: `1px solid ${T.color.TintLilac}55`,
-                borderRadius: 10,
-                fontFamily: T.font.Reading, fontSize: 14, lineHeight: '20px', color: T.color.PrimaryText,
-                fontStyle: 'italic',
-              }}>"{j.text}"</div>
-            ))}
+            {(adds && adds.journal && adds.journal.today || []).slice().reverse().map((j) => {
+              const entry = {
+                id: j.id, time: '', kind: 'journal',
+                title: (j.text || '').split('\n')[0].slice(0, 60) || 'Journal entry',
+                body: j.text || '',
+              };
+              return (
+                <button key={j.id} onClick={() => onPickEntry && onPickEntry(entry)} style={{
+                  display: 'block', width: '100%', textAlign: 'left',
+                  marginTop: 8, padding: '10px 12px',
+                  background: T.color.TintLilac + '22',
+                  border: `1px solid ${T.color.TintLilac}55`,
+                  borderRadius: 10, cursor: 'pointer',
+                  fontFamily: T.font.Reading, fontSize: 14, lineHeight: '20px', color: T.color.PrimaryText,
+                  fontStyle: 'italic',
+                }}>"{j.text}"</button>
+              );
+            })}
           </div>
         )}
 
@@ -473,28 +482,71 @@ function FutureScreenProtoTappable({ adds, onOpenProject, onOpenGoal, onAddGoal,
       window.listProjects().catch(() => []),
     ]).then(([gs, ps]) => {
       if (cancelled) return;
-      // Map DB goal row → fixture shape (title/month/glyph/pal).
+      // Map DB goal row → fixture shape. Include defaults for the rich
+      // GoalDetail fields (intention/milestones/projectIds/reflections) so
+      // the detail screen renders gracefully even when the goal hasn't been
+      // fleshed out yet. projectIds is computed from the projects list.
       if (gs.length > 0) {
+        const projectsByGoal = {};
+        for (const p of (ps || [])) {
+          if (!p.goal_id || p.is_admin) continue;
+          (projectsByGoal[p.goal_id] = projectsByGoal[p.goal_id] || []).push(p.id);
+        }
+        const formatCreated = (iso) => {
+          try {
+            const d = new Date(iso);
+            return d.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+          } catch (e) { return ''; }
+        };
         setDbGoals(gs.map((g) => ({
           id: g.id,
           title: g.title,
           month: g.monthly_slice || '',
+          monthNarrative: '',
+          intention: '',
           glyph: g.glyph || 'leaf',
           pal: g.palette || ['#A8C0E0', '#D4C4F0', '#F0E0C0', '#F5E8D0'],
+          created: g.created_at ? formatCreated(g.created_at) : '',
+          milestones: [],
+          projectIds: projectsByGoal[g.id] || [],
+          reflections: [],
           _position: g.position,
           _updated_at: g.updated_at || g.created_at || null,
         })));
       }
       if (ps.length > 0) {
-        setDbProjects(ps.filter((p) => !p.is_admin).map((p) => ({
-          id: p.id,
-          title: p.title,
-          status: p.status,
-          // ProjectCard reads p.title; goal_id passed through for navigation
-          goal_id: p.goal_id,
-          todos: Array.isArray(p.todos) ? p.todos : [],
-          _updated_at: p.updated_at || p.created_at || null,
-        })));
+        // Stash the raw DB rows so GoalDetail can resolve projectIds without
+        // an extra fetch when opened. Lives on window because the detail
+        // component renders outside this subtree's state.
+        try { window._dbProjectsRaw = ps; } catch (e) {}
+        // Compute projects-band card facets (count, done, tint, glyph) and
+        // ProjectDetail facets (name, tracker, markdown, blurb) on the fly
+        // from the DB row + JSONB todos so the prototype's render path works
+        // uniformly across Sam-seeded and prototype-fixture data.
+        const TINT_PALETTE = [T.color.TintSage, T.color.TintLilac, T.color.TintButter, T.color.TintPeach, T.color.TintDusk, T.color.TintClay, T.color.TintMint, T.color.TintMoss];
+        const GLYPH_PALETTE = ['rocket', 'leaf', 'pen', 'mountain', 'flag', 'compass', 'spark', 'book'];
+        const richProjects = ps.filter((p) => !p.is_admin).map((p, i) => {
+          const todos = Array.isArray(p.todos) ? p.todos : [];
+          const done = todos.filter((t) => t && t.done).length;
+          return {
+            id: p.id,
+            title: p.title,
+            name: p.title,
+            status: p.status,
+            goal_id: p.goal_id,
+            todos,
+            blurb: p.body_markdown ? String(p.body_markdown).split('\n')[0].slice(0, 140) : '',
+            tint: TINT_PALETTE[i % TINT_PALETTE.length],
+            glyph: GLYPH_PALETTE[i % GLYPH_PALETTE.length],
+            count: todos.length,
+            done,
+            tracker: [],
+            markdown: p.body_markdown ? [{ kind: 'p', text: p.body_markdown }] : [],
+            _updated_at: p.updated_at || p.created_at || null,
+          };
+        });
+        setDbProjects(richProjects);
+        try { window._dbProjects = richProjects; } catch (e) {}
         // Roll project updated_at up to per-goal max activity timestamp.
         const activity = {};
         for (const p of ps) {
@@ -784,6 +836,7 @@ function PrototypePhone({ dayState, setDayState, idx, setIdx }) {
           adds={m.state}
           onAddPlan={m.addPlanItem}
           onAddJournal={m.addJournal}
+          onPickEntry={setOpenEntry}
           animate={false}
           onStartReview={() => setDayState('review')}
           plan={livePlan}
@@ -797,6 +850,7 @@ function PrototypePhone({ dayState, setDayState, idx, setIdx }) {
         adds={m.state}
         onAddPlan={m.addPlanItem}
         onAddJournal={m.addJournal}
+        onPickEntry={setOpenEntry}
         animate={briefJustAccepted}
         plan={livePlan}
       />
@@ -938,6 +992,7 @@ function PrototypePhone({ dayState, setDayState, idx, setIdx }) {
         <div style={{ position: 'absolute', top: 62, left: 0, right: 0, bottom: 0, zIndex: 40 }}>
           <GoalDetail
             goal={openGoal}
+            dbProjects={typeof window !== 'undefined' ? window._dbProjects : null}
             onBack={() => setOpenGoal(null)}
             onOpenProject={(p) => { setOpenGoal(null); setOpenProject(p); }}
           />

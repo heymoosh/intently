@@ -117,19 +117,32 @@ const PROJECT_EXTRAS = {
 };
 
 // ─── GOAL DETAIL SCREEN ─────────────────────────────────────────────
-function GoalDetail({ goal, onBack, onOpenProject }) {
-  const projects = goal.projectIds
-    .map(id => {
-      const p = (typeof PROJECT_DATA !== 'undefined' && PROJECT_DATA.find(x => x.id === id)) || null;
-      if (p) return p;
-      // Fallback stub for visa/japanese (not in original PROJECT_DATA)
-      const stubs = {
-        visa:      { id: 'visa',     name: 'Visa paperwork',      blurb: 'HSP track. Passport renewal is the open blocker.',        tint: T.color.TintPeachSoft, glyph: 'alarm', count: 8, done: 6, tracker: [], markdown: [] },
-        japanese:  { id: 'japanese', name: 'Japanese — N4 by landing', blurb: '20 min/day. N5 feels close. N4 is the real target.',     tint: T.color.TintButter,    glyph: 'book',  count: 4, done: 1, tracker: [], markdown: [] },
-      };
-      return stubs[id];
-    })
-    .filter(Boolean);
+function GoalDetail({ goal, onBack, onOpenProject, dbProjects }) {
+  // Resolve projects from (1) the live DB list (preferred), (2) PROJECT_DATA
+  // fixtures, (3) hard-coded stubs for the demo journey. Goals from Supabase
+  // expose projectIds as actual UUIDs; fixture goals use kebab keys like 'visa'.
+  const lookupProject = (id) => {
+    if (Array.isArray(dbProjects)) {
+      const hit = dbProjects.find((x) => x.id === id);
+      if (hit) return hit;
+    }
+    if (typeof PROJECT_DATA !== 'undefined') {
+      const hit = PROJECT_DATA.find((x) => x.id === id);
+      if (hit) return hit;
+    }
+    const stubs = {
+      visa:      { id: 'visa',     name: 'Visa paperwork',      blurb: 'HSP track. Passport renewal is the open blocker.',        tint: T.color.TintPeachSoft, glyph: 'alarm', count: 8, done: 6, tracker: [], markdown: [] },
+      japanese:  { id: 'japanese', name: 'Japanese — N4 by landing', blurb: '20 min/day. N5 feels close. N4 is the real target.',     tint: T.color.TintButter,    glyph: 'book',  count: 4, done: 1, tracker: [], markdown: [] },
+    };
+    return stubs[id] || null;
+  };
+  const projects = (goal.projectIds || []).map(lookupProject).filter(Boolean);
+  const milestones = Array.isArray(goal.milestones) ? goal.milestones : [];
+  const reflections = Array.isArray(goal.reflections) ? goal.reflections : [];
+  const intention = (goal.intention || '').trim();
+  const monthSlice = (goal.month || '').trim();
+  const monthNarr = (goal.monthNarrative || '').trim();
+  const showMonthSection = !!(monthSlice || monthNarr);
 
   return (
     <div style={{ height: '100%', background: T.color.PrimarySurface, display: 'flex', flexDirection: 'column', overflow: 'hidden', }}>
@@ -163,33 +176,47 @@ function GoalDetail({ goal, onBack, onOpenProject }) {
 
       {/* Scroll */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '18px 22px 140px' }}>
-        {/* Intention — the original why */}
-        <Section label="Intention">
-          <p style={readingP}>{goal.intention}</p>
-        </Section>
+        {/* Intention — the original why. Hidden for newly-added goals until the
+            user authors one (placeholder shown so the section is discoverable). */}
+        {intention ? (
+          <Section label="Intention">
+            <p style={readingP}>{intention}</p>
+          </Section>
+        ) : (
+          <Section label="Intention" sub="not written yet">
+            <p style={{ ...readingP, color: T.color.SubtleText, fontStyle: 'italic' }}>Tap the mic to dictate the why behind this goal.</p>
+          </Section>
+        )}
 
         {/* This month — the agent's monthly review narrative */}
-        <Section label="This month" sub="from your monthly review">
-          <div style={{
-            background: T.color.TintSage + '33',
-            border: `1px solid ${T.color.TintSage}88`,
-            borderRadius: 12, padding: '14px 16px',
-          }}>
-            <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: T.color.TintSageDeep, marginBottom: 6 }}>April · focus</div>
-            <div style={{ fontFamily: T.font.Reading, fontSize: 15, lineHeight: '23px', color: T.color.PrimaryText, fontStyle: 'italic', marginBottom: 10 }}>
-              "{goal.month.replace(/^April:\s*/, '')}"
+        {showMonthSection && (
+          <Section label="This month" sub="from your monthly review">
+            <div style={{
+              background: T.color.TintSage + '33',
+              border: `1px solid ${T.color.TintSage}88`,
+              borderRadius: 12, padding: '14px 16px',
+            }}>
+              <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: T.color.TintSageDeep, marginBottom: 6 }}>This month</div>
+              {monthSlice && (
+                <div style={{ fontFamily: T.font.Reading, fontSize: 15, lineHeight: '23px', color: T.color.PrimaryText, fontStyle: 'italic', marginBottom: monthNarr ? 10 : 0 }}>
+                  "{monthSlice.replace(/^[A-Z][a-z]+:\s*/, '')}"
+                </div>
+              )}
+              {monthNarr && (
+                <div style={{ fontFamily: T.font.Reading, fontSize: 14, lineHeight: '22px', color: T.color.SupportingText }}>
+                  {monthNarr}
+                </div>
+              )}
             </div>
-            <div style={{ fontFamily: T.font.Reading, fontSize: 14, lineHeight: '22px', color: T.color.SupportingText }}>
-              {goal.monthNarrative}
-            </div>
-          </div>
-        </Section>
+          </Section>
+        )}
 
-        {/* Milestones — target months, not dates */}
-        <Section label="Milestones" sub="the higher-level beats">
+        {/* Milestones — target months, not dates. Hidden when none authored. */}
+        {milestones.length > 0 && (
+          <Section label="Milestones" sub="the higher-level beats">
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {goal.milestones.map((m, i) => {
-              const isLast = i === goal.milestones.length - 1;
+            {milestones.map((m, i) => {
+              const isLast = i === milestones.length - 1;
               const dotColor = m.status === 'done' ? T.color.TintSageDeep
                              : m.status === 'doing' ? T.color.FocusObject
                              : T.color.SubtleText;
@@ -228,19 +255,26 @@ function GoalDetail({ goal, onBack, onOpenProject }) {
             })}
           </div>
         </Section>
+        )}
 
         {/* Projects under this goal */}
-        <Section label="Projects" sub={`${projects.length} under this goal`}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            {projects.map(p => <ProjectCard key={p.id} p={p} onOpen={() => onOpenProject && onOpenProject(p)} />)}
-          </div>
+        <Section label="Projects" sub={projects.length === 0 ? 'none yet' : `${projects.length} under this goal`}>
+          {projects.length === 0 ? (
+            <div style={{ padding: '12px 14px', borderRadius: 10, background: T.color.SecondarySurface, border: `1px solid ${T.color.EdgeLine}`, fontFamily: T.font.Reading, fontSize: 13, lineHeight: '19px', color: T.color.SubtleText, fontStyle: 'italic' }}>
+              No projects under this goal yet. Add one from Future.
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              {projects.map(p => <ProjectCard key={p.id} p={p} onOpen={() => onOpenProject && onOpenProject(p)} />)}
+            </div>
+          )}
         </Section>
 
         {/* Reflections — pulled journal quotes */}
-        {goal.reflections && goal.reflections.length > 0 && (
+        {reflections.length > 0 && (
           <Section label="Reflections" sub="pulled from your journal">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {goal.reflections.map((r, i) => (
+              {reflections.map((r, i) => (
                 <div key={i} style={{
                   padding: '14px 16px',
                   background: T.color.TintLilac + '2a',
@@ -278,19 +312,25 @@ const readingP = { fontFamily: T.font.Reading, fontSize: 15, lineHeight: '24px',
 // Impact, and a tight one-line Status. Also a proper X close button in
 // the hero.
 function ProjectDetailV2({ p, adds, onBack, onAddProjectTodo, onToggleProjectTodo, onOpenGoal }) {
-  const extras = PROJECT_EXTRAS[p.id] || { goalId: null, intention: null, impact: null, status: null };
-  const goal = extras.goalId && GOAL_DATA.find(g => g.id === extras.goalId);
+  // Defensive across both fixture (PROJECT_DATA) and DB-hydrated project shapes.
+  const extras = (typeof PROJECT_EXTRAS !== 'undefined' && PROJECT_EXTRAS[p.id]) || { goalId: null, intention: null, impact: null, status: null };
+  const goal = extras.goalId && (typeof GOAL_DATA !== 'undefined') && GOAL_DATA.find(g => g.id === extras.goalId);
   const addedTodos = (adds && adds.projectTodos && adds.projectTodos[p.id]) || [];
+  const tracker = Array.isArray(p.tracker) ? p.tracker : [];
+  const markdown = Array.isArray(p.markdown) ? p.markdown : [];
+  const projectName = p.name || p.title || 'Project';
+  const projectGlyph = p.glyph || 'leaf';
+  const projectTint = p.tint || T.color.TintSage;
 
   // Derive a tight status — use the extras.status if present, otherwise fall back to first status-y paragraph from markdown.
   const statusText = extras.status
-    || (p.markdown && p.markdown.find(b => b.kind === 'p' && /^(lease|draft|status|held)/i.test(b.text))?.text)
+    || (markdown.find(b => b.kind === 'p' && /^(lease|draft|status|held)/i.test(b.text))?.text)
     || p.blurb;
 
   return (
     <div style={{ height: '100%', background: T.color.PrimarySurface, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* Cover */}
-      <div style={{ position: 'relative', padding: '14px 18px 20px', background: p.tint, overflow: 'hidden', flexShrink: 0 }}>
+      <div style={{ position: 'relative', padding: '14px 18px 20px', background: projectTint, overflow: 'hidden', flexShrink: 0 }}>
         <div className="intently-grain" style={{ opacity: 0.25 }} />
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
           <button onClick={onBack} aria-label="Back" style={{
@@ -312,7 +352,7 @@ function ProjectDetailV2({ p, adds, onBack, onAddProjectTodo, onToggleProjectTod
         <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-end', gap: 12, marginTop: 18 }}>
           <div style={{ flex: 1 }}>
             <div style={{ fontFamily: T.font.UI, fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: T.color.TintMoss, opacity: 0.8 }}>Project</div>
-            <div style={{ fontFamily: T.font.Display, fontSize: 26, lineHeight: '30px', fontStyle: 'italic', fontWeight: 500, color: T.color.TintMoss, letterSpacing: -0.4, marginTop: 2 }}>{p.name}</div>
+            <div style={{ fontFamily: T.font.Display, fontSize: 26, lineHeight: '30px', fontStyle: 'italic', fontWeight: 500, color: T.color.TintMoss, letterSpacing: -0.4, marginTop: 2 }}>{projectName}</div>
             {goal && (
               <button onClick={() => onOpenGoal && onOpenGoal(goal)} style={{
                 marginTop: 10,
@@ -329,7 +369,7 @@ function ProjectDetailV2({ p, adds, onBack, onAddProjectTodo, onToggleProjectTod
             )}
           </div>
           <span style={{ width: 48, height: 48, borderRadius: 12, background: 'rgba(43,33,24,0.12)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <Glyph name={p.glyph} size={26} color={T.color.TintMoss} stroke={1.75} />
+            <Glyph name={projectGlyph} size={26} color={T.color.TintMoss} stroke={1.75} />
           </span>
         </div>
       </div>
@@ -360,9 +400,9 @@ function ProjectDetailV2({ p, adds, onBack, onAddProjectTodo, onToggleProjectTod
         )}
 
         {/* Tracker */}
-        <Section label="Tracker">
+        <Section label="Tracker" sub={tracker.length === 0 && addedTodos.length === 0 ? 'add a todo to start tracking' : undefined}>
           <div style={{ background: T.color.SecondarySurface, border: `1px solid ${T.color.EdgeLine}`, borderRadius: 12, overflow: 'hidden' }}>
-            {p.tracker.map((r, i) => {
+            {tracker.map((r, i) => {
               const dot = { done: T.color.TintSageDeep, doing: T.color.TintDusk, todo: T.color.SubtleText }[r.status];
               return (
                 <div key={i} style={{

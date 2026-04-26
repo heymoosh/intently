@@ -426,12 +426,19 @@ function useManualAdds() {
         window.insertAdminReminder && window.insertAdminReminder(text),
       );
     },
-    toggleAdminReminder: (id) =>
-      // In-memory only — see header comment.
+    toggleAdminReminder: (id) => {
       setState((s) => ({
         ...s,
         adminReminders: s.adminReminders.map((r) => (r.id === id ? { ...r, done: !r.done } : r)),
-      })),
+      }));
+      // Persist to reminders table when this is a real DB UUID. Optimistic ids
+      // (`r-*`) skip cleanly; they'll persist when the next add lands a UUID.
+      if (typeof id === 'string' && /^[0-9a-f]{8}-/.test(id)) {
+        _persist('markAdminReminderDone', () =>
+          window.markAdminReminderDone && window.markAdminReminderDone(id),
+        );
+      }
+    },
     addProjectTodo: (projectId, text) => {
       setState((s) => ({
         ...s,
@@ -449,15 +456,23 @@ function useManualAdds() {
         );
       }
     },
-    toggleProjectTodo: (projectId, id) =>
-      // In-memory only — see header comment.
+    toggleProjectTodo: (projectId, id) => {
       setState((s) => ({
         ...s,
         projectTodos: {
           ...s.projectTodos,
           [projectId]: (s.projectTodos[projectId] || []).map((t) => (t.id === id ? { ...t, done: !t.done } : t)),
         },
-      })),
+      }));
+      // Persist when projectId + todoId are both real DB UUIDs. Optimistic ids
+      // skip cleanly until the next add returns a UUID.
+      const looksUuid = (s) => typeof s === 'string' && /^[0-9a-f]{8}-/.test(s);
+      if (looksUuid(projectId) && looksUuid(id)) {
+        _persist('toggleProjectTodo', () =>
+          window.toggleProjectTodo && window.toggleProjectTodo(projectId, id),
+        );
+      }
+    },
   };
 }
 
