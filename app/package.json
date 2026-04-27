@@ -19,7 +19,7 @@
     "@expo-google-fonts/source-serif-4": "*",
     "@expo/metro-runtime": "~6.1.2",
     "@ronradtke/react-native-markdown-display": "^8.1.0",
-    "@supabase/supabase-js": "^2.104.0",
+    "@supabase/supabase-js": "^2.105.0",
     "expo": "~54.0.33",
     "expo-font": "~13.3.1",
     "expo-speech": "~14.0.8",
