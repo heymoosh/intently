@@ -12,7 +12,7 @@
     "eval:run": "tsx ../evals/runner/bin.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.90.0",
+    "@anthropic-ai/sdk": "^0.91.1",
     "@expo-google-fonts/fraunces": "*",
     "@expo-google-fonts/inter": "*",
     "@expo-google-fonts/jetbrains-mono": "*",
