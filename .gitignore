@@ -74,6 +74,9 @@ docs/process/usr-*.md
 *.log
 tmp/
 .tmp/
+.replay-runs/
+.replay-worktrees/
+.replay-metrics/
 
 # === Playwright smoke artifacts ===
 # Screenshots and snapshot files written during interactive Playwright smoke
