@@ -374,7 +374,7 @@ All files live at the project root. Load order matters — later files depend on
 | `intently-journal.jsx` | `PastJournal`, `YearView`, `MonthView`, `WeekView`, `DayView`, `JOURNAL_DATA` | The zoomable art-journal. Owns the fake data for MVP hackathon. |
 | `intently-projects.jsx` | `ProjectsBand`, `ProjectCard`, `ProjectDetail`, `PROJECT_DATA` | The Projects band under Future + the detail view. |
 | `intently-screens.jsx` | `PastScreen`, `PresentScreen`, `FutureScreen`, `ScreenHeader` | The three tense screens. Present has `phase` prop. Future has `scroll` prop. |
-| `intently-screens-prototype.jsx` | `PresentPlanProto`, `FutureScreenProto`, `ProjectDetailProto` | **Prototype-only** forks of the screens that wire in inline-add affordances. The Design System canvas uses the originals; the prototype HTML uses these. |
+| `intently-screens-prototype.jsx` | `PresentPlanProto`, `FutureScreenProto`, `ProjectDetailProto` | Forks of the screens that wire in inline-add affordances. The Design System canvas uses the originals; the production app uses these. (The "Prototype" name is historical — these power the real shipping screens.) |
 | `intently-manual-add.jsx` | `InlineAdd`, `useManualAdds` | Single-line inline add control + tiny session store. The pattern for any "add a thing" affordance. |
 | `intently-flows.jsx` | `BriefFlow`, `ReviewFlow`, `GoalDetail`, `ProjectDetailV2`, `PresentEmpty`, `PresentClosed`, `usePopulate`, `ChatBubble`, `AgentTyping`, `BriefConfirmCard`, `ReviewConfirmCard`, `AutoCheckList` | Day-arc flows + their building blocks. Brief & Review are full-bleed overlays driven by step indices. `usePopulate` animates plan-band fade-in after brief acceptance. |
 | `intently-extras.jsx` | `JournalComposer`, `ConnectionsPage`, `OAuthFlow`, `ProfileButton`, `OnboardingConnectCard`, `INTEGRATIONS`, `useConnections` | Journal entry overlay + Connections sub-page + integration registry + the bottom-left avatar button. |
@@ -455,11 +455,11 @@ If `Object.assign` lists a name not covered above (e.g. `ReflectionCard`, `TodoR
 
 ### Why some things are on the bench
 
-The MVP demo prioritizes **the agentic day arc** (brief → plan → review → close). Anything that doesn't appear in that loop got parked:
+The MVP build prioritizes **the agentic day arc** (brief → plan → review → close). Anything that doesn't appear in that loop got parked:
 
-- **`HeroListening` / `HeroChat`** — real voice infra is post-MVP; the brief/review flows simulate chat for the demo.
+- **`HeroListening` / `HeroChat`** — both ship in v1. The hero affordance drives real voice (live mic + speech-to-text) and real chat with the agent. The brief/review flows are wired to the live agent pipeline; nothing is simulated.
 - **`ConfirmationCard` (full version)** — the brief/review have their own purpose-built confirm cards (`BriefConfirmCard`, `ReviewConfirmCard`) tuned to those flows. The general `ConfirmationCard` is for **the second wave**: when the agent starts taking actions outside of brief/review (rescheduling meetings, declining syncs, pulling tasks).
-- **`FeatureCard`, `MorningLight`, `JournalCard`, `Collage`** — alternate visual treatments validated in the canvas but not chosen for the demo's specific layouts. They're correct expressions of the design system; pick them up when their corresponding layouts come back.
+- **`FeatureCard`, `MorningLight`, `JournalCard`, `Collage`** — alternate visual treatments validated in the canvas but not chosen for the launch layouts. They're correct expressions of the design system; pick them up when their corresponding layouts come back.
 - **`TrackerCard`** — Project detail currently shows a flat to-do list. Add `TrackerCard` to the detail when projects start tracking real progress numbers.
 
 When in doubt, **check the design system canvas first** (`Intently Design System.html`). Every component is presented in its intended context with a label. If you see a layout there you want to ship, lift the component combination wholesale.
@@ -565,16 +565,21 @@ Always stroke 1.4–1.75. Always monotone (`PrimaryText` or `InverseText`). No m
 
 ## 8. Scope — MVP vs post-launch
 
-### In for MVP (hackathon cut)
+> **What this build is.** A fully functioning responsive web app — every approved design converted into shipping UI, backed by real infrastructure: real voice (live mic + STT), real chat, real Supabase persistence, real managed agents (daily brief, daily review, weekly review, monthly review, setup, update-tracker) running on real schedules, real calendar/email integrations. No mocks, no fake waveforms, no simulated agent responses. The `intently-screens-prototype.jsx` and the HTML files in this folder are the design source-of-truth, not a runtime substitute.
 
-- Three-tense swipe shell with arrow-dot nav.
-- Hero affordance with all four states.
-- Past: Year/Month/Week/Day zoom.
-- Present: morning pre-brief, planned phase, evening review CTA.
-- Future: three goals + projects band.
+### In for MVP
+
+- Three-tense swipe shell with arrow-dot nav (responsive across mobile + desktop).
+- Hero affordance with all four states, wired to real voice + chat.
+- Past: Year/Month/Week/Day zoom backed by real Entry data.
+- Present: morning pre-brief, planned phase, evening review CTA — all driven by the live daily-brief and daily-review agents.
+- Future: three goals + projects band, persisted to Supabase.
 - ProjectDetail view (markdown + todos).
 - Auto-generated daily marks (agent picks the glyph).
 - Reading mode for long-form files.
+- **Real managed agents on schedule:** daily-brief (morning), daily-review (evening), weekly-review (Sunday), monthly-review (end of month), setup, update-tracker. Each reads from and writes to the same Entry/Goal/Project store. Their output renders in Present and Past, not just in chat.
+- **Real integrations:** Google Calendar + email (brief pulls from a live schedule, not a fake one).
+- Real auth + per-user data (no demo-mode shortcuts).
 
 ### Out / deferred
 
@@ -583,10 +588,9 @@ Always stroke 1.4–1.75. Always monotone (`PrimaryText` or `InverseText`). No m
 - Gamification (streaks, badges, XP).
 - Collaboration / shared goals.
 - Kanban or Gantt project trackers.
-- The weekly-review *authoring* UI (cards reflect it, but users edit it in chat for MVP).
-- Monthly-review *authoring* UI (same — agent drafts in chat).
+- The weekly-review *authoring* UI (cards reflect it, but users edit it in chat for v1).
+- Monthly-review *authoring* UI (same — agent drafts in chat; the agent run + its rendered output are in scope, only the dedicated authoring screen is deferred).
 - Deep search across entries.
-- Calendar integration (brief pulls from a fake schedule for now).
 
 ---
 
@@ -623,14 +627,15 @@ One life, one voice, three tenses.
 
 If picking this up cold, build in this order:
 
-1. **Entry store** — one flat array with the types from §2.3. Every screen reads from it. Every hero commit writes to it.
-2. **Agent pipeline** — mock a `classify(text) → {kind, fields}` function. Wire Hero listening → classify → Entry.
-3. **DailyBrief generator** — a pure function of *yesterday's entries + current WeeklyReview + the day's calendar*. Run it on app open if today's brief doesn't exist.
-4. **DailyReview flow** — hero-driven; composes an Entry of kind `review`.
-5. **WeeklyReview generator** — similar, runs Sunday evening or on-demand.
-6. **Real voice** — swap the listening takeover's fake waveform for a live mic stream; hook a speech-to-text provider.
+1. **Entry store on Supabase** — one Entries table backing the types from §2.3, with Goals + Projects + Reminders alongside. Every screen reads from it. Every hero commit writes to it. Real auth, per-user rows.
+2. **Real voice + classify pipeline** — live mic capture → speech-to-text provider → `classify(text) → {kind, fields}` running as a managed agent → Entry write. The hero's listening takeover shows the real waveform from the mic, not a fake one.
+3. **Daily-brief agent** — managed agent on a morning schedule. Reads yesterday's entries + current WeeklyReview + the day's calendar (real Google Calendar) and writes a brief Entry. Present's morning phase renders it.
+4. **Daily-review agent** — hero-driven and end-of-day scheduled. Composes an Entry of kind `review`.
+5. **Weekly-review agent** — runs Sunday evening; Present/Past render its output.
+6. **Monthly-review agent** — runs end of month; Present/Past render its output. (Authoring UI deferred per §8 — the agent itself, its schedule, and its rendered output are in scope.)
+7. **Setup + update-tracker agents** — onboarding + state-keeping, both real, both on schedule.
 
-Everything visual is done. The app's identity is in the files. What's missing is the plumbing behind them.
+Everything visual is done. The app's identity is in the files. What's left is wiring every screen into the live pipeline.
 
 ---
 
